@@ -1,6 +1,7 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use std::io::Read;
 use std::str::FromStr;
+use std::fmt;
 use structopt::StructOpt;
 
 
@@ -31,11 +32,21 @@ impl FromStr for RangeList {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Side {
     None,
     Some(i32),
     Continue,
+}
+
+impl fmt::Display for Side {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Side::None => write!(f, ""),
+            Side::Some(v) => write!(f, "{}", v),
+            Side::Continue => write!(f, "-"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -43,6 +54,19 @@ struct Range {
     l: Side,
     r: Side,
 }
+
+impl fmt::Display for Range {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{}{}",
+            self.l,
+            if self.r != Side::None {
+                "-"
+            } else { "" },
+            self.r,
+        )
+    }
+}
+
 
 impl FromStr for Range {
     type Err = Box<dyn std::error::Error>;
@@ -128,9 +152,27 @@ fn main() -> Result<()> {
     content = content.trim().to_string();
 
     let parts: Vec<&str> = content.split(&opt.delimiter).collect::<Vec<&str>>();
-    println!("{:?}", parts);
 
-
+    let parts_length = parts.len();
+    let fields_vec = match opt.fields { RangeList(v) => v };
+    for f in fields_vec {
+        match f.l {
+            Side::Some(n) => {
+                if n.abs() as usize > parts_length {
+                    bail!("Out of bounds: {}. Index {} reaches beyond the number of parts ({})", f, n, parts_length);
+                }
+            }
+            _ => (),
+        }
+        match f.r {
+            Side::Some(n) => {
+                if n.abs() as usize > parts_length {
+                    bail!("Out of bounds: {}. Index {} reaches beyond the number of parts ({})", f, n, parts_length);
+                }
+            },
+            _ => (),
+        }
+    }
 
     Ok(())
 }
