@@ -32,44 +32,63 @@ impl FromStr for RangeList {
 }
 
 #[derive(Debug)]
+enum Side {
+    None,
+    Some(i32),
+    Continue,
+}
+
+#[derive(Debug)]
 struct Range {
-    l: i32,
-    r: Option<i32>,
+    l: Side,
+    r: Side,
 }
 
 impl FromStr for Range {
     type Err = Box<dyn std::error::Error>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // as a regexp "((-)\d+)(-((-)\d+)?)?"
-
         if s.len() == 0 {
             return Err("Empty field".into());
         }
 
         let mut search_start_from = 0;
+        let mut chars = s.chars();
 
-        if s.chars().next().unwrap() == '-' {
+        if chars.next().unwrap() == '-' {
             if s.len() == 1 {
                 return Err("Cannot parse `-` by itself, there must be number next it".into());
+            } else {
+                search_start_from = if chars.next() == Some('-') {
+                    // e.g. --9 a.k.a. -(-9)
+                    0
+                } else {
+                    // e.g. -1...-
+                    1
+                };
             }
-            search_start_from = 1;
         }
 
-        let l: i32;
-        let mut r: Option<i32> = None;
+        let l: Side;
+        let mut r: Side = Side::None;
         match s[search_start_from..].find('-') {
             Some(k) => {
                 let idx = k + search_start_from;
-                l = s[..idx].parse::<i32>().or_else(|_| Err(format!("Not a number: {}`", s[..idx].to_string())))?;
-                r = if s[idx+1..].len() == 0 {
-                    None
+
+                l = if s[..idx].len() == 0 {
+                    Side::Continue
                 } else {
-                    Some(s[idx+1..].parse::<i32>().or_else(|_| Err(format!("Not a number: {}`", s[idx+1..].to_string())))?)
+                    Side::Some(s[..idx].parse::<i32>().or_else(|_| Err(format!("Not a number: {}`", s[..idx].to_string())))?)
+                };
+
+                r = if s[idx+1..].len() == 0 {
+                    Side::Continue
+                } else {
+                    Side::Some(s[idx+1..].parse::<i32>().or_else(|_| Err(format!("Not a number: {}`", s[idx+1..].to_string())))?)
                 };
             },
             None => {
-                l = s.parse::<i32>().or_else(|_| Err(format!("Not a number `{}`", s)))?;
+                l = Side::Some(s.parse::<i32>().or_else(|_| Err(format!("Not a number `{}`", s)))?);
             }
         }
 
@@ -78,7 +97,7 @@ impl FromStr for Range {
 }
 
 impl Range {
-    pub fn new(l: i32, r: Option<i32>) -> Self {
+    pub fn new(l: Side, r: Side) -> Self {
         Range {
             l,
             r,
@@ -88,7 +107,7 @@ impl Range {
 
 impl Default for Range {
     fn default() -> Self {
-        Range::new(1, None)
+        Range::new(Side::Some(1), Side::None)
     }
 }
 
