@@ -1,4 +1,7 @@
+use anyhow::{Context, Result};
+use std::io::Read;
 use structopt::StructOpt;
+
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -16,7 +19,21 @@ struct Opt {
 }
 
 
-fn main() {
+fn main() -> Result<()> {
     let opt = Opt::from_args();
     println!("{:?}",opt);
+
+    let mut content = String::new();
+    std::io::stdin()
+            .read_to_string(&mut content)
+            .with_context(|| format!("Cannot read from STDIN"));
+
+    content = content.trim().to_string();
+
+    let parts: Vec<&str> = content.split(&opt.delimiter).collect::<Vec<&str>>();
+    println!("{:?}", parts);
+
+
+
+    Ok(())
 }
