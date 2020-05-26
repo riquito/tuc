@@ -37,6 +37,20 @@ enum Side {
     Continue,
 }
 
+impl FromStr for Side {
+    type Err = Box<dyn std::error::Error>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "" => Side::Continue,
+            _ => Side::Some(
+                s.parse::<i32>()
+                    .or_else(|_| Err(format!("Not a number `{}`", s)))?,
+            ),
+        })
+    }
+}
+
 impl fmt::Display for Side {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -63,68 +77,28 @@ impl FromStr for Range {
     type Err = Box<dyn std::error::Error>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() == 0 {
-            return Err("Empty field".into());
-        }
+        let pair: Vec<&str> = s.split(':').collect::<Vec<&str>>();
 
-        let mut search_start_from = 0;
-        let mut chars = s.chars();
-
-        if chars.next().unwrap() == '-' {
-            if s.len() == 1 {
-                return Err("Cannot parse `-` by itself, there must be number next it".into());
-            } else {
-                search_start_from = if chars.next() == Some('-') {
-                    // e.g. --9 a.k.a. -(-9)
-                    0
-                } else {
-                    // e.g. -1...-
-                    1
-                };
+        let (l, r): (Side, Side) = match &pair[..] {
+            &[""] => {
+                return Err("Field format error: empty field".into());
             }
-        }
-
-        match s[search_start_from..].find('-') {
-            Some(k) => {
-                let idx = k + search_start_from;
-
-                l = if s[..idx].len() == 0 {
-                    Side::Continue
-                } else {
-                    Side::Some(
-                        s[..idx]
-                            .parse::<i32>()
-                            .or_else(|_| Err(format!("Not a number: {}`", s[..idx].to_string())))?,
-                    )
-                };
-
-                r =
-                    if s[idx + 1..].len() == 0 {
-                        Side::Continue
-                    } else {
-                        Side::Some(s[idx + 1..].parse::<i32>().or_else(|_| {
-                            Err(format!("Not a number: {}`", s[idx + 1..].to_string()))
-                        })?)
-                    };
+            &["", ""] => {
+                return Err("Field format error, no numbers next to `:`".into());
             }
-            None => {
-                l = Side::Some(
-                    s.parse::<i32>()
-                        .or_else(|_| Err(format!("Not a number `{}`", s)))?,
-                );
-                r = l;
+            &[x, y] => (Side::from_str(x)?, Side::from_str(y)?),
+            &[x] => (Side::from_str(x)?, Side::from_str(x)?),
+            _ => {
+                return Err(format!("Field format error (too many `:` in `{}`)", s).into());
             }
-        }
+        };
 
         match (l, r) {
-            (Side::Continue, Side::Continue) => {
-                return Err(format!("Error parsing range, no value found in `{}`", s).into());
-            }
             (Side::Some(0), _) => {
-                return Err("Fields are 1-indexed".into());
+                return Err("Field value 0 is not allowed (fields are 1-indexed)".into());
             }
             (_, Side::Some(0)) => {
-                return Err("Fields are 1-indexed".into());
+                return Err("Field value 0 is not allowed (fields are 1-indexed)".into());
             }
             _ => (),
         }
