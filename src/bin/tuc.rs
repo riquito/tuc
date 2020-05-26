@@ -32,17 +32,16 @@ impl FromStr for RangeList {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Side {
-    None,
     Some(i32),
     Continue,
 }
 
+
 impl fmt::Display for Side {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Side::None => write!(f, ""),
             Side::Some(v) => write!(f, "{}", v),
             Side::Continue => write!(f, "-"),
         }
@@ -53,17 +52,12 @@ impl fmt::Display for Side {
 struct Range {
     l: Side,
     r: Side,
+    raw: String,
 }
 
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{}{}",
-            self.l,
-            if self.r != Side::None {
-                "-"
-            } else { "" },
-            self.r,
-        )
+        write!(f, "{}", self.raw)
     }
 }
 
@@ -94,7 +88,8 @@ impl FromStr for Range {
         }
 
         let l: Side;
-        let mut r: Side = Side::None;
+        let r: Side;
+
         match s[search_start_from..].find('-') {
             Some(k) => {
                 let idx = k + search_start_from;
@@ -113,25 +108,40 @@ impl FromStr for Range {
             },
             None => {
                 l = Side::Some(s.parse::<i32>().or_else(|_| Err(format!("Not a number `{}`", s)))?);
+                r = l;
             }
         }
 
-        Ok(Range::new(l,r))
+        match (l, r) {
+            (Side::Continue, Side::Continue) => {
+                return Err(format!("Error parsing range, no value found in `{}`", s).into());
+            },
+            (Side::Some(0), _) => {
+                return Err("Fields are 1-indexed".into());
+            }
+            (_, Side::Some(0)) => {
+                return Err("Fields are 1-indexed".into());
+            }
+            _ => (),
+        }
+
+        Ok(Range::new(l,r, s.to_string()))
     }
 }
 
 impl Range {
-    pub fn new(l: Side, r: Side) -> Self {
+    pub fn new(l: Side, r: Side, raw: String) -> Self {
         Range {
             l,
             r,
+            raw,
         }
     }
 }
 
 impl Default for Range {
     fn default() -> Self {
-        Range::new(Side::Some(1), Side::None)
+        Range::new(Side::Some(1), Side::Some(1), String::from("1"))
     }
 }
 
@@ -155,22 +165,51 @@ fn main() -> Result<()> {
 
     let parts_length = parts.len();
     let fields_vec = match opt.fields { RangeList(v) => v };
-    for f in fields_vec {
-        match f.l {
-            Side::Some(n) => {
-                if n.abs() as usize > parts_length {
-                    bail!("Out of bounds: {}. Index {} reaches beyond the number of parts ({})", f, n, parts_length);
+
+    for f in &fields_vec {
+        let l: usize;
+        let r: usize;
+        
+        l = match f.l {
+            Side::Continue => {
+                1
+            }
+            Side::Some(v) => {
+                if v.abs() as usize > parts_length {
+                    bail!("Out of bounds: {}", v);
+                }
+                if v < 0 {
+                    parts_length - (v * -1) as usize + 1
+                } else {
+                    v as usize
                 }
             }
-            _ => (),
-        }
-        match f.r {
-            Side::Some(n) => {
-                if n.abs() as usize > parts_length {
-                    bail!("Out of bounds: {}. Index {} reaches beyond the number of parts ({})", f, n, parts_length);
+        };
+
+        r = match f.r {
+            Side::Continue => {
+                parts_length
+            }
+            Side::Some(v) => {
+                if v.abs() as usize > parts_length {
+                    bail!("Out of bounds: {}", v);
                 }
-            },
-            _ => (),
+                if v < 0 {
+                    parts_length - (v * -1) as usize + 1
+                } else {
+                    v as usize
+                }
+            }
+        };
+
+        if l > r {
+            bail!("Invalid decreasing range")
+        }
+
+        println!("Bounds to check {} {} ({} parts)", l, r, parts_length);
+
+        for i in l..r {
+            print!("{}", parts[i]);
         }
     }
 
