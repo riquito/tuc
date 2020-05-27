@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use regex::Regex;
+use regex::{escape, Regex};
 use std::fmt;
 use std::io::Read;
 use std::str::FromStr;
@@ -124,9 +124,7 @@ fn main() -> Result<()> {
         .setting(structopt::clap::AppSettings::AllowLeadingHyphen)
         .get_matches();
 
-    //let opt = Opt::from_args();
     let opt = Opt::from_clap(&matches);
-    println!("{:?}", opt);
 
     let mut content = String::new();
     std::io::stdin()
@@ -135,12 +133,14 @@ fn main() -> Result<()> {
 
     content = content.trim().to_string();
 
-    let parts: Vec<&str> = content.split(&opt.delimiter).collect::<Vec<&str>>();
-    //    lazy_static! {
-    //        static ref RE: Regex = Regex::new("^(?P<l>-?\d+)?(?P<sep>:)?(-?\d+)?$").unwrap();
-    //    }
+    let re: Regex = Regex::new(format!("({})+", escape(&opt.delimiter)).as_ref()).unwrap();
 
-    let parts_length = parts.len();
+    let delimiter_indices: Vec<(usize, usize)> = re
+        .find_iter(&content)
+        .map(|m| (m.start(), m.end()))
+        .collect::<Vec<_>>();
+    let parts_length: usize = delimiter_indices.len() + 1;
+
     let fields_vec = match opt.fields {
         RangeList(v) => v,
     };
@@ -181,12 +181,24 @@ fn main() -> Result<()> {
             bail!("Invalid decreasing range")
         }
 
-        println!("Bounds to check {} {} ({} parts)", l, r, parts_length);
+        //      0       delimiter_indices
+        //  1       2   parts
+        // 012 345 678  indices
+        // aaa bbb ccc  content
 
-        for i in l..r {
-            print!("{}", parts[i]);
-        }
+        let str_l_idx: usize = match l {
+            1 => 0,
+            v => delimiter_indices[(v - 2) as usize].1,
+        };
+
+        let str_r_idx: usize = match r {
+            v if v as usize == parts_length => content.len(),
+            v => delimiter_indices[(v - 1) as usize].0,
+        };
+
+        print!("{}", &content[str_l_idx..str_r_idx]);
     }
+    println!("");
 
     Ok(())
 }
