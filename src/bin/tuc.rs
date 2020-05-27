@@ -4,8 +4,6 @@ use std::fmt;
 use std::io::Read;
 use std::str::FromStr;
 use structopt::StructOpt;
-#[macro_use]
-use lazy_static;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "tuc", about = "When cut doesn't cut it.")]
