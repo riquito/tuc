@@ -139,11 +139,7 @@ fn main() -> Result<()> {
         .collect::<Vec<_>>();
     let parts_length: usize = delimiter_indices.len() + 1;
 
-    let fields_vec = match opt.fields {
-        RangeList(v) => v,
-    };
-
-    for f in &fields_vec {
+    for f in &opt.fields.0 {
         let l: usize;
         let r: usize;
 
