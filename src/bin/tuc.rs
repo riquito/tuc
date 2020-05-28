@@ -125,6 +125,7 @@ fn cut_line(out: &mut dyn Write, re: &Regex, fields: &RangeList, content: String
     let parts_length: usize = delimiter_indices.len() + 1;
 
     if parts_length == 1 {
+        write!(out, "{}", &content)?;
         return Ok(());
     }
 
