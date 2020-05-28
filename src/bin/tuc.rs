@@ -124,6 +124,10 @@ fn cut_line(out: &mut dyn Write, re: &Regex, fields: &RangeList, content: String
         .collect::<Vec<_>>();
     let parts_length: usize = delimiter_indices.len() + 1;
 
+    if parts_length == 1 {
+        return Ok(());
+    }
+
     for f in &fields.0 {
         let l: usize;
         let r: usize;
@@ -195,9 +199,11 @@ fn main() -> Result<()> {
     stdin
         .lock()
         .lines()
-        .try_for_each(|line| cut_line(&mut stdout, &re, &opt.fields, line?))?;
-
-    println!("");
+        .try_for_each::<_, Result<()>>(|maybe_line| {
+            cut_line(&mut stdout, &re, &opt.fields, maybe_line?)?;
+            println!("");
+            Ok(())
+        })?;
 
     Ok(())
 }
