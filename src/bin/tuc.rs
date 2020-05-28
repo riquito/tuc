@@ -129,8 +129,6 @@ fn main() -> Result<()> {
         .read_to_string(&mut content)
         .with_context(|| format!("Cannot read from STDIN"))?;
 
-    content = content.trim().to_string();
-
     let re: Regex = Regex::new(format!("({})+", escape(&opt.delimiter)).as_ref()).unwrap();
 
     let delimiter_indices: Vec<(usize, usize)> = re
