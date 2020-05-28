@@ -1,7 +1,7 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use regex::{escape, Regex};
 use std::fmt;
-use std::io::Read;
+use std::io::{BufRead, Write};
 use std::str::FromStr;
 use structopt::StructOpt;
 
@@ -117,27 +117,14 @@ impl Default for Range {
     }
 }
 
-fn main() -> Result<()> {
-    let matches = Opt::clap()
-        .setting(structopt::clap::AppSettings::AllowLeadingHyphen)
-        .get_matches();
-
-    let opt = Opt::from_clap(&matches);
-
-    let mut content = String::new();
-    std::io::stdin()
-        .read_to_string(&mut content)
-        .with_context(|| format!("Cannot read from STDIN"))?;
-
-    let re: Regex = Regex::new(format!("({})+", escape(&opt.delimiter)).as_ref()).unwrap();
-
+fn cut_line(out: &mut dyn Write, re: &Regex, fields: &RangeList, content: String) -> Result<()> {
     let delimiter_indices: Vec<(usize, usize)> = re
         .find_iter(&content)
         .map(|m| (m.start(), m.end()))
         .collect::<Vec<_>>();
     let parts_length: usize = delimiter_indices.len() + 1;
 
-    for f in &opt.fields.0 {
+    for f in &fields.0 {
         let l: usize;
         let r: usize;
 
@@ -188,8 +175,28 @@ fn main() -> Result<()> {
             v => delimiter_indices[(v - 1) as usize].0,
         };
 
-        print!("{}", &content[str_l_idx..str_r_idx]);
+        write!(out, "{}", &content[str_l_idx..str_r_idx])?;
     }
+
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let matches = Opt::clap()
+        .setting(structopt::clap::AppSettings::AllowLeadingHyphen)
+        .get_matches();
+
+    let opt = Opt::from_clap(&matches);
+    let re: Regex = Regex::new(format!("({})+", escape(&opt.delimiter)).as_ref()).unwrap();
+
+    let stdin = std::io::stdin();
+    let mut stdout = std::io::stdout();
+
+    stdin
+        .lock()
+        .lines()
+        .try_for_each(|line| cut_line(&mut stdout, &re, &opt.fields, line?))?;
+
     println!("");
 
     Ok(())
