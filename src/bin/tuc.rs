@@ -15,6 +15,9 @@ struct Opt {
     /// Fields to keep, like 1-3 or 3,2 or 1- or 3,1-2 or -3 or -3--2
     #[structopt(short, long, default_value = "1-")]
     fields: RangeList,
+    /// Do not print lines not containing delimiters
+    #[structopt(short = "s", long = "only-delimited")]
+    only_delimited: bool,
 }
 
 #[derive(Debug)]
@@ -125,11 +128,6 @@ fn cut_line(
 ) -> Result<()> {
     let parts_length: usize = delimiter_indices.len() + 1;
 
-    if parts_length == 1 {
-        write!(out, "{}", &content)?;
-        return Ok(());
-    }
-
     for f in &fields.0 {
         let l: usize;
         let r: usize;
@@ -208,9 +206,16 @@ fn main() -> Result<()> {
                 .map(|m| (m.start(), m.end()))
                 .collect::<Vec<_>>();
 
-            cut_line(&mut stdout, &delimiter_indices, &opt.fields, line)?;
-            println!("");
-            Ok(())
+            Ok(match delimiter_indices.len() {
+                0 if opt.only_delimited => (),
+                0 => {
+                    write!(stdout, "{}\n", &line)?;
+                }
+                _ => {
+                    cut_line(&mut stdout, &delimiter_indices, &opt.fields, line)?;
+                    write!(stdout, "\n")?;
+                }
+            })
         })?;
 
     Ok(())
