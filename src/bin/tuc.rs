@@ -120,69 +120,60 @@ impl Default for Range {
     }
 }
 
-fn cut_line(
-    out: &mut dyn Write,
-    delimiter_indices: &[(usize, usize)],
-    fields: &RangeList,
-    content: String,
-) -> Result<()> {
+fn cut_line(delimiter_indices: &[(usize, usize)], f: &Range, line: &str) -> Result<(usize, usize)> {
     let parts_length: usize = delimiter_indices.len() + 1;
 
-    for f in &fields.0 {
-        let l: usize;
-        let r: usize;
+    let l: usize;
+    let r: usize;
 
-        l = match f.l {
-            Side::Continue => 1,
-            Side::Some(v) => {
-                if v.abs() as usize > parts_length {
-                    bail!("Out of bounds: {}", v);
-                }
-                if v < 0 {
-                    parts_length - (v * -1) as usize + 1
-                } else {
-                    v as usize
-                }
+    l = match f.l {
+        Side::Continue => 1,
+        Side::Some(v) => {
+            if v.abs() as usize > parts_length {
+                bail!("Out of bounds: {}", v);
             }
-        };
-
-        r = match f.r {
-            Side::Continue => parts_length,
-            Side::Some(v) => {
-                if v.abs() as usize > parts_length {
-                    bail!("Out of bounds: {}", v);
-                }
-                if v < 0 {
-                    parts_length - (v * -1) as usize + 1
-                } else {
-                    v as usize
-                }
+            if v < 0 {
+                parts_length - (v * -1) as usize + 1
+            } else {
+                v as usize
             }
-        };
-
-        if l > r {
-            bail!("Invalid decreasing range")
         }
+    };
 
-        //      0       delimiter_indices
-        //  1       2   parts
-        // 012 345 678  indices
-        // aaa bbb ccc  content
+    r = match f.r {
+        Side::Continue => parts_length,
+        Side::Some(v) => {
+            if v.abs() as usize > parts_length {
+                bail!("Out of bounds: {}", v);
+            }
+            if v < 0 {
+                parts_length - (v * -1) as usize + 1
+            } else {
+                v as usize
+            }
+        }
+    };
 
-        let str_l_idx: usize = match l {
-            1 => 0,
-            v => delimiter_indices[(v - 2) as usize].1,
-        };
-
-        let str_r_idx: usize = match r {
-            v if v as usize == parts_length => content.len(),
-            v => delimiter_indices[(v - 1) as usize].0,
-        };
-
-        write!(out, "{}", &content[str_l_idx..str_r_idx])?;
+    if l > r {
+        bail!("Invalid decreasing range")
     }
 
-    Ok(())
+    //      0       delimiter_indices
+    //  1       2   parts
+    // 012 345 678  indices
+    // aaa bbb ccc  line
+
+    let str_l_idx: usize = match l {
+        1 => 0,
+        v => delimiter_indices[(v - 2) as usize].1,
+    };
+
+    let str_r_idx: usize = match r {
+        v if v as usize == parts_length => line.len(),
+        v => delimiter_indices[(v - 1) as usize].0,
+    };
+
+    Ok((str_l_idx, str_r_idx))
 }
 
 fn main() -> Result<()> {
@@ -212,7 +203,10 @@ fn main() -> Result<()> {
                     write!(stdout, "{}\n", &line)?;
                 }
                 _ => {
-                    cut_line(&mut stdout, &delimiter_indices, &opt.fields, line)?;
+                    for f in &opt.fields.0 {
+                        let (start, end) = cut_line(&delimiter_indices, &f, &line)?;
+                        write!(stdout, "{}", &line[start..end])?;
+                    }
                     write!(stdout, "\n")?;
                 }
             })
