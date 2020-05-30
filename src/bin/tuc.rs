@@ -19,7 +19,7 @@ struct Opt {
     #[structopt(short = "s", long = "only-delimited")]
     only_delimited: bool,
     /// Display the delimiter at most once in a sequence
-    #[structopt(short = "p")]
+    #[structopt(short = "p", long)]
     compress_delimiter: bool,
     /// Replace the delimiter
     #[structopt(short = "r")]
