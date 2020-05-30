@@ -24,6 +24,32 @@ struct Opt {
     /// Replace the delimiter
     #[structopt(short = "r")]
     replace_delimiter: Option<String>,
+    /// Trim the delimiter (trim is applied before any other cut or replace)
+    #[structopt(
+        short = "t",
+        help = "Valid trim values are (l|L)eft, (r|R)ight, (b|B)oth"
+    )]
+    trim: Option<Trim>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Trim {
+    LEFT,
+    RIGHT,
+    BOTH,
+}
+
+impl FromStr for Trim {
+    type Err = Box<dyn std::error::Error>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "l" | "L" => Trim::LEFT,
+            "r" | "R" => Trim::RIGHT,
+            "b" | "B" => Trim::BOTH,
+            _ => return Err("Valid trim values are (l|L)eft, (r|R)ight, (b|B)oth".into()),
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -198,7 +224,17 @@ fn main() -> Result<()> {
         .lock()
         .lines()
         .try_for_each::<_, Result<()>>(|maybe_line| {
-            let line = maybe_line?;
+            let line = &maybe_line?;
+
+            let line = match opt.trim {
+                Some(Trim::BOTH) => line
+                    .trim_start_matches(&opt.delimiter)
+                    .trim_end_matches(&opt.delimiter),
+                Some(Trim::LEFT) => line.trim_start_matches(&opt.delimiter),
+                Some(Trim::RIGHT) => line.trim_end_matches(&opt.delimiter),
+                _ => line,
+            };
+
             let delimiter_indices: Vec<(usize, usize)> = re
                 .find_iter(&line)
                 .map(|m| (m.start(), m.end()))
