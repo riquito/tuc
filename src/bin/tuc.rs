@@ -126,6 +126,7 @@ impl Default for Range {
     }
 }
 
+#[allow(clippy::neg_multiply)]
 fn cut_line(delimiter_indices: &[(usize, usize)], f: &Range, line: &str) -> Result<(usize, usize)> {
     let parts_length: usize = delimiter_indices.len() + 1;
 
