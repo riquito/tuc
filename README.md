@@ -1,5 +1,16 @@
 # tuc (when cut doesn't cut it)
 
+We've all been there. You want to `cut` some string on a delimiter repeated in a non-deterministic way. Maybe you even want to use negative indexes or replace the delimiters in the cut part with something else...
+That's where `tuc` can help.
+
+## Install
+
+Download one of the [releases](https://github.com/riquito/tuc/releases) or run
+
+```
+cargo install
+```
+
 ## Help
 
 ```
@@ -26,18 +37,24 @@ OPTIONS:
 
 ```
 # Cut using a greedy delimiter
-$ echo "foo    bar   baz" | tuc -d ' ' -f 2:
+❯ echo "foo    bar   baz" | tuc -d ' ' -f 2:
 bar   baz
 ```
 
 ```
 # Compress delimiters after cut
-$ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p
+❯ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p
 bar baz
 ```
 
 ```
 # Replace remaining delimiters with something else
-$ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p -r '/'
+❯ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p -r '/'
 bar/baz
+```
+
+```
+# Indexes can be negative and rearranged
+❯ echo "a b c" | tuc -d ' ' -f -1,-2,-3
+cba
 ```
