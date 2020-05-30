@@ -206,7 +206,7 @@ fn main() -> Result<()> {
             match delimiter_indices.len() {
                 0 if opt.only_delimited => (),
                 0 => {
-                    write!(stdout, "{}\n", &line)?;
+                    writeln!(stdout, "{}", &line)?;
                 }
                 _ => {
                     for f in &opt.fields.0 {
@@ -228,7 +228,7 @@ fn main() -> Result<()> {
 
                         write!(stdout, "{}", edited_line)?;
                     }
-                    write!(stdout, "\n")?;
+                    writeln!(stdout)?;
                 }
             };
 
