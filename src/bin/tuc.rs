@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use regex::{escape, Regex};
+use regex::{escape, NoExpand, Regex};
 use std::fmt;
 use std::io::{BufRead, Write};
 use std::str::FromStr;
@@ -18,6 +18,9 @@ struct Opt {
     /// Do not print lines not containing delimiters
     #[structopt(short = "s", long = "only-delimited")]
     only_delimited: bool,
+    /// Display the delimiter at most once in a sequence
+    #[structopt(short = "p")]
+    compress_delimiter: bool,
 }
 
 #[derive(Debug)]
@@ -197,7 +200,7 @@ fn main() -> Result<()> {
                 .map(|m| (m.start(), m.end()))
                 .collect::<Vec<_>>();
 
-            Ok(match delimiter_indices.len() {
+            match delimiter_indices.len() {
                 0 if opt.only_delimited => (),
                 0 => {
                     write!(stdout, "{}\n", &line)?;
@@ -205,11 +208,22 @@ fn main() -> Result<()> {
                 _ => {
                     for f in &opt.fields.0 {
                         let (start, end) = cut_line(&delimiter_indices, &f, &line)?;
-                        write!(stdout, "{}", &line[start..end])?;
+                        let cut_line: &str = &line[start..end];
+                        let mut edited_line: &str = cut_line;
+                        let rep_owner;
+
+                        if opt.compress_delimiter {
+                            rep_owner = re.replace_all(cut_line, NoExpand(&opt.delimiter));
+                            edited_line = rep_owner.as_ref();
+                        }
+
+                        write!(stdout, "{}", edited_line)?;
                     }
                     write!(stdout, "\n")?;
                 }
-            })
+            };
+
+            Ok(())
         })?;
 
     Ok(())
