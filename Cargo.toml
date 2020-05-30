@@ -4,9 +4,12 @@ description = "When cut doesn't cut it"
 version = "0.1.0"
 authors = ["Riccardo Attilio Galli <riccardo@sideralis.org>"]
 edition = "2018"
+homepage = "https://github.com/riquito/tuc"
 repository = "https://github.com/riquito/tuc"
 license = "GPL-3.0-or-later"
 readme = "README.md"
+keywords = ["cli"]
+categories = ["command-line-utilities"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
