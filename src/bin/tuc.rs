@@ -21,6 +21,9 @@ struct Opt {
     /// Display the delimiter at most once in a sequence
     #[structopt(short = "p")]
     compress_delimiter: bool,
+    /// Replace the delimiter
+    #[structopt(short = "r")]
+    replace_delimiter: Option<String>,
 }
 
 #[derive(Debug)]
@@ -210,11 +213,17 @@ fn main() -> Result<()> {
                         let (start, end) = cut_line(&delimiter_indices, &f, &line)?;
                         let cut_line: &str = &line[start..end];
                         let mut edited_line: &str = cut_line;
-                        let rep_owner;
+                        let owner_compress;
+                        let owner_replace;
 
                         if opt.compress_delimiter {
-                            rep_owner = re.replace_all(cut_line, NoExpand(&opt.delimiter));
-                            edited_line = rep_owner.as_ref();
+                            owner_compress = re.replace_all(cut_line, NoExpand(&opt.delimiter));
+                            edited_line = owner_compress.as_ref();
+                        }
+
+                        if let Some(replace_delimiter) = &opt.replace_delimiter {
+                            owner_replace = edited_line.replace(&opt.delimiter, &replace_delimiter);
+                            edited_line = &owner_replace;
                         }
 
                         write!(stdout, "{}", edited_line)?;
