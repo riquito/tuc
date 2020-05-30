@@ -12,8 +12,8 @@ struct Opt {
     /// Delimiter to use to cut the text into pieces
     #[structopt(short, long, default_value = "\t")]
     delimiter: String,
-    /// Fields to keep, like 1-3 or 3,2 or 1- or 3,1-2 or -3 or -3--2
-    #[structopt(short, long, default_value = "1-")]
+    /// Fields to keep, like 1:3 or 3,2 or 1: or 3,1:2 or -3 or -3:-2
+    #[structopt(short, long, default_value = "1:")]
     fields: RangeList,
     /// Do not print lines not containing delimiters
     #[structopt(short = "s", long = "only-delimited")]
