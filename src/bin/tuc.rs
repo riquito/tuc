@@ -87,14 +87,14 @@ impl FromStr for Range {
         let pair: Vec<&str> = s.split(':').collect::<Vec<&str>>();
 
         let (l, r): (Side, Side) = match &pair[..] {
-            &[""] => {
+            [""] => {
                 return Err("Field format error: empty field".into());
             }
-            &["", ""] => {
+            ["", ""] => {
                 return Err("Field format error, no numbers next to `:`".into());
             }
-            &[x, y] => (Side::from_str(x)?, Side::from_str(y)?),
-            &[x] => (Side::from_str(x)?, Side::from_str(x)?),
+            [x, y] => (Side::from_str(x)?, Side::from_str(y)?),
+            [x] => (Side::from_str(x)?, Side::from_str(x)?),
             _ => {
                 return Err(format!("Field format error (too many `:` in `{}`)", s).into());
             }
