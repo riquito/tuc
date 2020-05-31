@@ -70,3 +70,9 @@ ac
 ❯ echo "a𝌆b𝌆c" | cut -d '𝌆' -f1,3
 ac
 ```
+
+## LICENSE
+
+Tuc is distributed under the GNU GPL license (version 3 or any later version).
+
+See [LICENSE](./LICENSE) file for details.
