@@ -21,6 +21,9 @@ jobs:
         with:
           fetch-depth: "0"
 
+      - name: Check
+        run: cargo check --locked
+
       - name: Get version from Cargo.toml
         id: version-by-cargo
         run: |
@@ -30,6 +33,14 @@ jobs:
         id: is-new-version
         run: |
           echo "::set-output name=result::$(test $(git tag --list ${{ steps.version-by-cargo.outputs.version }}) && echo "" || echo ${{ steps.version-by-cargo.outputs.version }})"
+
+      - name: Push tag/create release point
+        id: apply-tag
+        if: steps.is-new-version.outputs.result != ''
+        uses: anothrNick/github-tag-action@1.17.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CUSTOM_TAG: ${{ steps.is-new-version.outputs.result }}
 
   release:
     needs: check-if-needs-release
@@ -57,18 +68,11 @@ jobs:
       - name: Build project
         run: cargo build --release --locked
 
-      - name: Bump version and push tag/create release point
-        uses: anothrNick/github-tag-action@1.17.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_TAG: ${{ needs.check-if-needs-release.outputs.new_version }}
-        id: bump_version
-
       - name: Upload binary to release
         uses: svenstaro/upload-release-action@v1-release
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/release/${{ matrix.artifact_name }}
           asset_name: ${{ matrix.asset_name }}
-          tag: ${{ steps.bump_version.outputs.new_tag }}
+          tag: ${{ needs.check-if-needs-release.outputs.new_version }}
           overwrite: true
