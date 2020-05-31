@@ -14,7 +14,7 @@ cargo install
 ## Help
 
 ```
-tuc 0.1.0
+tuc 0.3.0
 When cut doesn't cut it.
 
 USAGE:
@@ -49,12 +49,24 @@ bar baz
 
 ```
 # Replace remaining delimiters with something else
-❯ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p -r '/'
-bar/baz
+❯ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p -r ' -> '
+bar -> baz
 ```
 
 ```
 # Indexes can be negative and rearranged
 ❯ echo "a b c" | tuc -d ' ' -f -1,-2,-3
 cba
+```
+
+```
+# Delemiters can be any number of characters long
+echo "a<sep>b<sep>c" | cargo run -- -d '<sep>' -f 1,3
+ac
+```
+
+```
+# Works with multibyte utf-8 encoded characaters
+❯ echo "a𝌆b𝌆c" | cut -d '𝌆' -f1,3
+ac
 ```
