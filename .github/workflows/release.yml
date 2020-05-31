@@ -1,25 +1,54 @@
 name: Build, bump tag version and release
 
+defaults:
+  run:
+    shell: bash
+
 on:
   push:
     branches:
       - master
 
 jobs:
+  check-if-needs-release:
+    name: Check if needs release
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.is-new-version.outputs.result }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+
+      - name: Get version from Cargo.toml
+        id: version-by-cargo
+        run: |
+          echo "::set-output name=version::v$(cargo metadata --offline --no-deps --format-version=1 | jq --raw-output '.packages[0].version')"
+
+      - name: Is already tagged at latest version?
+        id: is-new-version
+        run: |
+          echo "::set-output name=result::$(test $(git tag --list ${{ steps.version-by-cargo.outputs.version }}) && echo "" || echo ${{ steps.version-by-cargo.outputs.version }})"
+
   release:
+    needs: check-if-needs-release
+    if: needs.check-if-needs-release.outputs.new_version != ''
     name: Build and Release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+
       - name: Build project
         run: cargo build --release --locked
       - name: Bump version and push tag/create release point
         uses: anothrNick/github-tag-action@1.17.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: true
-          INITIAL_VERSION: 0.1.0
+          CUSTOM_TAG: ${{ needs.check-if-needs-release.outputs.new_version }}
         id: bump_version
 
       - name: Upload binary to release
