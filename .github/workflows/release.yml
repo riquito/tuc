@@ -68,6 +68,10 @@ jobs:
       - name: Build project
         run: cargo build --release --locked
 
+      - name: Strip release binary (linux and macos)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        run: strip "target/release/${{ matrix.artifact_name }}"
+
       - name: Upload binary to release
         uses: svenstaro/upload-release-action@v1-release
         with:
