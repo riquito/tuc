@@ -5,10 +5,12 @@ That's where `tuc` can help.
 
 ## Install
 
-Download one of the [releases](https://github.com/riquito/tuc/releases) or run
+Download one of the [prebuilt binaries](https://github.com/riquito/tuc/releases)
+
+or run
 
 ```
-cargo install
+cargo install tuc
 ```
 
 ## Help
@@ -35,37 +37,37 @@ OPTIONS:
 
 ## Examples
 
-```
+```sh
 # Cut using a greedy delimiter
 ❯ echo "foo    bar   baz" | tuc -d ' ' -f 2:
 bar   baz
 ```
 
-```
+```sh
 # Compress delimiters after cut
 ❯ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p
 bar baz
 ```
 
-```
+```sh
 # Replace remaining delimiters with something else
 ❯ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p -r ' -> '
 bar -> baz
 ```
 
-```
+```sh
 # Indexes can be negative and rearranged
 ❯ echo "a b c" | tuc -d ' ' -f -1,-2,-3
 cba
 ```
 
-```
+```sh
 # Delimiters can be any number of characters long
 ❯ echo "a<sep>b<sep>c" | cargo run -- -d '<sep>' -f 1,3
 ac
 ```
 
-```
+```sh
 # Works with multibyte utf-8 encoded characters
 ❯ echo "a𝌆b𝌆c" | cut -d '𝌆' -f1,3
 ac
