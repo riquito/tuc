@@ -21,10 +21,10 @@ USAGE:
     tuc [FLAGS] [OPTIONS]
 
 FLAGS:
-    -p                      Display the delimiter at most once in a sequence
-    -h, --help              Prints help information
-    -s, --only-delimited    Do not print lines not containing delimiters
-    -V, --version           Prints version information
+    -p, --compress-delimiter    Display the delimiter at most once in a sequence
+    -h, --help                  Prints help information
+    -s, --only-delimited        Do not print lines not containing delimiters
+    -V, --version               Prints version information
 
 OPTIONS:
     -d, --delimiter <delimiter>    Delimiter to use to cut the text into pieces [default: 	]
@@ -60,13 +60,13 @@ cba
 ```
 
 ```
-# Delemiters can be any number of characters long
-echo "a<sep>b<sep>c" | cargo run -- -d '<sep>' -f 1,3
+# Delimiters can be any number of characters long
+❯ echo "a<sep>b<sep>c" | cargo run -- -d '<sep>' -f 1,3
 ac
 ```
 
 ```
-# Works with multibyte utf-8 encoded characaters
+# Works with multibyte utf-8 encoded characters
 ❯ echo "a𝌆b𝌆c" | cut -d '𝌆' -f1,3
 ac
 ```
