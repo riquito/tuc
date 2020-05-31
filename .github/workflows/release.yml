@@ -35,7 +35,19 @@ jobs:
     needs: check-if-needs-release
     if: needs.check-if-needs-release.outputs.new_version != ''
     name: Build and Release
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: tuc
+            asset_name: tuc-linux-amd64
+          - os: macos-latest
+            artifact_name: tuc
+            asset_name: tuc-macos-amd64
+          - os: windows-latest
+            artifact_name: tuc.exe
+            asset_name: tuc-windows-amd64
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -44,6 +56,7 @@ jobs:
 
       - name: Build project
         run: cargo build --release --locked
+
       - name: Bump version and push tag/create release point
         uses: anothrNick/github-tag-action@1.17.2
         env:
@@ -55,7 +68,7 @@ jobs:
         uses: svenstaro/upload-release-action@v1-release
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/tuc
-          asset_name: tuc-linux-amd64
+          file: target/release/${{ matrix.artifact_name }}
+          asset_name: ${{ matrix.asset_name }}
           tag: ${{ steps.bump_version.outputs.new_tag }}
           overwrite: true
