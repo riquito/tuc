@@ -14,7 +14,7 @@ cargo install
 ## Help
 
 ```
-tuc 0.3.0
+tuc 0.4.0
 When cut doesn't cut it.
 
 USAGE:
