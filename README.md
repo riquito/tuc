@@ -68,7 +68,7 @@ ac
 ```
 
 ```sh
-# Works with multibyte utf-8 encoded characters
+# Can split on unicode scalar values (expect UTF-8 encoding)
 ❯ echo "a𝌆b𝌆c" | cut -d '𝌆' -f1,3
 ac
 ```
