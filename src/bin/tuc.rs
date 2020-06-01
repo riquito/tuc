@@ -78,7 +78,7 @@ impl FromStr for Side {
             "" => Side::Continue,
             _ => Side::Some(
                 s.parse::<i32>()
-                    .or_else(|_| Err(format!("Not a number `{}`", s)))?,
+                    .map_err(|_| format!("Not a number `{}`", s))?,
             ),
         })
     }
