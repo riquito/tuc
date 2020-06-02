@@ -63,13 +63,13 @@ cba
 
 ```sh
 # Delimiters can be any number of characters long
-❯ echo "a<sep>b<sep>c" | cargo run -- -d '<sep>' -f 1,3
+❯ echo "a<sep>b<sep>c" | tuc -d '<sep>' -f 1,3
 ac
 ```
 
 ```sh
 # Can split on unicode scalar values (expect UTF-8 encoding)
-❯ echo "a𝌆b𝌆c" | cut -d '𝌆' -f1,3
+❯ echo "a𝌆b𝌆c" | tuc -d '𝌆' -f 1,3
 ac
 ```
 
