@@ -152,7 +152,6 @@ impl Default for Range {
     }
 }
 
-#[allow(clippy::neg_multiply)]
 fn cut_line(delimiter_indices: &[(usize, usize)], f: &Range, line: &str) -> Result<(usize, usize)> {
     let parts_length: usize = delimiter_indices.len() + 1;
 
@@ -166,7 +165,7 @@ fn cut_line(delimiter_indices: &[(usize, usize)], f: &Range, line: &str) -> Resu
                 bail!("Out of bounds: {}", v);
             }
             if v < 0 {
-                parts_length - (v * -1) as usize + 1
+                parts_length + v as usize + 1
             } else {
                 v as usize
             }
@@ -180,7 +179,7 @@ fn cut_line(delimiter_indices: &[(usize, usize)], f: &Range, line: &str) -> Resu
                 bail!("Out of bounds: {}", v);
             }
             if v < 0 {
-                parts_length - (v * -1) as usize + 1
+                parts_length + v as usize + 1
             } else {
                 v as usize
             }
