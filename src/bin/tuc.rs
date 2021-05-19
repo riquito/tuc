@@ -34,9 +34,9 @@ struct Opt {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Trim {
-    LEFT,
-    RIGHT,
-    BOTH,
+    Left,
+    Right,
+    Both,
 }
 
 impl FromStr for Trim {
@@ -44,9 +44,9 @@ impl FromStr for Trim {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
-            "l" | "L" => Trim::LEFT,
-            "r" | "R" => Trim::RIGHT,
-            "b" | "B" => Trim::BOTH,
+            "l" | "L" => Trim::Left,
+            "r" | "R" => Trim::Right,
+            "b" | "B" => Trim::Both,
             _ => return Err("Valid trim values are (l|L)eft, (r|R)ight, (b|B)oth".into()),
         })
     }
@@ -227,11 +227,11 @@ fn main() -> Result<()> {
             let line = &maybe_line?;
 
             let line = match opt.trim {
-                Some(Trim::BOTH) => line
+                Some(Trim::Both) => line
                     .trim_start_matches(&opt.delimiter)
                     .trim_end_matches(&opt.delimiter),
-                Some(Trim::LEFT) => line.trim_start_matches(&opt.delimiter),
-                Some(Trim::RIGHT) => line.trim_end_matches(&opt.delimiter),
+                Some(Trim::Left) => line.trim_start_matches(&opt.delimiter),
+                Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
                 _ => line,
             };
 
