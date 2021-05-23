@@ -1,9 +1,11 @@
 use anyhow::{bail, Result};
+use grep_cli;
 use regex::{escape, NoExpand, Regex};
 use std::fmt;
 use std::io::{BufRead, Write};
 use std::str::FromStr;
 use structopt::StructOpt;
+use termcolor;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "tuc", about = "When cut doesn't cut it.")]
@@ -217,7 +219,7 @@ fn main() -> Result<()> {
     let re: Regex = Regex::new(format!("({})+", escape(&opt.delimiter)).as_ref()).unwrap();
 
     let stdin = std::io::stdin();
-    let mut stdout = std::io::stdout();
+    let mut stdout = grep_cli::stdout(termcolor::ColorChoice::Never);
 
     stdin
         .lock()
