@@ -212,12 +212,12 @@ fn search_and_replace<'a, S: Into<Cow<'a, str>>>(
     };
 
     let line: &str = match opt.trim {
+        None => &line,
         Some(Trim::Both) => line
             .trim_start_matches(&opt.delimiter)
             .trim_end_matches(&opt.delimiter),
         Some(Trim::Left) => line.trim_start_matches(&opt.delimiter),
         Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
-        _ => &line,
     };
 
     let parts = re.split(&line);
