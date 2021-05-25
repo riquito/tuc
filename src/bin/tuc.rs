@@ -225,7 +225,7 @@ fn search_and_replace<'a, S: Into<Cow<'a, str>>>(
     let parts = line.split(&opt.delimiter);
     let collected_parts = parts.collect::<Vec<_>>();
 
-    let mut output = String::with_capacity(line.len() + line.len() / 2);
+    let mut output = String::with_capacity(line.len());
     for f in &opt.fields.0 {
         let matching_parts = get_parts_by_fields_range(&collected_parts, f)?;
 
