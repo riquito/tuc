@@ -228,18 +228,11 @@ fn search_and_replace<'a, S: Into<Cow<'a, str>>>(
     let mut output = String::with_capacity(line.len());
     for f in &opt.fields.0 {
         let matching_parts = get_parts_by_fields_range(&collected_parts, f)?;
+        output.push_str(&matching_parts.join(&opt.delimiter));
+    }
 
-        let cut_line: &str = &matching_parts.join(&opt.delimiter);
-        let mut edited_line: &str = cut_line;
-
-        let owner_replace;
-
-        if let Some(replace_delimiter) = &opt.replace_delimiter {
-            owner_replace = edited_line.replace(&opt.delimiter, &replace_delimiter);
-            edited_line = &owner_replace;
-        }
-
-        output.push_str(edited_line);
+    if let Some(replace_delimiter) = &opt.replace_delimiter {
+        output = output.replace(&opt.delimiter, &replace_delimiter);
     }
 
     Ok(Cow::Owned(output))
