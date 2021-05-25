@@ -1,11 +1,9 @@
 use anyhow::{bail, Result};
-use grep_cli;
 use regex::{escape, NoExpand, Regex};
 use std::fmt;
 use std::io::{BufRead, Write};
 use std::str::FromStr;
 use structopt::StructOpt;
-use termcolor;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "tuc", about = "When cut doesn't cut it.")]
@@ -154,9 +152,8 @@ impl Default for Range {
     }
 }
 
-#[allow(clippy::neg_multiply)]
-fn cut_line(delimiter_indices: &[(usize, usize)], f: &Range, line: &str) -> Result<(usize, usize)> {
-    let parts_length: usize = delimiter_indices.len() + 1;
+fn get_parts_by_fields_range<'a>(parts: &'a [&'a str], f: &Range) -> Result<&'a [&'a str]> {
+    let parts_length: usize = parts.len();
 
     let l: usize;
     let r: usize;
@@ -168,12 +165,12 @@ fn cut_line(delimiter_indices: &[(usize, usize)], f: &Range, line: &str) -> Resu
                 bail!("Out of bounds: {}", v);
             }
             if v < 0 {
-                parts_length - (v * -1) as usize + 1
+                parts_length - v.abs() as usize + 1
             } else {
                 v as usize
             }
         }
-    };
+    } - 1;
 
     r = match f.r {
         Side::Continue => parts_length,
@@ -182,33 +179,14 @@ fn cut_line(delimiter_indices: &[(usize, usize)], f: &Range, line: &str) -> Resu
                 bail!("Out of bounds: {}", v);
             }
             if v < 0 {
-                parts_length - (v * -1) as usize + 1
+                parts_length - v.abs() as usize + 1
             } else {
                 v as usize
             }
         }
     };
 
-    if l > r {
-        bail!("Invalid decreasing range")
-    }
-
-    //      0       delimiter_indices
-    //  1       2   parts
-    // 012 345 678  indices
-    // aaa bbb ccc  line
-
-    let str_l_idx: usize = match l {
-        1 => 0,
-        v => delimiter_indices[(v - 2) as usize].1,
-    };
-
-    let str_r_idx: usize = match r {
-        v if v as usize == parts_length => line.len(),
-        v => delimiter_indices[(v - 1) as usize].0,
-    };
-
-    Ok((str_l_idx, str_r_idx))
+    Ok(&parts[l..r])
 }
 
 fn main() -> Result<()> {
@@ -237,28 +215,30 @@ fn main() -> Result<()> {
                 _ => line,
             };
 
-            let delimiter_indices: Vec<(usize, usize)> = re
-                .find_iter(&line)
-                .map(|m| (m.start(), m.end()))
-                .collect::<Vec<_>>();
+            let owner_compress;
+            let line: &str = if opt.compress_delimiter {
+                owner_compress = re.replace_all(line, NoExpand(&opt.delimiter));
+                owner_compress.as_ref()
+            } else {
+                line
+            };
 
-            match delimiter_indices.len() {
-                0 if opt.only_delimited => (),
-                0 => {
+            let parts = line.split(&opt.delimiter);
+            let collected_parts = parts.collect::<Vec<_>>();
+
+            match collected_parts.len() {
+                1 if opt.only_delimited => (),
+                1 => {
                     writeln!(stdout, "{}", &line)?;
                 }
                 _ => {
                     for f in &opt.fields.0 {
-                        let (start, end) = cut_line(&delimiter_indices, &f, &line)?;
-                        let cut_line: &str = &line[start..end];
-                        let mut edited_line: &str = cut_line;
-                        let owner_compress;
-                        let owner_replace;
+                        let matching_parts = get_parts_by_fields_range(&collected_parts, f)?;
 
-                        if opt.compress_delimiter {
-                            owner_compress = re.replace_all(cut_line, NoExpand(&opt.delimiter));
-                            edited_line = owner_compress.as_ref();
-                        }
+                        let cut_line: &str = &matching_parts.join(&opt.delimiter);
+                        let mut edited_line: &str = cut_line;
+
+                        let owner_replace;
 
                         if let Some(replace_delimiter) = &opt.replace_delimiter {
                             owner_replace = edited_line.replace(&opt.delimiter, &replace_delimiter);
