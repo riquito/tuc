@@ -205,6 +205,12 @@ fn search_and_replace<'a, S: Into<Cow<'a, str>>>(
         }
     }
 
+    let line = if opt.compress_delimiter {
+        re.replace_all(&line, NoExpand(&opt.delimiter))
+    } else {
+        line
+    };
+
     let line: &str = match opt.trim {
         Some(Trim::Both) => line
             .trim_start_matches(&opt.delimiter)
@@ -212,14 +218,6 @@ fn search_and_replace<'a, S: Into<Cow<'a, str>>>(
         Some(Trim::Left) => line.trim_start_matches(&opt.delimiter),
         Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
         _ => &line,
-    };
-
-    let owner_compress;
-    let line: &str = if opt.compress_delimiter {
-        owner_compress = re.replace_all(line, NoExpand(&opt.delimiter));
-        owner_compress.as_ref()
-    } else {
-        line
     };
 
     let parts = re.split(&line);
