@@ -1,8 +1,8 @@
 use anyhow::{bail, Result};
 use regex::{escape, NoExpand, Regex};
-use std::fmt;
 use std::io::{BufRead, Write};
 use std::str::FromStr;
+use std::{borrow::Cow, fmt};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -189,14 +189,29 @@ fn get_parts_by_fields_range<'a>(parts: &'a [&'a str], f: &Range) -> Result<&'a 
     Ok(&parts[l..r])
 }
 
-fn search_and_replace(line: &str, re: &Regex, opt: &Opt) -> Result<String> {
-    let line = match opt.trim {
+fn search_and_replace<'a, S: Into<Cow<'a, str>>>(
+    orig_line: S,
+    re: &Regex,
+    opt: &Opt,
+) -> Result<Cow<'a, str>> {
+    let line: Cow<'a, str> = orig_line.into();
+
+    // optimize the no-match behaviour
+    if !re.is_match(&line) {
+        if opt.only_delimited {
+            return Ok(Cow::Borrowed(""));
+        } else {
+            return Ok(line);
+        }
+    }
+
+    let line: &str = match opt.trim {
         Some(Trim::Both) => line
             .trim_start_matches(&opt.delimiter)
             .trim_end_matches(&opt.delimiter),
         Some(Trim::Left) => line.trim_start_matches(&opt.delimiter),
         Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
-        _ => line,
+        _ => &line,
     };
 
     let owner_compress;
@@ -210,29 +225,24 @@ fn search_and_replace(line: &str, re: &Regex, opt: &Opt) -> Result<String> {
     let parts = line.split(&opt.delimiter);
     let collected_parts = parts.collect::<Vec<_>>();
 
-    match collected_parts.len() {
-        1 if opt.only_delimited => Ok("".to_owned()),
-        1 => Ok(line.to_owned()),
-        _ => {
-            let mut output = String::with_capacity(line.len() + line.len() / 2);
-            for f in &opt.fields.0 {
-                let matching_parts = get_parts_by_fields_range(&collected_parts, f)?;
+    let mut output = String::with_capacity(line.len() + line.len() / 2);
+    for f in &opt.fields.0 {
+        let matching_parts = get_parts_by_fields_range(&collected_parts, f)?;
 
-                let cut_line: &str = &matching_parts.join(&opt.delimiter);
-                let mut edited_line: &str = cut_line;
+        let cut_line: &str = &matching_parts.join(&opt.delimiter);
+        let mut edited_line: &str = cut_line;
 
-                let owner_replace;
+        let owner_replace;
 
-                if let Some(replace_delimiter) = &opt.replace_delimiter {
-                    owner_replace = edited_line.replace(&opt.delimiter, &replace_delimiter);
-                    edited_line = &owner_replace;
-                }
-
-                output.push_str(edited_line);
-            }
-            Ok(output)
+        if let Some(replace_delimiter) = &opt.replace_delimiter {
+            owner_replace = edited_line.replace(&opt.delimiter, &replace_delimiter);
+            edited_line = &owner_replace;
         }
+
+        output.push_str(edited_line);
     }
+
+    Ok(Cow::Owned(output))
 }
 
 fn main() -> Result<()> {
@@ -251,7 +261,8 @@ fn main() -> Result<()> {
         .lock()
         .lines()
         .try_for_each::<_, Result<()>>(|maybe_line| {
-            let output = search_and_replace(&maybe_line?, &re, &opt)?;
+            let line = maybe_line?;
+            let output = search_and_replace(&line, &re, &opt)?;
             writeln!(stdout, "{}", output)?;
             Ok(())
         })?;
