@@ -189,12 +189,59 @@ fn get_parts_by_fields_range<'a>(parts: &'a [&'a str], f: &Range) -> Result<&'a 
     Ok(&parts[l..r])
 }
 
+fn search_and_replace(line: &str, re: &Regex, opt: &Opt) -> Result<String> {
+    let line = match opt.trim {
+        Some(Trim::Both) => line
+            .trim_start_matches(&opt.delimiter)
+            .trim_end_matches(&opt.delimiter),
+        Some(Trim::Left) => line.trim_start_matches(&opt.delimiter),
+        Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
+        _ => line,
+    };
+
+    let owner_compress;
+    let line: &str = if opt.compress_delimiter {
+        owner_compress = re.replace_all(line, NoExpand(&opt.delimiter));
+        owner_compress.as_ref()
+    } else {
+        line
+    };
+
+    let parts = line.split(&opt.delimiter);
+    let collected_parts = parts.collect::<Vec<_>>();
+
+    match collected_parts.len() {
+        1 if opt.only_delimited => Ok("".to_owned()),
+        1 => Ok(line.to_owned()),
+        _ => {
+            let mut output = String::with_capacity(line.len() + line.len() / 2);
+            for f in &opt.fields.0 {
+                let matching_parts = get_parts_by_fields_range(&collected_parts, f)?;
+
+                let cut_line: &str = &matching_parts.join(&opt.delimiter);
+                let mut edited_line: &str = cut_line;
+
+                let owner_replace;
+
+                if let Some(replace_delimiter) = &opt.replace_delimiter {
+                    owner_replace = edited_line.replace(&opt.delimiter, &replace_delimiter);
+                    edited_line = &owner_replace;
+                }
+
+                output.push_str(edited_line);
+            }
+            Ok(output)
+        }
+    }
+}
+
 fn main() -> Result<()> {
     let matches = Opt::clap()
         .setting(structopt::clap::AppSettings::AllowLeadingHyphen)
         .get_matches();
 
     let opt = Opt::from_clap(&matches);
+
     let re: Regex = Regex::new(format!("({})+", escape(&opt.delimiter)).as_ref()).unwrap();
 
     let stdin = std::io::stdin();
@@ -204,53 +251,8 @@ fn main() -> Result<()> {
         .lock()
         .lines()
         .try_for_each::<_, Result<()>>(|maybe_line| {
-            let line = &maybe_line?;
-
-            let line = match opt.trim {
-                Some(Trim::Both) => line
-                    .trim_start_matches(&opt.delimiter)
-                    .trim_end_matches(&opt.delimiter),
-                Some(Trim::Left) => line.trim_start_matches(&opt.delimiter),
-                Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
-                _ => line,
-            };
-
-            let owner_compress;
-            let line: &str = if opt.compress_delimiter {
-                owner_compress = re.replace_all(line, NoExpand(&opt.delimiter));
-                owner_compress.as_ref()
-            } else {
-                line
-            };
-
-            let parts = line.split(&opt.delimiter);
-            let collected_parts = parts.collect::<Vec<_>>();
-
-            match collected_parts.len() {
-                1 if opt.only_delimited => (),
-                1 => {
-                    writeln!(stdout, "{}", &line)?;
-                }
-                _ => {
-                    for f in &opt.fields.0 {
-                        let matching_parts = get_parts_by_fields_range(&collected_parts, f)?;
-
-                        let cut_line: &str = &matching_parts.join(&opt.delimiter);
-                        let mut edited_line: &str = cut_line;
-
-                        let owner_replace;
-
-                        if let Some(replace_delimiter) = &opt.replace_delimiter {
-                            owner_replace = edited_line.replace(&opt.delimiter, &replace_delimiter);
-                            edited_line = &owner_replace;
-                        }
-
-                        write!(stdout, "{}", edited_line)?;
-                    }
-                    writeln!(stdout)?;
-                }
-            };
-
+            let output = search_and_replace(&maybe_line?, &re, &opt)?;
+            writeln!(stdout, "{}", output)?;
             Ok(())
         })?;
 
