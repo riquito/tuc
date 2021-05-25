@@ -222,7 +222,7 @@ fn search_and_replace<'a, S: Into<Cow<'a, str>>>(
         line
     };
 
-    let parts = line.split(&opt.delimiter);
+    let parts = re.split(&line);
     let collected_parts = parts.collect::<Vec<_>>();
 
     let mut output = String::with_capacity(line.len());
@@ -252,7 +252,11 @@ fn main() -> Result<()> {
 
     let opt = Opt::from_clap(&matches);
 
-    let re: Regex = Regex::new(format!("({})+", escape(&opt.delimiter)).as_ref()).unwrap();
+    let re: Regex = if opt.compress_delimiter {
+        Regex::new(format!("({})+", escape(&opt.delimiter)).as_ref()).unwrap()
+    } else {
+        Regex::new(format!("({})", escape(&opt.delimiter)).as_ref()).unwrap()
+    };
 
     let stdin = std::io::stdin();
     let mut stdout = grep_cli::stdout(termcolor::ColorChoice::Never);
