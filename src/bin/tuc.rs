@@ -1,5 +1,4 @@
 use anyhow::{bail, Result};
-use grep_cli::StandardStream;
 use regex::{escape, NoExpand, Regex};
 use std::fmt;
 use std::io::{BufRead, Write};
@@ -185,7 +184,12 @@ fn field_to_std_range(parts_length: usize, f: &Range) -> Result<std::ops::Range<
     Ok(std::ops::Range { start, end })
 }
 
-fn cut(line: &str, re: &Regex, opt: &Opt, stdout: &mut StandardStream) -> Result<()> {
+fn cut(
+    line: &str,
+    re: &Regex,
+    opt: &Opt,
+    stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
+) -> Result<()> {
     let mut line: &str = line;
     let mut k = std::borrow::Cow::from(line);
     if opt.compress_delimiter {
@@ -267,7 +271,8 @@ fn main() -> Result<()> {
     };
 
     let stdin = std::io::stdin();
-    let mut stdout = grep_cli::stdout(termcolor::ColorChoice::Never);
+    let stdout = std::io::stdout();
+    let mut stdout = std::io::BufWriter::with_capacity(32 * 1024, stdout.lock());
 
     stdin
         .lock()
@@ -277,6 +282,8 @@ fn main() -> Result<()> {
             cut(&line, &re, &opt, &mut stdout)?;
             Ok(())
         })?;
+
+    stdout.flush()?;
 
     Ok(())
 }
