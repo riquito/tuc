@@ -226,11 +226,10 @@ fn cut(
     });
 
     if fields_as_ranges.len() == 1 {
-        if opt.only_delimited {
-            writeln!(stdout)?;
-        } else {
-            writeln!(stdout, "{}", line)?;
+        if !opt.only_delimited {
+            stdout.write_all(line.as_bytes())?;
         }
+        stdout.write_all(b"\n")?;
         return Ok(());
     }
 
@@ -241,18 +240,19 @@ fn cut(
         let output = &line[idx_start..idx_end];
 
         if let Some(replace_delimiter) = &opt.replace_delimiter {
-            write!(
-                stdout,
-                "{}",
-                output.replace(&opt.delimiter, &replace_delimiter)
+            stdout.write_all(
+                output
+                    .replace(&opt.delimiter, &replace_delimiter)
+                    .as_bytes(),
             )?;
         } else {
-            write!(stdout, "{}", output)?;
+            stdout.write_all(output.as_bytes())?;
         }
 
         Ok(())
     })?;
-    writeln!(stdout)?;
+
+    stdout.write_all(b"\n")?;
 
     Ok(())
 }
