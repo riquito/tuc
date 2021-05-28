@@ -184,11 +184,42 @@ fn field_to_std_range(parts_length: usize, f: &Range) -> Result<std::ops::Range<
     Ok(std::ops::Range { start, end })
 }
 
+/*
+ * Build a vector of ranges (start/end) for each field.
+ *
+ * The vector is expected to be empty (we reuse an existing vector
+ * for performance reasons).
+ */
+fn get_fields_as_ranges<'a>(
+    fields_as_ranges: &'a mut Vec<std::ops::Range<usize>>,
+    line: &str,
+    delimiter: &str,
+) -> &'a mut Vec<std::ops::Range<usize>> {
+    let delimiter_lenth = delimiter.len();
+    let mut next_part_start = 0;
+
+    for mat in line.match_indices(&delimiter) {
+        fields_as_ranges.push(std::ops::Range {
+            start: next_part_start,
+            end: mat.0,
+        });
+        next_part_start = mat.0 + delimiter_lenth;
+    }
+
+    fields_as_ranges.push(std::ops::Range {
+        start: next_part_start,
+        end: line.len(),
+    });
+
+    fields_as_ranges
+}
+
 fn cut(
     line: &str,
     re: &Regex,
     opt: &Opt,
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
+    fields_as_ranges: &mut Vec<std::ops::Range<usize>>,
 ) -> Result<()> {
     let mut line: &str = line;
     let mut k = std::borrow::Cow::from(line);
@@ -206,24 +237,9 @@ fn cut(
         Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
     };
 
-    let mut fields_as_ranges = Vec::with_capacity((line.len() as i32 / 2 * 3).abs() as usize + 1);
+    // let mut fields_as_ranges = Vec::with_capacity((line.len() as i32 / 2 * 3).abs() as usize + 1);
 
-    // Build a vector of ranges (start/end) for each field
-    let delimiter_lenth = opt.delimiter.len();
-    let mut next_part_start = 0;
-
-    for mat in re.find_iter(line) {
-        fields_as_ranges.push(std::ops::Range {
-            start: next_part_start,
-            end: mat.start(),
-        });
-        next_part_start = mat.start() + delimiter_lenth;
-    }
-
-    fields_as_ranges.push(std::ops::Range {
-        start: next_part_start,
-        end: line.len(),
-    });
+    let fields_as_ranges = get_fields_as_ranges(fields_as_ranges, &line, &opt.delimiter);
 
     if fields_as_ranges.len() == 1 {
         if !opt.only_delimited {
@@ -273,13 +289,15 @@ fn main() -> Result<()> {
     let stdin = std::io::stdin();
     let stdout = std::io::stdout();
     let mut stdout = std::io::BufWriter::with_capacity(32 * 1024, stdout.lock());
+    let mut fields_as_ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(100);
 
     stdin
         .lock()
         .lines()
         .try_for_each::<_, Result<()>>(|maybe_line| -> Result<()> {
             let line = maybe_line?;
-            cut(&line, &re, &opt, &mut stdout)?;
+            cut(&line, &re, &opt, &mut stdout, &mut fields_as_ranges)?;
+            fields_as_ranges.clear();
             Ok(())
         })?;
 
