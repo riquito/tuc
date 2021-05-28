@@ -1,8 +1,9 @@
 use anyhow::{bail, Result};
+use grep_cli::StandardStream;
 use regex::{escape, NoExpand, Regex};
+use std::fmt;
 use std::io::{BufRead, Write};
 use std::str::FromStr;
-use std::{borrow::Cow, fmt};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -152,27 +153,22 @@ impl Default for Range {
     }
 }
 
-fn get_parts_by_fields_range<'a>(parts: &'a [&'a str], f: &Range) -> Result<&'a [&'a str]> {
-    let parts_length: usize = parts.len();
-
-    let l: usize;
-    let r: usize;
-
-    l = match f.l {
-        Side::Continue => 1,
+fn field_to_std_range(parts_length: usize, f: &Range) -> Result<std::ops::Range<usize>> {
+    let start: usize = match f.l {
+        Side::Continue => 0,
         Side::Some(v) => {
             if v.abs() as usize > parts_length {
                 bail!("Out of bounds: {}", v);
             }
             if v < 0 {
-                parts_length - v.abs() as usize + 1
+                parts_length - v.abs() as usize
             } else {
-                v as usize
+                v as usize - 1
             }
         }
-    } - 1;
+    };
 
-    r = match f.r {
+    let end: usize = match f.r {
         Side::Continue => parts_length,
         Side::Some(v) => {
             if v.abs() as usize > parts_length {
@@ -186,30 +182,16 @@ fn get_parts_by_fields_range<'a>(parts: &'a [&'a str], f: &Range) -> Result<&'a 
         }
     };
 
-    Ok(&parts[l..r])
+    Ok(std::ops::Range { start, end })
 }
 
-fn search_and_replace<'a, S: Into<Cow<'a, str>>>(
-    orig_line: S,
-    re: &Regex,
-    opt: &Opt,
-) -> Result<Cow<'a, str>> {
-    let line: Cow<'a, str> = orig_line.into();
-
-    // optimize the no-match behaviour
-    if !re.is_match(&line) {
-        if opt.only_delimited {
-            return Ok(Cow::Borrowed(""));
-        } else {
-            return Ok(line);
-        }
+fn cut(line: &str, re: &Regex, opt: &Opt, stdout: &mut StandardStream) -> Result<()> {
+    let mut line: &str = line;
+    let mut k = std::borrow::Cow::from(line);
+    if opt.compress_delimiter {
+        k = re.replace_all(&line, NoExpand(&opt.delimiter));
     }
-
-    let line = if opt.compress_delimiter {
-        re.replace_all(&line, NoExpand(&opt.delimiter))
-    } else {
-        line
-    };
+    line = &k;
 
     let line: &str = match opt.trim {
         None => &line,
@@ -220,20 +202,55 @@ fn search_and_replace<'a, S: Into<Cow<'a, str>>>(
         Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
     };
 
-    let parts = re.split(&line);
-    let collected_parts = parts.collect::<Vec<_>>();
+    let mut fields_as_ranges = Vec::with_capacity((line.len() as i32 / 2 * 3).abs() as usize + 1);
 
-    let mut output = String::with_capacity(line.len());
-    for f in &opt.fields.0 {
-        let matching_parts = get_parts_by_fields_range(&collected_parts, f)?;
-        output.push_str(&matching_parts.join(&opt.delimiter));
+    // Build a vector of ranges (start/end) for each field
+    let delimiter_lenth = opt.delimiter.len();
+    let mut next_part_start = 0;
+
+    for mat in re.find_iter(line) {
+        fields_as_ranges.push(std::ops::Range {
+            start: next_part_start,
+            end: mat.start(),
+        });
+        next_part_start = mat.start() + delimiter_lenth;
     }
 
-    if let Some(replace_delimiter) = &opt.replace_delimiter {
-        output = output.replace(&opt.delimiter, &replace_delimiter);
+    fields_as_ranges.push(std::ops::Range {
+        start: next_part_start,
+        end: line.len(),
+    });
+
+    if fields_as_ranges.len() == 1 {
+        if opt.only_delimited {
+            writeln!(stdout)?;
+        } else {
+            writeln!(stdout, "{}", line)?;
+        }
+        return Ok(());
     }
 
-    Ok(Cow::Owned(output))
+    opt.fields.0.iter().try_for_each(|f| -> Result<()> {
+        let r = field_to_std_range(fields_as_ranges.len(), f)?;
+        let idx_start = fields_as_ranges[r.start].start;
+        let idx_end = fields_as_ranges[r.end - 1].end;
+        let output = &line[idx_start..idx_end];
+
+        if let Some(replace_delimiter) = &opt.replace_delimiter {
+            write!(
+                stdout,
+                "{}",
+                output.replace(&opt.delimiter, &replace_delimiter)
+            )?;
+        } else {
+            write!(stdout, "{}", output)?;
+        }
+
+        Ok(())
+    })?;
+    writeln!(stdout)?;
+
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -244,9 +261,9 @@ fn main() -> Result<()> {
     let opt = Opt::from_clap(&matches);
 
     let re: Regex = if opt.compress_delimiter {
-        Regex::new(format!("({})+", escape(&opt.delimiter)).as_ref()).unwrap()
+        Regex::new(format!("{}+", escape(&opt.delimiter)).as_ref()).unwrap()
     } else {
-        Regex::new(format!("({})", escape(&opt.delimiter)).as_ref()).unwrap()
+        Regex::new(escape(&opt.delimiter).as_ref()).unwrap()
     };
 
     let stdin = std::io::stdin();
@@ -255,10 +272,9 @@ fn main() -> Result<()> {
     stdin
         .lock()
         .lines()
-        .try_for_each::<_, Result<()>>(|maybe_line| {
+        .try_for_each::<_, Result<()>>(|maybe_line| -> Result<()> {
             let line = maybe_line?;
-            let output = search_and_replace(&line, &re, &opt)?;
-            writeln!(stdout, "{}", output)?;
+            cut(&line, &re, &opt, &mut stdout)?;
             Ok(())
         })?;
 
