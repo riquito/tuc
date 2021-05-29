@@ -50,3 +50,15 @@ fn it_accepts_values_starting_with_hyphen() {
 
     assert.success().stdout("hello\n");
 }
+
+#[test]
+fn it_compresses_delimiters_when_requested() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-d", "-", "-p", "-f", "2"])
+        .write_stdin("foo---bar")
+        .assert();
+
+    assert.success().stdout("bar\n");
+}

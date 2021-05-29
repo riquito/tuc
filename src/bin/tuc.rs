@@ -1,5 +1,4 @@
 use anyhow::{bail, Result};
-use regex::{escape, NoExpand, Regex};
 use std::fmt;
 use std::io::{BufRead, Write};
 use std::str::FromStr;
@@ -214,21 +213,26 @@ fn get_fields_as_ranges<'a>(
     fields_as_ranges
 }
 
+fn compress_delimiter(
+    fields_as_ranges: &[std::ops::Range<usize>],
+    line: &str,
+    delimiter: &str,
+) -> String {
+    fields_as_ranges
+        .iter()
+        .map(|r| &line[r.start..r.end])
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<&str>>()
+        .join(&delimiter)
+}
+
 fn cut(
     line: &str,
-    re: &Regex,
     opt: &Opt,
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
     fields_as_ranges: &mut Vec<std::ops::Range<usize>>,
 ) -> Result<()> {
-    let mut line: &str = line;
-    let mut k = std::borrow::Cow::from(line);
-    if opt.compress_delimiter {
-        k = re.replace_all(&line, NoExpand(&opt.delimiter));
-    }
-    line = &k;
-
-    let line: &str = match opt.trim {
+    let mut line: &str = match opt.trim {
         None => &line,
         Some(Trim::Both) => line
             .trim_start_matches(&opt.delimiter)
@@ -237,9 +241,15 @@ fn cut(
         Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
     };
 
-    // let mut fields_as_ranges = Vec::with_capacity((line.len() as i32 / 2 * 3).abs() as usize + 1);
+    let mut fields_as_ranges = get_fields_as_ranges(fields_as_ranges, &line, &opt.delimiter);
+    let compressed_line: String;
 
-    let fields_as_ranges = get_fields_as_ranges(fields_as_ranges, &line, &opt.delimiter);
+    if opt.compress_delimiter {
+        compressed_line = compress_delimiter(fields_as_ranges, &line, &opt.delimiter);
+        line = &compressed_line;
+        fields_as_ranges.clear();
+        fields_as_ranges = get_fields_as_ranges(fields_as_ranges, &line, &opt.delimiter);
+    }
 
     if fields_as_ranges.len() == 1 {
         if !opt.only_delimited {
@@ -280,12 +290,6 @@ fn main() -> Result<()> {
 
     let opt = Opt::from_clap(&matches);
 
-    let re: Regex = if opt.compress_delimiter {
-        Regex::new(format!("{}+", escape(&opt.delimiter)).as_ref()).unwrap()
-    } else {
-        Regex::new(escape(&opt.delimiter).as_ref()).unwrap()
-    };
-
     let stdin = std::io::stdin();
     let stdin = std::io::BufReader::with_capacity(32 * 1024, stdin.lock());
 
@@ -298,7 +302,7 @@ fn main() -> Result<()> {
         .lines()
         .try_for_each::<_, Result<()>>(|maybe_line| -> Result<()> {
             let line = maybe_line?;
-            cut(&line, &re, &opt, &mut stdout, &mut fields_as_ranges)?;
+            cut(&line, &opt, &mut stdout, &mut fields_as_ranges)?;
             fields_as_ranges.clear();
             Ok(())
         })?;
