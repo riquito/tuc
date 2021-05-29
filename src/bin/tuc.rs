@@ -251,34 +251,35 @@ fn cut(
         fields_as_ranges = get_fields_as_ranges(fields_as_ranges, &line, &opt.delimiter);
     }
 
-    if fields_as_ranges.len() == 1 {
-        if !opt.only_delimited {
+    match fields_as_ranges.len() {
+        1 if opt.only_delimited => stdout.write_all(b"")?,
+        1 => {
             stdout.write_all(line.as_bytes())?;
+            stdout.write_all(b"\n")?;
         }
-        stdout.write_all(b"\n")?;
-        return Ok(());
+        _ => {
+            opt.fields.0.iter().try_for_each(|f| -> Result<()> {
+                let r = field_to_std_range(fields_as_ranges.len(), f)?;
+                let idx_start = fields_as_ranges[r.start].start;
+                let idx_end = fields_as_ranges[r.end - 1].end;
+                let output = &line[idx_start..idx_end];
+
+                if let Some(replace_delimiter) = &opt.replace_delimiter {
+                    stdout.write_all(
+                        output
+                            .replace(&opt.delimiter, &replace_delimiter)
+                            .as_bytes(),
+                    )?;
+                } else {
+                    stdout.write_all(output.as_bytes())?;
+                }
+
+                Ok(())
+            })?;
+
+            stdout.write_all(b"\n")?;
+        }
     }
-
-    opt.fields.0.iter().try_for_each(|f| -> Result<()> {
-        let r = field_to_std_range(fields_as_ranges.len(), f)?;
-        let idx_start = fields_as_ranges[r.start].start;
-        let idx_end = fields_as_ranges[r.end - 1].end;
-        let output = &line[idx_start..idx_end];
-
-        if let Some(replace_delimiter) = &opt.replace_delimiter {
-            stdout.write_all(
-                output
-                    .replace(&opt.delimiter, &replace_delimiter)
-                    .as_bytes(),
-            )?;
-        } else {
-            stdout.write_all(output.as_bytes())?;
-        }
-
-        Ok(())
-    })?;
-
-    stdout.write_all(b"\n")?;
 
     Ok(())
 }

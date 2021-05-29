@@ -10,6 +10,18 @@ fn it_echo_non_delimited_line() {
 }
 
 #[test]
+fn it_skips_non_delimited_line_when_requested() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-s"])
+        .write_stdin("one\ntwo\tkeepme\nthree")
+        .assert();
+
+    assert.success().stdout("two\tkeepme\n");
+}
+
+#[test]
 fn it_cut_a_field() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
