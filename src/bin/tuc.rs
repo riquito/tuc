@@ -287,12 +287,14 @@ fn main() -> Result<()> {
     };
 
     let stdin = std::io::stdin();
+    let stdin = std::io::BufReader::with_capacity(32 * 1024, stdin.lock());
+
     let stdout = std::io::stdout();
     let mut stdout = std::io::BufWriter::with_capacity(32 * 1024, stdout.lock());
+
     let mut fields_as_ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(100);
 
     stdin
-        .lock()
         .lines()
         .try_for_each::<_, Result<()>>(|maybe_line| -> Result<()> {
             let line = maybe_line?;
