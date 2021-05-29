@@ -19,3 +19,8 @@ anyhow = "1.0.31"
 
 [dev-dependencies]
 assert_cmd = "1.0.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = 'abort'
