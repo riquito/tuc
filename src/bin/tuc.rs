@@ -1,32 +1,32 @@
 use anyhow::{bail, Result};
+use argh::FromArgs;
 use std::fmt;
 use std::io::{BufRead, Write};
 use std::str::FromStr;
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "tuc", about = "When cut doesn't cut it.")]
-
+#[derive(FromArgs)]
+/// tuc - when cut doesn't cut it
 struct Opt {
-    /// Delimiter to use to cut the text into pieces
-    #[structopt(short, long, default_value = "\t")]
+    /// delimiter to use to cut the text into pieces
+    #[argh(option, short = 'd', default = "String::from(\"\\t\")")]
     delimiter: String,
-    /// Fields to keep, like 1:3 or 3,2 or 1: or 3,1:2 or -3 or -3:-2
-    #[structopt(short, long, default_value = "1:")]
+    /// fields to keep, like 1:3 or 3,2 or 1: or 3,1:2 or -3 or -3:-2
+    #[argh(option, short = 'f', default = "RangeList::from_str(\"1:\").unwrap()")]
     fields: RangeList,
-    /// Do not print lines not containing delimiters
-    #[structopt(short = "s", long = "only-delimited")]
+    /// do not print lines not containing delimiters
+    #[argh(switch, short = 's')]
     only_delimited: bool,
-    /// Display the delimiter at most once in a sequence
-    #[structopt(short = "p", long)]
+    /// display the delimiter at most once in a sequence
+    #[argh(switch, short = 'p')]
     compress_delimiter: bool,
-    /// Replace the delimiter
-    #[structopt(short = "r")]
+    /// replace the delimiter
+    #[argh(option, short = 'r')]
     replace_delimiter: Option<String>,
-    /// Trim the delimiter (trim is applied before any other cut or replace)
-    #[structopt(
-        short = "t",
-        help = "Valid trim values are (l|L)eft, (r|R)ight, (b|B)oth"
+    /// trim the delimiter (trim is applied before any other cut or replace)
+    #[argh(
+        option,
+        short = 't',
+        description = "valid trim values are (l|L)eft, (r|R)ight, (b|B)oth"
     )]
     trim: Option<Trim>,
 }
@@ -285,11 +285,7 @@ fn cut(
 }
 
 fn main() -> Result<()> {
-    let matches = Opt::clap()
-        .setting(structopt::clap::AppSettings::AllowLeadingHyphen)
-        .get_matches();
-
-    let opt = Opt::from_clap(&matches);
+    let opt: Opt = argh::from_env();
 
     let stdin = std::io::stdin();
     let stdin = std::io::BufReader::with_capacity(32 * 1024, stdin.lock());
