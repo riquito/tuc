@@ -1,34 +1,77 @@
 use anyhow::{bail, Result};
-use argh::FromArgs;
 use std::fmt;
 use std::io::{BufRead, Write};
 use std::str::FromStr;
 
-#[derive(FromArgs)]
-/// tuc - when cut doesn't cut it
+const HELP: &str = concat!(
+    "tuc ",
+    env!("CARGO_PKG_VERSION"),
+    "
+When cut doesn't cut it.
+
+USAGE:
+    tuc [FLAGS] [OPTIONS]
+
+FLAGS:
+    -p, --compress-delimiter      Collapse any sequence of delimiters
+    -s, --only-delimited          Do not print lines not containing delimiters
+    -h, --help                    Prints this help and exit
+
+OPTIONS:
+    -d, --delimiter <delimiter>   Delimiter to use to cut the text into pieces
+                                  [default: \\t]
+    -f, --fields <fields>         Fields to keep, 1-indexed, comma separated.
+                                  Use colon for inclusive ranges.
+                                  e.g. 1:3 or 3,2 or 1: or 3,1:2 or -3 or -3:-2
+                                  [default 1:]
+    -r, --replace-delimiter <s>   Replace the delimiter with the provided text
+    -t, --trim <trim>             Trim the delimiter. Valid trim values are
+                                  (l|L)eft, (r|R)ight, (b|B)oth
+
+Notes:
+    --trim and --compress-delimiter are applied before --fields
+"
+);
+
+#[derive(Debug)]
 struct Opt {
-    /// delimiter to use to cut the text into pieces
-    #[argh(option, short = 'd', default = "String::from(\"\\t\")")]
     delimiter: String,
-    /// fields to keep, like 1:3 or 3,2 or 1: or 3,1:2 or -3 or -3:-2
-    #[argh(option, short = 'f', default = "RangeList::from_str(\"1:\").unwrap()")]
     fields: RangeList,
-    /// do not print lines not containing delimiters
-    #[argh(switch, short = 's')]
     only_delimited: bool,
-    /// display the delimiter at most once in a sequence
-    #[argh(switch, short = 'p')]
     compress_delimiter: bool,
-    /// replace the delimiter
-    #[argh(option, short = 'r')]
     replace_delimiter: Option<String>,
-    /// trim the delimiter (trim is applied before any other cut or replace)
-    #[argh(
-        option,
-        short = 't',
-        description = "valid trim values are (l|L)eft, (r|R)ight, (b|B)oth"
-    )]
     trim: Option<Trim>,
+}
+
+fn parse_args() -> Result<Opt, pico_args::Error> {
+    let mut pargs = pico_args::Arguments::from_env();
+
+    if pargs.contains(["-h", "--help"]) {
+        print!("{}", HELP);
+        std::process::exit(0);
+    }
+
+    let args = Opt {
+        delimiter: pargs
+            .opt_value_from_str(["-d", "--delimiter"])?
+            .unwrap_or_else(|| String::from('\t')),
+        fields: pargs
+            .opt_value_from_str(["-f", "--fields"])?
+            .unwrap_or_else(|| RangeList::from_str("1:").unwrap()),
+        only_delimited: pargs.contains(["-s", "--only-delimited"]),
+        compress_delimiter: pargs.contains(["-p", "--compress-delimiter"]),
+        replace_delimiter: pargs.opt_value_from_str(["-r", "--replace-delimiter"])?,
+        trim: pargs.opt_value_from_str(["-t", "--trim"])?,
+    };
+
+    let remaining = pargs.finish();
+
+    if !remaining.is_empty() {
+        eprintln!("Error: unexpected arguments: {:?}.", remaining);
+        std::process::exit(1);
+    }
+
+    Ok(args)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -285,7 +328,7 @@ fn cut(
 }
 
 fn main() -> Result<()> {
-    let opt: Opt = argh::from_env();
+    let opt: Opt = parse_args()?;
 
     let stdin = std::io::stdin();
     let stdin = std::io::BufReader::with_capacity(32 * 1024, stdin.lock());

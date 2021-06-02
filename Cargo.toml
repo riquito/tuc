@@ -15,7 +15,7 @@ categories = ["command-line-utilities"]
 
 [dependencies]
 anyhow = "1.0.31"
-argh = "0.1.3"
+pico-args = { version = "0.4.0", features = ["short-space-opt", "combined-flags"] }
 
 [dev-dependencies]
 assert_cmd = "1.0.1"
