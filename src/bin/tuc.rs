@@ -15,6 +15,7 @@ USAGE:
 FLAGS:
     -p, --compress-delimiter      Collapse any sequence of delimiters
     -s, --only-delimited          Do not print lines not containing delimiters
+    -V, --version                 Prints version information
     -h, --help                    Prints this help and exit
 
 OPTIONS:
@@ -41,6 +42,7 @@ struct Opt {
     compress_delimiter: bool,
     replace_delimiter: Option<String>,
     trim: Option<Trim>,
+    version: bool,
 }
 
 fn parse_args() -> Result<Opt, pico_args::Error> {
@@ -58,13 +60,19 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         fields: pargs
             .opt_value_from_str(["-f", "--fields"])?
             .unwrap_or_else(|| RangeList::from_str("1:").unwrap()),
-        only_delimited: pargs.contains(["-s", "--only-delimited"]),
-        compress_delimiter: pargs.contains(["-p", "--compress-delimiter"]),
         replace_delimiter: pargs.opt_value_from_str(["-r", "--replace-delimiter"])?,
         trim: pargs.opt_value_from_str(["-t", "--trim"])?,
+        only_delimited: pargs.contains(["-s", "--only-delimited"]),
+        compress_delimiter: pargs.contains(["-p", "--compress-delimiter"]),
+        version: pargs.contains(["-V", "--version"]),
     };
 
     let remaining = pargs.finish();
+
+    if args.version {
+        println!("tuc {}", env!("CARGO_PKG_VERSION"));
+        std::process::exit(0);
+    }
 
     if !remaining.is_empty() {
         eprintln!("Error: unexpected arguments: {:?}.", remaining);
