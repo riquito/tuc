@@ -14,11 +14,11 @@ categories = ["command-line-utilities"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.31"
-pico-args = { version = "0.4.0", features = ["short-space-opt", "combined-flags"] }
+anyhow = "1.0.41"
+pico-args = { version = "0.4.2", features = ["short-space-opt", "combined-flags"] }
 
 [dev-dependencies]
-assert_cmd = "1.0.1"
+assert_cmd = "1.0.5"
 
 [profile.release]
 lto = true
