@@ -75,7 +75,8 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     }
 
     if !remaining.is_empty() {
-        eprintln!("Error: unexpected arguments: {:?}.", remaining);
+        eprintln!("tuc: unexpected arguments {:?}", remaining);
+        eprintln!("Try 'tuc --help' for more information.");
         std::process::exit(1);
     }
 
