@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.5.0] - 2021-07-21
+
+- Better performances (faster, less allocations)
+- Faster to compile
+- Smaller binary size
+- Display a better error message on unknown arguments
+- Add an option to get the version back
+- Migrate to pico-args
+- Fix output when --only-delimited is present
+- Delimiters are replaced once, allowing empty strings
+- Updated dependencies
+- More integration tests
+
 ## [0.4.0] - 2020-05-31
 
 ### Changed
