@@ -24,3 +24,4 @@ assert_cmd = "1.0.5"
 lto = true
 codegen-units = 1
 panic = 'abort'
+strip = "debuginfo"
