@@ -1,4 +1,4 @@
-name: Build, bump tag version and release
+name: Release
 
 defaults:
   run:
@@ -6,45 +6,42 @@ defaults:
 
 on:
   push:
-    branches:
-      - master
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
 
 jobs:
-  check-if-needs-release:
-    name: Check if needs release
+  check_if_safe:
+    name: Check if safe to release
     runs-on: ubuntu-latest
-    outputs:
-      new_version: ${{ steps.is-new-version.outputs.result }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
         with:
-          fetch-depth: "0"
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: clippy, rustfmt
 
-      - name: Check
-        run: cargo check --locked
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
 
-      - name: Get version from Cargo.toml
-        id: version-by-cargo
-        run: |
-          echo "::set-output name=version::v$(cargo metadata --offline --no-deps --format-version=1 | jq --raw-output '.packages[0].version')"
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all-targets --all-features
 
-      - name: Is already tagged at latest version?
-        id: is-new-version
-        run: |
-          echo "::set-output name=result::$(test $(git tag --list ${{ steps.version-by-cargo.outputs.version }}) && echo "" || echo ${{ steps.version-by-cargo.outputs.version }})"
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
 
-      - name: Push tag/create release point
-        id: apply-tag
-        if: steps.is-new-version.outputs.result != ''
-        uses: anothrNick/github-tag-action@1.17.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_TAG: ${{ steps.is-new-version.outputs.result }}
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
 
   release:
-    needs: check-if-needs-release
-    if: needs.check-if-needs-release.outputs.new_version != ''
+    needs: check_if_safe
     name: Build and Release
     runs-on: ${{ matrix.os }}
     strategy:
@@ -62,21 +59,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-        with:
-          fetch-depth: "0"
 
       - name: Build project
         run: cargo build --release --locked
 
-      - name: Strip release binary (linux and macos)
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
-        run: strip "target/release/${{ matrix.artifact_name }}"
-
       - name: Upload binary to release
-        uses: svenstaro/upload-release-action@v1-release
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/release/${{ matrix.artifact_name }}
           asset_name: ${{ matrix.asset_name }}
-          tag: ${{ needs.check-if-needs-release.outputs.new_version }}
+          tag: ${{ github.ref }}
           overwrite: true
