@@ -71,3 +71,28 @@ jobs:
           asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}
           overwrite: true
+
+  macos_arm:
+    needs: check_if_safe
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install ARM target
+        run: rustup update && rustup target add aarch64-apple-darwin
+
+      - name: Test
+        run: cargo test --release
+
+      - name: Build ARM
+        run: cargo build --release --target=aarch64-apple-darwin
+
+      - name: Upload binary to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/release/tuc
+          asset_name: tuc-macos-aarch64
+          tag: ${{ github.ref }}
+          overwrite: true
