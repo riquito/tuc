@@ -275,7 +275,7 @@ fn compress_delimiter(
         .map(|r| &line[r.start..r.end])
         .filter(|l| !l.is_empty())
         .collect::<Vec<&str>>()
-        .join(&delimiter)
+        .join(delimiter)
 }
 
 fn cut(
@@ -285,7 +285,7 @@ fn cut(
     fields_as_ranges: &mut Vec<std::ops::Range<usize>>,
 ) -> Result<()> {
     let mut line: &str = match opt.trim {
-        None => &line,
+        None => line,
         Some(Trim::Both) => line
             .trim_start_matches(&opt.delimiter)
             .trim_end_matches(&opt.delimiter),
@@ -293,14 +293,14 @@ fn cut(
         Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
     };
 
-    let mut fields_as_ranges = get_fields_as_ranges(fields_as_ranges, &line, &opt.delimiter);
+    let mut fields_as_ranges = get_fields_as_ranges(fields_as_ranges, line, &opt.delimiter);
     let compressed_line: String;
 
     if opt.compress_delimiter {
-        compressed_line = compress_delimiter(fields_as_ranges, &line, &opt.delimiter);
+        compressed_line = compress_delimiter(fields_as_ranges, line, &opt.delimiter);
         line = &compressed_line;
         fields_as_ranges.clear();
-        fields_as_ranges = get_fields_as_ranges(fields_as_ranges, &line, &opt.delimiter);
+        fields_as_ranges = get_fields_as_ranges(fields_as_ranges, line, &opt.delimiter);
     }
 
     match fields_as_ranges.len() {
@@ -317,11 +317,8 @@ fn cut(
                 let output = &line[idx_start..idx_end];
 
                 if let Some(replace_delimiter) = &opt.replace_delimiter {
-                    stdout.write_all(
-                        output
-                            .replace(&opt.delimiter, &replace_delimiter)
-                            .as_bytes(),
-                    )?;
+                    stdout
+                        .write_all(output.replace(&opt.delimiter, replace_delimiter).as_bytes())?;
                 } else {
                     stdout.write_all(output.as_bytes())?;
                 }
