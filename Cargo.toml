@@ -18,7 +18,7 @@ anyhow = "1.0.57"
 pico-args = { version = "0.4.2", features = ["short-space-opt", "combined-flags"] }
 
 [dev-dependencies]
-assert_cmd = "1.0.5"
+assert_cmd = "2.0.4"
 
 [profile.release]
 lto = true
