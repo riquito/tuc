@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use std::fmt;
-use std::io::{BufRead, Write};
+use std::io::Write;
 use std::str::FromStr;
 
 const HELP: &str = concat!(
@@ -337,23 +337,54 @@ fn main() -> Result<()> {
     let opt: Opt = parse_args()?;
 
     let stdin = std::io::stdin();
-    let stdin = std::io::BufReader::with_capacity(32 * 1024, stdin.lock());
+    let mut stdin = reuse_buffer_reader::BufReader::with_capacity(32 * 1024, stdin.lock());
 
     let stdout = std::io::stdout();
     let mut stdout = std::io::BufWriter::with_capacity(32 * 1024, stdout.lock());
 
     let mut fields_as_ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(100);
 
-    stdin
-        .lines()
-        .try_for_each::<_, Result<()>>(|maybe_line| -> Result<()> {
-            let line = maybe_line?;
-            cut(&line, &opt, &mut stdout, &mut fields_as_ranges)?;
-            fields_as_ranges.clear();
-            Ok(())
-        })?;
+    let mut buffer = String::with_capacity(32 * 1024);
+    while let Some(line) = stdin.read_line(&mut buffer) {
+        let line = line?;
+        let line: &str = line.as_ref();
+        let line = line
+            .strip_suffix("\r\n")
+            .or_else(|| line.strip_suffix('\n'))
+            .unwrap_or(line);
+        cut(line, &opt, &mut stdout, &mut fields_as_ranges)?;
+        fields_as_ranges.clear();
+    }
 
     stdout.flush()?;
 
     Ok(())
+}
+
+mod reuse_buffer_reader {
+    use std::io::{self, prelude::*};
+
+    pub struct BufReader<R> {
+        reader: io::BufReader<R>,
+    }
+
+    impl<R: Read> BufReader<R> {
+        pub fn with_capacity(capacity: usize, inner: R) -> BufReader<R> {
+            let reader = io::BufReader::with_capacity(capacity, inner);
+
+            Self { reader }
+        }
+
+        pub fn read_line<'buf>(
+            &mut self,
+            buffer: &'buf mut String,
+        ) -> Option<io::Result<&'buf mut String>> {
+            buffer.clear();
+
+            self.reader
+                .read_line(buffer)
+                .map(|u| if u == 0 { None } else { Some(buffer) })
+                .transpose()
+        }
+    }
 }
