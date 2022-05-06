@@ -1,4 +1,7 @@
 # tuc (when cut doesn't cut it)
+[![version](https://img.shields.io/crates/v/tuc.svg)](https://crates.io/crates/tuc)
+![ci](https://github.com/riquito/tuc/actions/workflows/ci.yml/badge.svg)
+[![license](https://img.shields.io/crates/l/tuc.svg)](https://crates.io/crates/tuc)
 
 We've all been there. You want to `cut` some string on a delimiter repeated in a non-deterministic way. Maybe you even want to use negative indexes or replace the delimiters in the cut part with something else...
 That's where `tuc` can help.
