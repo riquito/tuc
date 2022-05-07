@@ -355,7 +355,7 @@ fn main() -> Result<()> {
 
     let mut fields_as_ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(100);
 
-    let mut line_buf = String::with_capacity(32 * 1024);
+    let mut line_buf = String::with_capacity(1024);
     let mut compressed_line_buf = if opt.compress_delimiter {
         String::with_capacity(line_buf.capacity())
     } else {
