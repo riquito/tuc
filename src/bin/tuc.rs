@@ -270,12 +270,23 @@ fn compress_delimiter(
     line: &str,
     delimiter: &str,
 ) -> String {
-    fields_as_ranges
-        .iter()
-        .map(|r| &line[r.start..r.end])
-        .filter(|l| !l.is_empty())
-        .collect::<Vec<&str>>()
-        .join(delimiter)
+    let mut output = String::with_capacity(line.len());
+    fields_as_ranges.iter().enumerate().for_each(|(i, r)| {
+        if r.start == r.end {
+            return;
+        }
+
+        if output.is_empty() && r.start > 0 {
+            output.push_str(delimiter);
+        }
+
+        output.push_str(&line[r.start..r.end]);
+
+        if (i < fields_as_ranges.len() - 1) || (r.end < line.len() - 1) {
+            output.push_str(delimiter);
+        }
+    });
+    output
 }
 
 fn cut(

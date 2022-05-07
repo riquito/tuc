@@ -74,3 +74,15 @@ fn it_compresses_delimiters_when_requested() {
 
     assert.success().stdout("bar\n");
 }
+
+#[test]
+fn it_compresses_delimiters_when_requested_and_handles_boundaries() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-d", "-", "-p"])
+        .write_stdin("--foo---bar--")
+        .assert();
+
+    assert.success().stdout("-foo-bar-\n");
+}
