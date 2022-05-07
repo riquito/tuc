@@ -269,8 +269,8 @@ fn compress_delimiter(
     fields_as_ranges: &[std::ops::Range<usize>],
     line: &str,
     delimiter: &str,
-) -> String {
-    let mut output = String::with_capacity(line.len());
+    output: &mut String,
+) {
     fields_as_ranges.iter().enumerate().for_each(|(i, r)| {
         if r.start == r.end {
             return;
@@ -286,7 +286,6 @@ fn compress_delimiter(
             output.push_str(delimiter);
         }
     });
-    output
 }
 
 fn cut(
@@ -294,6 +293,7 @@ fn cut(
     opt: &Opt,
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
     fields_as_ranges: &mut Vec<std::ops::Range<usize>>,
+    compressed_line_buf: &mut String,
 ) -> Result<()> {
     let mut line: &str = match opt.trim {
         None => line,
@@ -305,11 +305,11 @@ fn cut(
     };
 
     let mut fields_as_ranges = get_fields_as_ranges(fields_as_ranges, line, &opt.delimiter);
-    let compressed_line: String;
 
     if opt.compress_delimiter {
-        compressed_line = compress_delimiter(fields_as_ranges, line, &opt.delimiter);
-        line = &compressed_line;
+        compressed_line_buf.clear();
+        compress_delimiter(fields_as_ranges, line, &opt.delimiter, compressed_line_buf);
+        line = compressed_line_buf;
         fields_as_ranges.clear();
         fields_as_ranges = get_fields_as_ranges(fields_as_ranges, line, &opt.delimiter);
     }
@@ -355,15 +355,27 @@ fn main() -> Result<()> {
 
     let mut fields_as_ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(100);
 
-    let mut buffer = String::with_capacity(32 * 1024);
-    while let Some(line) = stdin.read_line(&mut buffer) {
+    let mut line_buf = String::with_capacity(32 * 1024);
+    let mut compressed_line_buf = if opt.compress_delimiter {
+        String::with_capacity(line_buf.capacity())
+    } else {
+        String::new()
+    };
+
+    while let Some(line) = stdin.read_line(&mut line_buf) {
         let line = line?;
         let line: &str = line.as_ref();
         let line = line
             .strip_suffix("\r\n")
             .or_else(|| line.strip_suffix('\n'))
             .unwrap_or(line);
-        cut(line, &opt, &mut stdout, &mut fields_as_ranges)?;
+        cut(
+            line,
+            &opt,
+            &mut stdout,
+            &mut fields_as_ranges,
+            &mut compressed_line_buf,
+        )?;
         fields_as_ranges.clear();
     }
 
