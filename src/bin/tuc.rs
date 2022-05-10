@@ -139,7 +139,7 @@ impl fmt::Display for Side {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Side::Some(v) => write!(f, "{}", v),
-            Side::Continue => write!(f, "-"),
+            Side::Continue => write!(f, ""),
         }
     }
 }
@@ -148,12 +148,16 @@ impl fmt::Display for Side {
 struct Range {
     l: Side,
     r: Side,
-    raw: String,
 }
 
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.raw)
+        if self.l == self.r {
+            // note that Side::Continue, Side::Continue is not expected
+            write!(f, "{}", self.l)
+        } else {
+            write!(f, "{}:{}", self.l, self.r)
+        }
     }
 }
 
@@ -161,20 +165,27 @@ impl FromStr for Range {
     type Err = Box<dyn std::error::Error>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let pair: Vec<&str> = s.split(':').collect::<Vec<&str>>();
+        if s.is_empty() {
+            return Err("Field format error: empty field".into());
+        } else if s == ":" {
+            return Err("Field format error, no numbers next to `:`".into());
+        }
 
-        let (l, r): (Side, Side) = match &pair[..] {
-            [""] => {
-                return Err("Field format error: empty field".into());
+        let (l, r) = match s.find(':') {
+            None => {
+                let side = Side::from_str(s)?;
+                (side, side)
             }
-            ["", ""] => {
-                return Err("Field format error, no numbers next to `:`".into());
+            Some(idx_colon) if idx_colon == 0 => {
+                (Side::Continue, Side::from_str(&s[idx_colon + 1..])?)
             }
-            [x, y] => (Side::from_str(x)?, Side::from_str(y)?),
-            [x] => (Side::from_str(x)?, Side::from_str(x)?),
-            _ => {
-                return Err(format!("Field format error (too many `:` in `{}`)", s).into());
+            Some(idx_colon) if idx_colon == s.len() - 1 => {
+                (Side::from_str(&s[..idx_colon])?, Side::Continue)
             }
+            Some(idx_colon) => (
+                Side::from_str(&s[..idx_colon])?,
+                Side::from_str(&s[idx_colon + 1..])?,
+            ),
         };
 
         match (l, r) {
@@ -187,19 +198,19 @@ impl FromStr for Range {
             _ => (),
         }
 
-        Ok(Range::new(l, r, s.to_string()))
+        Ok(Range::new(l, r))
     }
 }
 
 impl Range {
-    pub fn new(l: Side, r: Side, raw: String) -> Self {
-        Range { l, r, raw }
+    pub fn new(l: Side, r: Side) -> Self {
+        Range { l, r }
     }
 }
 
 impl Default for Range {
     fn default() -> Self {
-        Range::new(Side::Some(1), Side::Some(1), String::from("1"))
+        Range::new(Side::Some(1), Side::Some(1))
     }
 }
 
