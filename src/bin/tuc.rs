@@ -25,6 +25,8 @@ OPTIONS:
                                   Use colon for inclusive ranges.
                                   e.g. 1:3 or 3,2 or 1: or 3,1:2 or -3 or -3:-2
                                   [default 1:]
+    -c, --characters              Same as --fields, but it keeps characters instead
+                                  (and it doesn't require a delimiter)
     -r, --replace-delimiter <s>   Replace the delimiter with the provided text
     -t, --trim <trim>             Trim the delimiter. Valid trim values are
                                   (l|L)eft, (r|R)ight, (b|B)oth
@@ -53,13 +55,20 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         std::process::exit(0);
     }
 
+    let maybe_fields: Option<RangeList> = pargs.opt_value_from_str(["-f", "--fields"])?;
+    let maybe_characters: Option<RangeList> = pargs.opt_value_from_str(["-c", "--characters"])?;
+    let delimiter: String = maybe_characters
+        .is_some()
+        .then(String::new)
+        .or_else(|| pargs.opt_value_from_str(["-d", "--delimiter"]).ok()?)
+        .unwrap_or_else(|| String::from('\t'));
+
     let args = Opt {
-        delimiter: pargs
-            .opt_value_from_str(["-d", "--delimiter"])?
-            .unwrap_or_else(|| String::from('\t')),
-        fields: pargs
-            .opt_value_from_str(["-f", "--fields"])?
-            .unwrap_or_else(|| RangeList::from_str("1:").unwrap()),
+        delimiter,
+        fields: maybe_fields
+            .or(maybe_characters)
+            .or_else(|| RangeList::from_str("1:").ok())
+            .unwrap(),
         replace_delimiter: pargs.opt_value_from_str(["-r", "--replace-delimiter"])?,
         trim: pargs.opt_value_from_str(["-t", "--trim"])?,
         only_delimited: pargs.contains(["-s", "--only-delimited"]),
@@ -315,14 +324,29 @@ fn cut(
         Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
     };
 
+    if line.is_empty() {
+        if !opt.only_delimited {
+            stdout.write_all(b"\n")?;
+        }
+        return Ok(());
+    }
+
     let mut fields_as_ranges = get_fields_as_ranges(fields_as_ranges, line, &opt.delimiter);
 
-    if opt.compress_delimiter {
+    if opt.compress_delimiter && opt.delimiter.as_str() != "" {
         compressed_line_buf.clear();
         compress_delimiter(fields_as_ranges, line, &opt.delimiter, compressed_line_buf);
         line = compressed_line_buf;
         fields_as_ranges.clear();
         fields_as_ranges = get_fields_as_ranges(fields_as_ranges, line, &opt.delimiter);
+    }
+
+    if opt.delimiter.as_str() == "" && fields_as_ranges.len() > 2 {
+        // Unless the line is empty (which should have already been handled),
+        // then the empty-string delimiter generated ranges alongside each
+        // character, plus one at each boundary, e.g. _f_o_o_. We drop them.
+        fields_as_ranges.pop();
+        fields_as_ranges.drain(..1);
     }
 
     match fields_as_ranges.len() {
