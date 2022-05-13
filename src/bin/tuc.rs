@@ -19,13 +19,15 @@ FLAGS:
     -h, --help                    Prints this help and exit
 
 OPTIONS:
+    -b, --bytes <fields>          Same as --fields, but it cuts on bytes instead
+                                  (and it doesn't require a delimiter)
     -d, --delimiter <delimiter>   Delimiter to use to cut the text into pieces
                                   [default: \\t]
     -f, --fields <fields>         Fields to keep, 1-indexed, comma separated.
                                   Use colon for inclusive ranges.
                                   e.g. 1:3 or 3,2 or 1: or 3,1:2 or -3 or -3:-2
                                   [default 1:]
-    -c, --characters              Same as --fields, but it keeps characters instead
+    -c, --characters <fields>     Same as --fields, but it keeps characters instead
                                   (and it doesn't require a delimiter)
     -r, --replace-delimiter <s>   Replace the delimiter with the provided text
     -t, --trim <trim>             Trim the delimiter. Valid trim values are
@@ -40,6 +42,7 @@ Notes:
 struct Opt {
     delimiter: String,
     fields: RangeList,
+    bytes: bool,
     only_delimited: bool,
     compress_delimiter: bool,
     replace_delimiter: Option<String>,
@@ -57,16 +60,19 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
 
     let maybe_fields: Option<RangeList> = pargs.opt_value_from_str(["-f", "--fields"])?;
     let maybe_characters: Option<RangeList> = pargs.opt_value_from_str(["-c", "--characters"])?;
-    let delimiter: String = maybe_characters
-        .is_some()
+    let maybe_bytes: Option<RangeList> = pargs.opt_value_from_str(["-b", "--bytes"])?;
+
+    let delimiter: String = (maybe_characters.is_some() || maybe_bytes.is_some())
         .then(String::new)
         .or_else(|| pargs.opt_value_from_str(["-d", "--delimiter"]).ok()?)
         .unwrap_or_else(|| String::from('\t'));
 
     let args = Opt {
         delimiter,
+        bytes: maybe_bytes.is_some(),
         fields: maybe_fields
             .or(maybe_characters)
+            .or(maybe_bytes)
             .or_else(|| RangeList::from_str("1:").ok())
             .unwrap(),
         replace_delimiter: pargs.opt_value_from_str(["-r", "--replace-delimiter"])?,
@@ -308,7 +314,7 @@ fn compress_delimiter(
     });
 }
 
-fn cut(
+fn cut_str(
     line: &str,
     opt: &Opt,
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
@@ -379,17 +385,33 @@ fn cut(
     Ok(())
 }
 
-fn main() -> Result<()> {
-    let opt: Opt = parse_args()?;
+fn cut_bytes(
+    data: &[u8],
+    opt: &Opt,
+    stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
+) -> Result<()> {
+    if data.is_empty() {
+        return Ok(());
+    }
 
-    let stdin = std::io::stdin();
-    let mut stdin = reuse_buffer_reader::BufReader::with_capacity(32 * 1024, stdin.lock());
+    opt.fields.0.iter().try_for_each(|f| -> Result<()> {
+        let r = field_to_std_range(data.len(), f)?;
+        let output = &data[r.start..r.end];
 
-    let stdout = std::io::stdout();
-    let mut stdout = std::io::BufWriter::with_capacity(32 * 1024, stdout.lock());
+        stdout.write_all(output)?;
 
-    let mut fields_as_ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(100);
+        Ok(())
+    })?;
 
+    Ok(())
+}
+
+fn read_and_cut_chars(
+    stdin: &mut reuse_buffer_reader::BufReader<std::io::StdinLock>,
+    stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
+    opt: Opt,
+    fields_as_ranges: &mut Vec<std::ops::Range<usize>>,
+) -> Result<()> {
     let mut line_buf = String::with_capacity(1024);
     let mut compressed_line_buf = if opt.compress_delimiter {
         String::with_capacity(line_buf.capacity())
@@ -404,14 +426,43 @@ fn main() -> Result<()> {
             .strip_suffix("\r\n")
             .or_else(|| line.strip_suffix('\n'))
             .unwrap_or(line);
-        cut(
+        cut_str(
             line,
             &opt,
-            &mut stdout,
-            &mut fields_as_ranges,
+            stdout,
+            fields_as_ranges,
             &mut compressed_line_buf,
         )?;
         fields_as_ranges.clear();
+    }
+    Ok(())
+}
+
+fn read_and_cut_bytes(
+    stdin: &mut reuse_buffer_reader::BufReader<std::io::StdinLock>,
+    stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
+    opt: Opt,
+) -> Result<()> {
+    let mut buffer: Vec<u8> = Vec::with_capacity(32 * 1024);
+    stdin.read_bytes_to_end(&mut buffer);
+    cut_bytes(&buffer, &opt, stdout)?;
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let opt: Opt = parse_args()?;
+
+    let stdin = std::io::stdin();
+    let mut stdin = reuse_buffer_reader::BufReader::with_capacity(32 * 1024, stdin.lock());
+
+    let stdout = std::io::stdout();
+    let mut stdout = std::io::BufWriter::with_capacity(32 * 1024, stdout.lock());
+
+    if opt.bytes {
+        read_and_cut_bytes(&mut stdin, &mut stdout, opt)?;
+    } else {
+        let mut fields_as_ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(100);
+        read_and_cut_chars(&mut stdin, &mut stdout, opt, &mut fields_as_ranges)?;
     }
 
     stdout.flush()?;
@@ -431,6 +482,18 @@ mod reuse_buffer_reader {
             let reader = io::BufReader::with_capacity(capacity, inner);
 
             Self { reader }
+        }
+
+        pub fn read_bytes_to_end<'buf>(
+            &mut self,
+            buffer: &'buf mut Vec<u8>,
+        ) -> Option<io::Result<&'buf mut Vec<u8>>> {
+            buffer.clear();
+
+            self.reader
+                .read_to_end(buffer)
+                .map(|u| if u == 0 { None } else { Some(buffer) })
+                .transpose()
         }
 
         pub fn read_line<'buf>(
