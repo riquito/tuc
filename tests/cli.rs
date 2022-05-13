@@ -86,3 +86,15 @@ fn it_compresses_delimiters_when_requested_and_handles_boundaries() {
 
     assert.success().stdout("-foo-bar-\n");
 }
+
+#[test]
+fn it_cuts_on_characters() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["--characters", "2,-2"])
+        .write_stdin("😁🤩😝😎")
+        .assert();
+
+    assert.success().stdout("🤩😝\n");
+}
