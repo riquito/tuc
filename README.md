@@ -94,7 +94,7 @@ ac
 
 ```sh
 # Can split on bytes (the following emoji are 4 bytes each)
-❯ echo "😁🤩😝😎" | ./target/debug/tuc -b 5:8
+❯ echo "😁🤩😝😎" | tuc -b 5:8
 🤩
 ```
 
