@@ -107,3 +107,15 @@ fn it_cuts_on_bytes() {
 
     assert.success().stdout("ber");
 }
+
+#[test]
+fn it_support_zero_terminated_lines() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-z", "-d", "_", "-f", "2"])
+        .write_stdin("hello_world\0foo_bar")
+        .assert();
+
+    assert.success().stdout("world\0bar\0");
+}
