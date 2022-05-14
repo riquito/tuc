@@ -98,3 +98,12 @@ fn it_cuts_on_characters() {
 
     assert.success().stdout("🤩😝\n");
 }
+
+#[test]
+fn it_cuts_on_bytes() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(&["--bytes", "3:"]).write_stdin("über").assert();
+
+    assert.success().stdout("ber");
+}
