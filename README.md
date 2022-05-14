@@ -19,7 +19,7 @@ cargo install tuc
 ## Help
 
 ```
-tuc 0.6.0
+tuc 0.7.0 [UNRELEASED]
 When cut doesn't cut it.
 
 USAGE:
@@ -29,6 +29,7 @@ FLAGS:
     -p, --compress-delimiter      Collapse any sequence of delimiters
     -s, --only-delimited          Do not print lines not containing delimiters
     -V, --version                 Prints version information
+    -z, --zero-terminated         line delimiter is NUL (\0), not LF (\n)
     -h, --help                    Prints this help and exit
 
 OPTIONS:
