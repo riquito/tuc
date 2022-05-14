@@ -20,7 +20,7 @@ FLAGS:
 
 OPTIONS:
     -b, --bytes <fields>          Same as --fields, but it cuts on bytes instead
-                                  (and it doesn't require a delimiter)
+                                  (doesn't require a delimiter)
     -d, --delimiter <delimiter>   Delimiter to use to cut the text into pieces
                                   [default: \\t]
     -f, --fields <fields>         Fields to keep, 1-indexed, comma separated.
@@ -28,7 +28,7 @@ OPTIONS:
                                   e.g. 1:3 or 3,2 or 1: or 3,1:2 or -3 or -3:-2
                                   [default 1:]
     -c, --characters <fields>     Same as --fields, but it keeps characters instead
-                                  (and it doesn't require a delimiter)
+                                  (doesn't require a delimiter)
     -r, --replace-delimiter <s>   Replace the delimiter with the provided text
     -t, --trim <trim>             Trim the delimiter. Valid trim values are
                                   (l|L)eft, (r|R)ight, (b|B)oth
