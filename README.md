@@ -80,9 +80,21 @@ ac
 ```
 
 ```sh
-# Can split on unicode scalar values (expect UTF-8 encoding)
+# Can split on unicode scalar values (it expects UTF-8 encoding)
 ❯ echo "a𝌆b𝌆c" | tuc -d '𝌆' -f 1,3
 ac
+```
+
+```sh
+# Can split on characters
+❯ echo "😁🤩😝😎" | tuc -c 4,3,2,1
+😎😝🤩😁
+```
+
+```sh
+# Can split on bytes (the following emoji are 4 bytes each)
+❯ echo "😁🤩😝😎" | ./target/debug/tuc -b 5:8
+🤩
 ```
 
 ## LICENSE
