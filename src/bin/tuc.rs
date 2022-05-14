@@ -16,6 +16,7 @@ FLAGS:
     -p, --compress-delimiter      Collapse any sequence of delimiters
     -s, --only-delimited          Do not print lines not containing delimiters
     -V, --version                 Prints version information
+    -z, --zero-terminated         line delimiter is NUL (\\0), not LF (\\n)
     -h, --help                    Prints this help and exit
 
 OPTIONS:
@@ -38,9 +39,17 @@ Notes:
 "
 );
 
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum EOL {
+    Zero = 0,
+    Newline = 10,
+}
+
 #[derive(Debug)]
 struct Opt {
     delimiter: String,
+    eol: EOL,
     fields: RangeList,
     bytes: bool,
     only_delimited: bool,
@@ -69,6 +78,11 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
 
     let args = Opt {
         delimiter,
+        eol: if pargs.contains(["-z", "--zero-terminated"]) {
+            EOL::Zero
+        } else {
+            EOL::Newline
+        },
         bytes: maybe_bytes.is_some(),
         fields: maybe_fields
             .or(maybe_characters)
@@ -320,6 +334,7 @@ fn cut_str(
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
     fields_as_ranges: &mut Vec<std::ops::Range<usize>>,
     compressed_line_buf: &mut String,
+    eol: u8,
 ) -> Result<()> {
     let mut line: &str = match opt.trim {
         None => line,
@@ -332,7 +347,7 @@ fn cut_str(
 
     if line.is_empty() {
         if !opt.only_delimited {
-            stdout.write_all(b"\n")?;
+            stdout.write_all(&[eol])?;
         }
         return Ok(());
     }
@@ -359,7 +374,7 @@ fn cut_str(
         1 if opt.only_delimited => stdout.write_all(b"")?,
         1 => {
             stdout.write_all(line.as_bytes())?;
-            stdout.write_all(b"\n")?;
+            stdout.write_all(&[eol])?;
         }
         _ => {
             opt.fields.0.iter().try_for_each(|f| -> Result<()> {
@@ -378,7 +393,7 @@ fn cut_str(
                 Ok(())
             })?;
 
-            stdout.write_all(b"\n")?;
+            stdout.write_all(&[eol])?;
         }
     }
 
@@ -406,7 +421,7 @@ fn cut_bytes(
     Ok(())
 }
 
-fn read_and_cut_chars(
+fn read_and_cut_str(
     stdin: &mut reuse_buffer_reader::BufReader<std::io::StdinLock>,
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
     opt: Opt,
@@ -419,19 +434,17 @@ fn read_and_cut_chars(
         String::new()
     };
 
-    while let Some(line) = stdin.read_line(&mut line_buf) {
+    while let Some(line) = stdin.read_line_with_eol(&mut line_buf, opt.eol) {
         let line = line?;
         let line: &str = line.as_ref();
-        let line = line
-            .strip_suffix("\r\n")
-            .or_else(|| line.strip_suffix('\n'))
-            .unwrap_or(line);
+        let line = line.strip_suffix(opt.eol as u8 as char).unwrap_or(line);
         cut_str(
             line,
             &opt,
             stdout,
             fields_as_ranges,
             &mut compressed_line_buf,
+            opt.eol as u8,
         )?;
         fields_as_ranges.clear();
     }
@@ -462,7 +475,7 @@ fn main() -> Result<()> {
         read_and_cut_bytes(&mut stdin, &mut stdout, opt)?;
     } else {
         let mut fields_as_ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(100);
-        read_and_cut_chars(&mut stdin, &mut stdout, opt, &mut fields_as_ranges)?;
+        read_and_cut_str(&mut stdin, &mut stdout, opt, &mut fields_as_ranges)?;
     }
 
     stdout.flush()?;
@@ -471,6 +484,7 @@ fn main() -> Result<()> {
 }
 
 mod reuse_buffer_reader {
+    pub use super::EOL;
     use std::io::{self, prelude::*};
 
     pub struct BufReader<R> {
@@ -496,16 +510,20 @@ mod reuse_buffer_reader {
                 .transpose()
         }
 
-        pub fn read_line<'buf>(
+        pub fn read_line_with_eol<'buf>(
             &mut self,
             buffer: &'buf mut String,
+            eol: EOL,
         ) -> Option<io::Result<&'buf mut String>> {
             buffer.clear();
 
-            self.reader
-                .read_line(buffer)
-                .map(|u| if u == 0 { None } else { Some(buffer) })
-                .transpose()
+            match eol {
+                // read_line is more optimized/safe than read_until for strings
+                EOL::Newline => self.reader.read_line(buffer),
+                EOL::Zero => unsafe { self.reader.read_until(eol as u8, buffer.as_mut_vec()) },
+            }
+            .map(|u| if u == 0 { None } else { Some(buffer) })
+            .transpose()
         }
     }
 }
