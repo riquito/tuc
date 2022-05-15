@@ -250,43 +250,16 @@ fn complement_std_range(
     parts_length: usize,
     r: &std::ops::Range<usize>,
 ) -> Vec<std::ops::Range<usize>> {
-    let mut output: Vec<std::ops::Range<usize>> = Vec::new();
-
-    // full match => no match
-    if parts_length == 1 || r.start == 0 && r.end == parts_length {
-        return Vec::new();
-    } else if r.start == 0 {
-        // e.g. :3 with 3 fields is a full match => no match
-        if r.end == parts_length {
-            return Vec::new();
-        } else {
-            //e.g :3 with 5 fields => 4:5
-            output.push(std::ops::Range {
-                start: r.end,
-                end: parts_length,
-            });
-        }
-    } else if r.end == parts_length {
-        // r.start == 0 already covered, 1-long already covered
-
-        // e.g. 2: => 1:1
-        output.push(std::ops::Range {
-            start: 0,
-            end: r.start,
-        });
-    } else {
-        // we have room before and after start/end
-        output.push(std::ops::Range {
-            start: 0,
-            end: r.start,
-        });
-        output.push(std::ops::Range {
-            start: r.end,
-            end: parts_length,
-        });
+    match (r.start, r.end) {
+        // full match => no match
+        (0, end) if end == parts_length => Vec::new(),
+        // match left side => match right side
+        (0, right) => vec![right..parts_length],
+        // match right side => match left side
+        (left, end) if end == parts_length => vec![0..left],
+        // match middle of string => match before and after
+        (left, right) => vec![0..left, right..parts_length],
     }
-
-    output
 }
 
 fn field_to_std_range(parts_length: usize, f: &Range) -> Result<std::ops::Range<usize>> {
