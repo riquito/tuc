@@ -305,7 +305,7 @@ fn get_fields_as_ranges<'a>(
     line: &str,
     delimiter: &str,
 ) -> &'a mut Vec<std::ops::Range<usize>> {
-    let delimiter_lenth = delimiter.len();
+    let delimiter_length = delimiter.len();
     let mut next_part_start = 0;
 
     for mat in line.match_indices(&delimiter) {
@@ -313,7 +313,7 @@ fn get_fields_as_ranges<'a>(
             start: next_part_start,
             end: mat.0,
         });
-        next_part_start = mat.0 + delimiter_lenth;
+        next_part_start = mat.0 + delimiter_length;
     }
 
     fields_as_ranges.push(std::ops::Range {
