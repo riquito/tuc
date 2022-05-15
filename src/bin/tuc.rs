@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use std::fmt;
 use std::io::Write;
+use std::ops::Range;
 use std::str::FromStr;
 
 const HELP: &str = concat!(
@@ -246,10 +247,7 @@ impl Default for UserBounds {
     }
 }
 
-fn complement_std_range(
-    parts_length: usize,
-    r: &std::ops::Range<usize>,
-) -> Vec<std::ops::Range<usize>> {
+fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usize>> {
     match (r.start, r.end) {
         // full match => no match
         (0, end) if end == parts_length => Vec::new(),
@@ -262,7 +260,7 @@ fn complement_std_range(
     }
 }
 
-fn field_to_std_range(parts_length: usize, f: &UserBounds) -> Result<std::ops::Range<usize>> {
+fn field_to_std_range(parts_length: usize, f: &UserBounds) -> Result<Range<usize>> {
     let start: usize = match f.l {
         Side::Continue => 0,
         Side::Some(v) => {
@@ -291,7 +289,7 @@ fn field_to_std_range(parts_length: usize, f: &UserBounds) -> Result<std::ops::R
         }
     };
 
-    Ok(std::ops::Range { start, end })
+    Ok(Range { start, end })
 }
 
 /*
@@ -301,22 +299,22 @@ fn field_to_std_range(parts_length: usize, f: &UserBounds) -> Result<std::ops::R
  * for performance reasons).
  */
 fn get_fields_as_ranges<'a>(
-    fields_as_ranges: &'a mut Vec<std::ops::Range<usize>>,
+    fields_as_ranges: &'a mut Vec<Range<usize>>,
     line: &str,
     delimiter: &str,
-) -> &'a mut Vec<std::ops::Range<usize>> {
+) -> &'a mut Vec<Range<usize>> {
     let delimiter_length = delimiter.len();
     let mut next_part_start = 0;
 
     for mat in line.match_indices(&delimiter) {
-        fields_as_ranges.push(std::ops::Range {
+        fields_as_ranges.push(Range {
             start: next_part_start,
             end: mat.0,
         });
         next_part_start = mat.0 + delimiter_length;
     }
 
-    fields_as_ranges.push(std::ops::Range {
+    fields_as_ranges.push(Range {
         start: next_part_start,
         end: line.len(),
     });
@@ -325,7 +323,7 @@ fn get_fields_as_ranges<'a>(
 }
 
 fn compress_delimiter(
-    fields_as_ranges: &[std::ops::Range<usize>],
+    fields_as_ranges: &[Range<usize>],
     line: &str,
     delimiter: &str,
     output: &mut String,
@@ -351,7 +349,7 @@ fn cut_str(
     line: &str,
     opt: &Opt,
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
-    fields_as_ranges: &mut Vec<std::ops::Range<usize>>,
+    fields_as_ranges: &mut Vec<Range<usize>>,
     compressed_line_buf: &mut String,
     eol: u8,
 ) -> Result<()> {
@@ -455,7 +453,7 @@ fn read_and_cut_str(
     stdin: &mut reuse_buffer_reader::BufReader<std::io::StdinLock>,
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
     opt: Opt,
-    fields_as_ranges: &mut Vec<std::ops::Range<usize>>,
+    fields_as_ranges: &mut Vec<Range<usize>>,
 ) -> Result<()> {
     let mut line_buf = String::with_capacity(1024);
     let mut compressed_line_buf = if opt.compress_delimiter {
@@ -504,7 +502,7 @@ fn main() -> Result<()> {
     if opt.bytes {
         read_and_cut_bytes(&mut stdin, &mut stdout, opt)?;
     } else {
-        let mut fields_as_ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(100);
+        let mut fields_as_ranges: Vec<Range<usize>> = Vec::with_capacity(100);
         read_and_cut_str(&mut stdin, &mut stdout, opt, &mut fields_as_ranges)?;
     }
 
