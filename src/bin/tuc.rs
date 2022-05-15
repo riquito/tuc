@@ -584,3 +584,32 @@ mod reuse_buffer_reader {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_complement_std_range() {
+        // remember, it assumes that ranges are "legit" (not out of bounds)
+
+        // test empty string
+        assert_eq!(complement_std_range(0, &(0..0)), vec![]);
+
+        // test 1-long string
+        assert_eq!(complement_std_range(1, &(0..1)), vec![]);
+
+        // test ranges that reach left or right bounds
+        assert_eq!(complement_std_range(5, &(0..5)), vec![]);
+        assert_eq!(complement_std_range(5, &(0..3)), vec![3..5]);
+        assert_eq!(complement_std_range(5, &(3..5)), vec![0..3]);
+
+        // test internal range
+        assert_eq!(complement_std_range(5, &(1..3)), vec![0..1, 3..5]);
+
+        // test 2-long string
+        assert_eq!(complement_std_range(2, &(0..2)), vec![]);
+        assert_eq!(complement_std_range(2, &(0..1)), vec![1..2]);
+        assert_eq!(complement_std_range(2, &(1..2)), vec![0..1]);
+    }
+}

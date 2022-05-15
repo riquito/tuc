@@ -119,3 +119,23 @@ fn it_support_zero_terminated_lines() {
 
     assert.success().stdout("world\0bar\0");
 }
+
+#[test]
+fn it_can_complement_the_fields() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-m", "-d", " ", "-f", "2"])
+        .write_stdin("a b c")
+        .assert();
+
+    assert.success().stdout("ac\n");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let assert = cmd
+        .args(&["-m", "-d", " ", "-f", "1:"])
+        .write_stdin("a b c")
+        .assert();
+
+    assert.success().stdout("\n");
+}
