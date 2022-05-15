@@ -79,12 +79,16 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         .unwrap_or_else(|| String::from('\t'));
 
     let args = Opt {
-        delimiter,
+        complement: pargs.contains(["-m", "--complement"]),
+        only_delimited: pargs.contains(["-s", "--only-delimited"]),
+        compress_delimiter: pargs.contains(["-p", "--compress-delimiter"]),
+        version: pargs.contains(["-V", "--version"]),
         eol: if pargs.contains(["-z", "--zero-terminated"]) {
             EOL::Zero
         } else {
             EOL::Newline
         },
+        delimiter,
         bytes: maybe_bytes.is_some(),
         fields: maybe_fields
             .or(maybe_characters)
@@ -93,10 +97,6 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             .unwrap(),
         replace_delimiter: pargs.opt_value_from_str(["-r", "--replace-delimiter"])?,
         trim: pargs.opt_value_from_str(["-t", "--trim"])?,
-        only_delimited: pargs.contains(["-s", "--only-delimited"]),
-        compress_delimiter: pargs.contains(["-p", "--compress-delimiter"]),
-        version: pargs.contains(["-V", "--version"]),
-        complement: pargs.contains(["-m", "--complement"]),
     };
 
     let remaining = pargs.finish();
