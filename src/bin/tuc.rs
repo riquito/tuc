@@ -584,4 +584,28 @@ mod tests {
         assert_eq!(complement_std_range(2, &(0..1)), vec![1..2]);
         assert_eq!(complement_std_range(2, &(1..2)), vec![0..1]);
     }
+
+    #[test]
+    fn test_range_formatting() {
+        assert_eq!(
+            Range::new(Side::Continue, Side::Continue).to_string(),
+            "1:-1"
+        );
+        assert_eq!(
+            Range::new(Side::Continue, Side::Some(3)).to_string(),
+            ":3"
+        );
+        assert_eq!(
+            Range::new(Side::Some(3), Side::Continue).to_string(),
+            "3:"
+        );
+        assert_eq!(
+            Range::new(Side::Some(1), Side::Some(2)).to_string(),
+            "1:2"
+        );
+        assert_eq!(
+            Range::new(Side::Some(-1), Side::Some(-2)).to_string(),
+            "-1:-2"
+        );
+    }
 }
