@@ -51,7 +51,7 @@ pub enum EOL {
 struct Opt {
     delimiter: String,
     eol: EOL,
-    fields: RangeList,
+    bounds: UserBoundsList,
     bytes: bool,
     only_delimited: bool,
     compress_delimiter: bool,
@@ -69,9 +69,10 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         std::process::exit(0);
     }
 
-    let maybe_fields: Option<RangeList> = pargs.opt_value_from_str(["-f", "--fields"])?;
-    let maybe_characters: Option<RangeList> = pargs.opt_value_from_str(["-c", "--characters"])?;
-    let maybe_bytes: Option<RangeList> = pargs.opt_value_from_str(["-b", "--bytes"])?;
+    let maybe_fields: Option<UserBoundsList> = pargs.opt_value_from_str(["-f", "--fields"])?;
+    let maybe_characters: Option<UserBoundsList> =
+        pargs.opt_value_from_str(["-c", "--characters"])?;
+    let maybe_bytes: Option<UserBoundsList> = pargs.opt_value_from_str(["-b", "--bytes"])?;
 
     let delimiter: String = (maybe_characters.is_some() || maybe_bytes.is_some())
         .then(String::new)
@@ -90,10 +91,10 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         },
         delimiter,
         bytes: maybe_bytes.is_some(),
-        fields: maybe_fields
+        bounds: maybe_fields
             .or(maybe_characters)
             .or(maybe_bytes)
-            .or_else(|| RangeList::from_str("1:").ok())
+            .or_else(|| UserBoundsList::from_str("1:").ok())
             .unwrap(),
         replace_delimiter: pargs.opt_value_from_str(["-r", "--replace-delimiter"])?,
         trim: pargs.opt_value_from_str(["-t", "--trim"])?,
@@ -136,14 +137,14 @@ impl FromStr for Trim {
 }
 
 #[derive(Debug)]
-struct RangeList(Vec<Range>);
+struct UserBoundsList(Vec<UserBounds>);
 
-impl FromStr for RangeList {
+impl FromStr for UserBoundsList {
     type Err = Box<dyn std::error::Error>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let k: Result<Vec<Range>, _> = s.split(',').map(Range::from_str).collect();
-        Ok(RangeList(k?))
+        let k: Result<Vec<UserBounds>, _> = s.split(',').map(UserBounds::from_str).collect();
+        Ok(UserBoundsList(k?))
     }
 }
 
@@ -177,12 +178,12 @@ impl fmt::Display for Side {
 }
 
 #[derive(Debug)]
-struct Range {
+struct UserBounds {
     l: Side,
     r: Side,
 }
 
-impl fmt::Display for Range {
+impl fmt::Display for UserBounds {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match (self.l, self.r) {
             (Side::Continue, Side::Continue) => write!(f, "1:-1"),
@@ -192,7 +193,7 @@ impl fmt::Display for Range {
     }
 }
 
-impl FromStr for Range {
+impl FromStr for UserBounds {
     type Err = Box<dyn std::error::Error>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -229,19 +230,19 @@ impl FromStr for Range {
             _ => (),
         }
 
-        Ok(Range::new(l, r))
+        Ok(UserBounds::new(l, r))
     }
 }
 
-impl Range {
+impl UserBounds {
     pub fn new(l: Side, r: Side) -> Self {
-        Range { l, r }
+        UserBounds { l, r }
     }
 }
 
-impl Default for Range {
+impl Default for UserBounds {
     fn default() -> Self {
-        Range::new(Side::Some(1), Side::Some(1))
+        UserBounds::new(Side::Some(1), Side::Some(1))
     }
 }
 
@@ -261,7 +262,7 @@ fn complement_std_range(
     }
 }
 
-fn field_to_std_range(parts_length: usize, f: &Range) -> Result<std::ops::Range<usize>> {
+fn field_to_std_range(parts_length: usize, f: &UserBounds) -> Result<std::ops::Range<usize>> {
     let start: usize = match f.l {
         Side::Continue => 0,
         Side::Some(v) => {
@@ -395,7 +396,7 @@ fn cut_str(
             stdout.write_all(&[eol])?;
         }
         _ => {
-            opt.fields.0.iter().try_for_each(|f| -> Result<()> {
+            opt.bounds.0.iter().try_for_each(|f| -> Result<()> {
                 let r_array = [field_to_std_range(fields_as_ranges.len(), f)?];
                 let mut r_iter = r_array.iter();
                 let _complements;
@@ -438,7 +439,7 @@ fn cut_bytes(
         return Ok(());
     }
 
-    opt.fields.0.iter().try_for_each(|f| -> Result<()> {
+    opt.bounds.0.iter().try_for_each(|f| -> Result<()> {
         let r = field_to_std_range(data.len(), f)?;
         let output = &data[r.start..r.end];
 
@@ -586,25 +587,25 @@ mod tests {
     }
 
     #[test]
-    fn test_range_formatting() {
+    fn test_user_bounds_formatting() {
         assert_eq!(
-            Range::new(Side::Continue, Side::Continue).to_string(),
+            UserBounds::new(Side::Continue, Side::Continue).to_string(),
             "1:-1"
         );
         assert_eq!(
-            Range::new(Side::Continue, Side::Some(3)).to_string(),
+            UserBounds::new(Side::Continue, Side::Some(3)).to_string(),
             ":3"
         );
         assert_eq!(
-            Range::new(Side::Some(3), Side::Continue).to_string(),
+            UserBounds::new(Side::Some(3), Side::Continue).to_string(),
             "3:"
         );
         assert_eq!(
-            Range::new(Side::Some(1), Side::Some(2)).to_string(),
+            UserBounds::new(Side::Some(1), Side::Some(2)).to_string(),
             "1:2"
         );
         assert_eq!(
-            Range::new(Side::Some(-1), Side::Some(-2)).to_string(),
+            UserBounds::new(Side::Some(-1), Side::Some(-2)).to_string(),
             "-1:-2"
         );
     }
