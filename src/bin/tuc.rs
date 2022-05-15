@@ -33,6 +33,7 @@ OPTIONS:
     -r, --replace-delimiter <s>   Replace the delimiter with the provided text
     -t, --trim <trim>             Trim the delimiter. Valid trim values are
                                   (l|L)eft, (r|R)ight, (b|B)oth
+    -m, --complement              keep the opposite fields than the one selected
 
 Notes:
     --trim and --compress-delimiter are applied before --fields
@@ -57,6 +58,7 @@ struct Opt {
     replace_delimiter: Option<String>,
     trim: Option<Trim>,
     version: bool,
+    complement: bool,
 }
 
 fn parse_args() -> Result<Opt, pico_args::Error> {
@@ -94,6 +96,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         only_delimited: pargs.contains(["-s", "--only-delimited"]),
         compress_delimiter: pargs.contains(["-p", "--compress-delimiter"]),
         version: pargs.contains(["-V", "--version"]),
+        complement: pargs.contains(["-m", "--complement"]),
     };
 
     let remaining = pargs.finish();
@@ -243,6 +246,49 @@ impl Default for Range {
     }
 }
 
+fn complement_std_range(
+    parts_length: usize,
+    r: &std::ops::Range<usize>,
+) -> Vec<std::ops::Range<usize>> {
+    let mut output: Vec<std::ops::Range<usize>> = Vec::new();
+
+    // full match => no match
+    if parts_length == 1 || r.start == 0 && r.end == parts_length {
+        return Vec::new();
+    } else if r.start == 0 {
+        // e.g. :3 with 3 fields is a full match => no match
+        if r.end == parts_length {
+            return Vec::new();
+        } else {
+            //e.g :3 with 5 fields => 4:5
+            output.push(std::ops::Range {
+                start: r.end,
+                end: parts_length,
+            });
+        }
+    } else if r.end == parts_length {
+        // r.start == 0 already covered, 1-long already covered
+
+        // e.g. 2: => 1:1
+        output.push(std::ops::Range {
+            start: 0,
+            end: r.start,
+        });
+    } else {
+        // we have room before and after start/end
+        output.push(std::ops::Range {
+            start: 0,
+            end: r.start,
+        });
+        output.push(std::ops::Range {
+            start: r.end,
+            end: parts_length,
+        });
+    }
+
+    output
+}
+
 fn field_to_std_range(parts_length: usize, f: &Range) -> Result<std::ops::Range<usize>> {
     let start: usize = match f.l {
         Side::Continue => 0,
@@ -378,16 +424,27 @@ fn cut_str(
         }
         _ => {
             opt.fields.0.iter().try_for_each(|f| -> Result<()> {
-                let r = field_to_std_range(fields_as_ranges.len(), f)?;
-                let idx_start = fields_as_ranges[r.start].start;
-                let idx_end = fields_as_ranges[r.end - 1].end;
-                let output = &line[idx_start..idx_end];
+                let r_array = [field_to_std_range(fields_as_ranges.len(), f)?];
+                let mut r_iter = r_array.iter();
+                let _complements;
 
-                if let Some(replace_delimiter) = &opt.replace_delimiter {
-                    stdout
-                        .write_all(output.replace(&opt.delimiter, replace_delimiter).as_bytes())?;
-                } else {
-                    stdout.write_all(output.as_bytes())?;
+                if opt.complement {
+                    _complements = complement_std_range(fields_as_ranges.len(), &r_array[0]);
+                    r_iter = _complements.iter();
+                }
+
+                for r in r_iter {
+                    let idx_start = fields_as_ranges[r.start].start;
+                    let idx_end = fields_as_ranges[r.end - 1].end;
+                    let output = &line[idx_start..idx_end];
+
+                    if let Some(replace_delimiter) = &opt.replace_delimiter {
+                        stdout.write_all(
+                            output.replace(&opt.delimiter, replace_delimiter).as_bytes(),
+                        )?;
+                    } else {
+                        stdout.write_all(output.as_bytes())?;
+                    }
                 }
 
                 Ok(())
