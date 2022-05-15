@@ -184,11 +184,10 @@ struct Range {
 
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.l == self.r {
-            // note that Side::Continue, Side::Continue is not expected
-            write!(f, "{}", self.l)
-        } else {
-            write!(f, "{}:{}", self.l, self.r)
+        match (self.l, self.r) {
+            (Side::Continue, Side::Continue) => write!(f, "1:-1"),
+            (l, r) if l == r => write!(f, "{}", l),
+            (l, r) => write!(f, "{}:{}", l, r),
         }
     }
 }
