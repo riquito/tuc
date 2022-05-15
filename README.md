@@ -98,6 +98,12 @@ ac
 🤩
 ```
 
+```sh
+# Can keep the opposite fields
+echo "a b c" | tuc --complement -d ' ' -f 2
+ac
+```
+
 ## LICENSE
 
 Tuc is distributed under the GNU GPL license (version 3 or any later version).
