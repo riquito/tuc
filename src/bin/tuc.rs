@@ -48,12 +48,20 @@ pub enum EOL {
     Newline = 10,
 }
 
+#[derive(Debug, PartialEq)]
+enum BoundsType {
+    Bytes,
+    Characters,
+    Fields,
+    Lines,
+}
+
 #[derive(Debug)]
 struct Opt {
     delimiter: String,
     eol: EOL,
     bounds: UserBoundsList,
-    bytes: bool,
+    bounds_type: BoundsType,
     only_delimited: bool,
     compress_delimiter: bool,
     replace_delimiter: Option<String>,
@@ -70,15 +78,31 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         std::process::exit(0);
     }
 
-    let maybe_fields: Option<UserBoundsList> = pargs.opt_value_from_str(["-f", "--fields"])?;
+    let mut maybe_fields: Option<UserBoundsList> = pargs.opt_value_from_str(["-f", "--fields"])?;
     let maybe_characters: Option<UserBoundsList> =
         pargs.opt_value_from_str(["-c", "--characters"])?;
     let maybe_bytes: Option<UserBoundsList> = pargs.opt_value_from_str(["-b", "--bytes"])?;
+    let maybe_lines: Option<UserBoundsList> = pargs.opt_value_from_str(["-l", "--lines"])?;
 
-    let delimiter: String = (maybe_characters.is_some() || maybe_bytes.is_some())
-        .then(String::new)
-        .or_else(|| pargs.opt_value_from_str(["-d", "--delimiter"]).ok()?)
-        .unwrap_or_else(|| String::from('\t'));
+    let bounds_type = if maybe_fields.is_some() {
+        BoundsType::Fields
+    } else if maybe_bytes.is_some() {
+        BoundsType::Bytes
+    } else if maybe_characters.is_some() {
+        BoundsType::Characters
+    } else if maybe_lines.is_some() {
+        BoundsType::Lines
+    } else {
+        maybe_fields = Some(UserBoundsList::from_str("1:").unwrap());
+        BoundsType::Fields
+    };
+
+    let delimiter = match bounds_type {
+        BoundsType::Fields => pargs
+            .opt_value_from_str(["-d", "--delimiter"])?
+            .unwrap_or_else(|| String::from('\t')),
+        _ => String::new(),
+    };
 
     let args = Opt {
         complement: pargs.contains(["-m", "--complement"]),
@@ -91,11 +115,11 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             EOL::Newline
         },
         delimiter,
-        bytes: maybe_bytes.is_some(),
+        bounds_type,
         bounds: maybe_fields
             .or(maybe_characters)
             .or(maybe_bytes)
-            .or_else(|| UserBoundsList::from_str("1:").ok())
+            .or(maybe_lines)
             .unwrap(),
         replace_delimiter: pargs.opt_value_from_str(["-r", "--replace-delimiter"])?,
         trim: pargs.opt_value_from_str(["-t", "--trim"])?,
@@ -366,7 +390,7 @@ fn cut_str(
 
     build_ranges_vec(bounds_as_ranges, line, &opt.delimiter);
 
-    if opt.compress_delimiter && opt.delimiter.as_str() != "" {
+    if opt.compress_delimiter && opt.bounds_type == BoundsType::Fields {
         compressed_line_buf.clear();
         compress_delimiter(bounds_as_ranges, line, &opt.delimiter, compressed_line_buf);
         line = compressed_line_buf;
@@ -374,7 +398,7 @@ fn cut_str(
         build_ranges_vec(bounds_as_ranges, line, &opt.delimiter);
     }
 
-    if opt.delimiter.as_str() == "" && bounds_as_ranges.len() > 2 {
+    if opt.bounds_type == BoundsType::Characters && bounds_as_ranges.len() > 2 {
         // Unless the line is empty (which should have already been handled),
         // then the empty-string delimiter generated ranges alongside each
         // character, plus one at each boundary, e.g. _f_o_o_. We drop them.
@@ -494,7 +518,7 @@ fn main() -> Result<()> {
     let stdout = std::io::stdout();
     let mut stdout = std::io::BufWriter::with_capacity(32 * 1024, stdout.lock());
 
-    if opt.bytes {
+    if opt.bounds_type == BoundsType::Bytes {
         read_and_cut_bytes(&mut stdin, &mut stdout, opt)?;
     } else {
         let mut bounds_as_ranges: Vec<Range<usize>> = Vec::with_capacity(100);
