@@ -260,8 +260,8 @@ fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usiz
     }
 }
 
-fn field_to_std_range(parts_length: usize, f: &UserBounds) -> Result<Range<usize>> {
-    let start: usize = match f.l {
+fn bounds_to_std_range(parts_length: usize, bounds: &UserBounds) -> Result<Range<usize>> {
+    let start: usize = match bounds.l {
         Side::Continue => 0,
         Side::Some(v) => {
             if v.abs() as usize > parts_length {
@@ -275,7 +275,7 @@ fn field_to_std_range(parts_length: usize, f: &UserBounds) -> Result<Range<usize
         }
     };
 
-    let end: usize = match f.r {
+    let end: usize = match bounds.r {
         Side::Continue => parts_length,
         Side::Some(v) => {
             if v.abs() as usize > parts_length {
@@ -390,7 +390,7 @@ fn cut_str(
         }
         _ => {
             opt.bounds.0.iter().try_for_each(|f| -> Result<()> {
-                let r_array = [field_to_std_range(bounds_as_ranges.len(), f)?];
+                let r_array = [bounds_to_std_range(bounds_as_ranges.len(), f)?];
                 let mut r_iter = r_array.iter();
                 let _complements;
 
@@ -433,7 +433,7 @@ fn cut_bytes(
     }
 
     opt.bounds.0.iter().try_for_each(|f| -> Result<()> {
-        let r = field_to_std_range(data.len(), f)?;
+        let r = bounds_to_std_range(data.len(), f)?;
         let output = &data[r.start..r.end];
 
         stdout.write_all(output)?;
