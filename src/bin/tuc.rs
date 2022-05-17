@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use std::fmt;
-use std::io::Write;
+use std::io::{BufRead, Read, Write};
 use std::ops::Range;
 use std::str::FromStr;
 
@@ -469,7 +469,7 @@ fn cut_bytes(
 }
 
 fn read_and_cut_str(
-    stdin: &mut reuse_buffer_reader::BufReader<std::io::StdinLock>,
+    stdin: &mut std::io::BufReader<std::io::StdinLock>,
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
     opt: Opt,
     bounds_as_ranges: &mut Vec<Range<usize>>,
@@ -481,7 +481,7 @@ fn read_and_cut_str(
         String::new()
     };
 
-    while let Some(line) = stdin.read_line_with_eol(&mut line_buf, opt.eol) {
+    while let Some(line) = read_line_with_eol(stdin, &mut line_buf, opt.eol) {
         let line = line?;
         let line: &str = line.as_ref();
         let line = line.strip_suffix(opt.eol as u8 as char).unwrap_or(line);
@@ -499,12 +499,12 @@ fn read_and_cut_str(
 }
 
 fn read_and_cut_bytes(
-    stdin: &mut reuse_buffer_reader::BufReader<std::io::StdinLock>,
+    stdin: &mut std::io::BufReader<std::io::StdinLock>,
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
     opt: Opt,
 ) -> Result<()> {
     let mut buffer: Vec<u8> = Vec::with_capacity(32 * 1024);
-    stdin.read_bytes_to_end(&mut buffer);
+    read_bytes_to_end(stdin, &mut buffer);
     cut_bytes(&buffer, &opt, stdout)?;
     Ok(())
 }
@@ -513,7 +513,7 @@ fn main() -> Result<()> {
     let opt: Opt = parse_args()?;
 
     let stdin = std::io::stdin();
-    let mut stdin = reuse_buffer_reader::BufReader::with_capacity(32 * 1024, stdin.lock());
+    let mut stdin = std::io::BufReader::with_capacity(32 * 1024, stdin.lock());
 
     let stdout = std::io::stdout();
     let mut stdout = std::io::BufWriter::with_capacity(32 * 1024, stdout.lock());
@@ -529,50 +529,32 @@ fn main() -> Result<()> {
 
     Ok(())
 }
+pub fn read_bytes_to_end<'buf>(
+    reader: &mut std::io::BufReader<std::io::StdinLock>,
+    buffer: &'buf mut Vec<u8>,
+) -> Option<std::io::Result<&'buf mut Vec<u8>>> {
+    buffer.clear();
 
-mod reuse_buffer_reader {
-    pub use super::EOL;
-    use std::io::{self, prelude::*};
+    reader
+        .read_to_end(buffer)
+        .map(|u| if u == 0 { None } else { Some(buffer) })
+        .transpose()
+}
 
-    pub struct BufReader<R> {
-        reader: io::BufReader<R>,
+pub fn read_line_with_eol<'buf>(
+    reader: &mut std::io::BufReader<std::io::StdinLock>,
+    buffer: &'buf mut String,
+    eol: EOL,
+) -> Option<std::io::Result<&'buf mut String>> {
+    buffer.clear();
+
+    match eol {
+        // read_line is more optimized/safe than read_until for strings
+        EOL::Newline => reader.read_line(buffer),
+        EOL::Zero => unsafe { reader.read_until(eol as u8, buffer.as_mut_vec()) },
     }
-
-    impl<R: Read> BufReader<R> {
-        pub fn with_capacity(capacity: usize, inner: R) -> BufReader<R> {
-            let reader = io::BufReader::with_capacity(capacity, inner);
-
-            Self { reader }
-        }
-
-        pub fn read_bytes_to_end<'buf>(
-            &mut self,
-            buffer: &'buf mut Vec<u8>,
-        ) -> Option<io::Result<&'buf mut Vec<u8>>> {
-            buffer.clear();
-
-            self.reader
-                .read_to_end(buffer)
-                .map(|u| if u == 0 { None } else { Some(buffer) })
-                .transpose()
-        }
-
-        pub fn read_line_with_eol<'buf>(
-            &mut self,
-            buffer: &'buf mut String,
-            eol: EOL,
-        ) -> Option<io::Result<&'buf mut String>> {
-            buffer.clear();
-
-            match eol {
-                // read_line is more optimized/safe than read_until for strings
-                EOL::Newline => self.reader.read_line(buffer),
-                EOL::Zero => unsafe { self.reader.read_until(eol as u8, buffer.as_mut_vec()) },
-            }
-            .map(|u| if u == 0 { None } else { Some(buffer) })
-            .transpose()
-        }
-    }
+    .map(|u| if u == 0 { None } else { Some(buffer) })
+    .transpose()
 }
 
 #[cfg(test)]
