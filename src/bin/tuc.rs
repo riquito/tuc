@@ -101,6 +101,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         BoundsType::Fields => pargs
             .opt_value_from_str(["-d", "--delimiter"])?
             .unwrap_or_else(|| String::from('\t')),
+        BoundsType::Lines => String::from("\n"),
         _ => String::new(),
     };
 
@@ -509,6 +510,39 @@ fn read_and_cut_bytes(
     Ok(())
 }
 
+fn read_and_cut_lines(
+    stdin: &mut std::io::BufReader<std::io::StdinLock>,
+    stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
+    opt: Opt,
+) -> Result<()> {
+    let mut idx = 0;
+
+    // If bounds ask us to collect from left to right and are not overlapping,
+    // (e.g. 1:2,4:5,8) then we can use a streaming algorithm and avoid
+    // collecting everything in memory.
+    let can_be_streamed = false;
+
+    if can_be_streamed {
+    } else {
+        let mut buffer: Vec<u8> = Vec::with_capacity(32 * 1024);
+        stdin.read_to_end(&mut buffer)?;
+        let buffer_as_str = std::str::from_utf8(&buffer)?;
+        let mut bounds_as_ranges: Vec<Range<usize>> = Vec::with_capacity(100);
+        let mut compressed_line_buf = String::new();
+
+        cut_str(
+            buffer_as_str,
+            &opt,
+            stdout,
+            &mut bounds_as_ranges,
+            &mut compressed_line_buf,
+            0,
+        )?;
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let opt: Opt = parse_args()?;
 
@@ -520,6 +554,8 @@ fn main() -> Result<()> {
 
     if opt.bounds_type == BoundsType::Bytes {
         read_and_cut_bytes(&mut stdin, &mut stdout, opt)?;
+    } else if opt.bounds_type == BoundsType::Lines {
+        read_and_cut_lines(&mut stdin, &mut stdout, opt)?;
     } else {
         read_and_cut_str(&mut stdin, &mut stdout, opt)?;
     }
