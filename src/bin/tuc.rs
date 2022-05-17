@@ -388,6 +388,7 @@ fn cut_str(
         return Ok(());
     }
 
+    bounds_as_ranges.clear();
     build_ranges_vec(bounds_as_ranges, line, &opt.delimiter);
 
     if opt.compress_delimiter && opt.bounds_type == BoundsType::Fields {
@@ -472,9 +473,9 @@ fn read_and_cut_str(
     stdin: &mut std::io::BufReader<std::io::StdinLock>,
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
     opt: Opt,
-    bounds_as_ranges: &mut Vec<Range<usize>>,
 ) -> Result<()> {
     let mut line_buf = String::with_capacity(1024);
+    let mut bounds_as_ranges: Vec<Range<usize>> = Vec::with_capacity(100);
     let mut compressed_line_buf = if opt.compress_delimiter {
         String::with_capacity(line_buf.capacity())
     } else {
@@ -489,11 +490,10 @@ fn read_and_cut_str(
             line,
             &opt,
             stdout,
-            bounds_as_ranges,
+            &mut bounds_as_ranges,
             &mut compressed_line_buf,
             opt.eol as u8,
         )?;
-        bounds_as_ranges.clear();
     }
     Ok(())
 }
@@ -521,8 +521,7 @@ fn main() -> Result<()> {
     if opt.bounds_type == BoundsType::Bytes {
         read_and_cut_bytes(&mut stdin, &mut stdout, opt)?;
     } else {
-        let mut bounds_as_ranges: Vec<Range<usize>> = Vec::with_capacity(100);
-        read_and_cut_str(&mut stdin, &mut stdout, opt, &mut bounds_as_ranges)?;
+        read_and_cut_str(&mut stdin, &mut stdout, opt)?;
     }
 
     stdout.flush()?;
