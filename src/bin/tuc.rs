@@ -465,7 +465,7 @@ fn cut_str(
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
     bounds_as_ranges: &mut Vec<Range<usize>>,
     compressed_line_buf: &mut String,
-    eol: u8,
+    eol: &[u8],
 ) -> Result<()> {
     let mut line: &str = match opt.trim {
         None => line,
@@ -478,7 +478,7 @@ fn cut_str(
 
     if line.is_empty() {
         if !opt.only_delimited {
-            stdout.write_all(&[eol])?;
+            stdout.write_all(eol)?;
         }
         return Ok(());
     }
@@ -508,7 +508,7 @@ fn cut_str(
         1 if opt.only_delimited => stdout.write_all(b"")?,
         1 => {
             stdout.write_all(line.as_bytes())?;
-            stdout.write_all(&[eol])?;
+            stdout.write_all(eol)?;
         }
         _ => {
             opt.bounds.0.iter().try_for_each(|f| -> Result<()> {
@@ -538,7 +538,7 @@ fn cut_str(
                 Ok(())
             })?;
 
-            stdout.write_all(&[eol])?;
+            stdout.write_all(eol)?;
         }
     }
 
@@ -589,7 +589,7 @@ fn read_and_cut_str(
             stdout,
             &mut bounds_as_ranges,
             &mut compressed_line_buf,
-            opt.eol as u8,
+            &[opt.eol as u8],
         )?;
     }
     Ok(())
@@ -679,7 +679,7 @@ fn read_and_cut_lines(
             stdout,
             &mut bounds_as_ranges,
             &mut compressed_line_buf,
-            0,
+            b"",
         )?;
     }
 
