@@ -180,13 +180,28 @@ impl FromStr for UserBoundsList {
 }
 
 impl UserBoundsList {
-    pub fn has_negative_bounds(&self) -> bool {
-        self.0.iter().all(|b| match (b.l, b.r) {
-            (Side::Some(left), Side::Some(right)) => left.is_negative() || right.is_negative(),
-            (Side::Some(left), Side::Continue) => left.is_negative(),
-            (Side::Continue, Side::Some(right)) => right.is_negative(),
-            (Side::Continue, Side::Continue) => false,
-        })
+    pub fn is_sortable(&self) -> bool {
+        let mut has_positive_idx = false;
+        let mut has_negative_idx = false;
+        self.0.iter().for_each(|b| {
+            if let Side::Some(left) = b.l {
+                if left.is_positive() {
+                    has_positive_idx = true;
+                } else {
+                    has_negative_idx = true;
+                }
+            }
+
+            if let Side::Some(right) = b.r {
+                if right.is_positive() {
+                    has_positive_idx = true;
+                } else {
+                    has_negative_idx = true;
+                }
+            }
+        });
+
+        !(has_negative_idx && has_positive_idx)
     }
 }
 
@@ -313,6 +328,12 @@ impl UserBounds {
 }
 
 impl Ord for UserBounds {
+    /*
+     * Compare UserBounds. Note that comparison gives wrong results if
+     * bounds happen to have a mix of positive/negative indexes (you cannot
+     * reliably compare -1 with 3 without kwowing how many parts are there).
+     * Check with UserBounds.is_sortable before comparing.
+     */
     fn cmp(&self, other: &Self) -> Ordering {
         if self == other {
             return Ordering::Equal;
@@ -597,7 +618,7 @@ fn read_and_cut_lines(
         !opt.complement
         && !opt.compress_delimiter
         // indexes must be positive (negative indexes require to allocate the whole data)
-        && !opt.bounds.has_negative_bounds()
+        && !opt.bounds.is_sortable()
         // XXX 2022-05-18 nightly-only && opt.bounds.0.iter().is_sorted()
         && is_sorted(&opt.bounds.0)
     };
