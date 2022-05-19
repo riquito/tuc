@@ -41,8 +41,8 @@ OPTIONS:
 
 Notes:
     --trim and --compress-delimiter are applied before --fields
-    --lines does not load the whole file in memory if the fields are ordered
-      and non-negative (e.g. -l 1,3:4,4,7)
+    --lines does not load the whole input in memory if the fields are ordered
+      and non-negative (e.g. -l 1,3:4,4,7) and options -p/-m have not been set
 "
 );
 
@@ -465,7 +465,9 @@ fn cut_str(
     bounds_as_ranges.clear();
     build_ranges_vec(bounds_as_ranges, line, &opt.delimiter);
 
-    if opt.compress_delimiter && opt.bounds_type == BoundsType::Fields {
+    if opt.compress_delimiter
+        && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines)
+    {
         compressed_line_buf.clear();
         compress_delimiter(bounds_as_ranges, line, &opt.delimiter, compressed_line_buf);
         line = compressed_line_buf;
@@ -592,8 +594,10 @@ fn read_and_cut_lines(
     // (e.g. 1:2,2,4:5,8) then we can use a streaming algorithm and avoid
     // allocating everything in memory.
     let can_be_streamed = {
+        !opt.complement
+        && !opt.compress_delimiter
         // indexes must be positive (negative indexes require to allocate the whole data)
-        !opt.bounds.has_negative_bounds()
+        && !opt.bounds.has_negative_bounds()
         // XXX 2022-05-18 nightly-only && opt.bounds.0.iter().is_sorted()
         && is_sorted(&opt.bounds.0)
     };
