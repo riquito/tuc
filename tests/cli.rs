@@ -139,3 +139,33 @@ fn it_can_complement_the_fields() {
 
     assert.success().stdout("\n");
 }
+
+#[test]
+fn it_cuts_on_lines() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["--lines", "1,3"])
+        .write_stdin("a\nb\nc")
+        .assert();
+
+    assert.success().stdout("ac");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["--lines", "2:3"])
+        .write_stdin("a\nb\nc")
+        .assert();
+
+    assert.success().stdout("b\nc");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["--complement", "--lines", "2"])
+        .write_stdin("a\nb\nc")
+        .assert();
+
+    assert.success().stdout("ac");
+}
