@@ -790,4 +790,62 @@ mod tests {
             "-1:-2"
         );
     }
+
+    #[test]
+    fn test_user_bounds_is_sortable() {
+        assert!(UserBoundsList(Vec::new()).is_sortable());
+
+        assert!(UserBoundsList(vec![UserBounds::from_str("1").unwrap(),]).is_sortable());
+
+        assert!(UserBoundsList(vec![
+            UserBounds::from_str("1").unwrap(),
+            UserBounds::from_str("2").unwrap(),
+        ])
+        .is_sortable());
+
+        assert!(UserBoundsList(vec![
+            UserBounds::from_str("3").unwrap(),
+            UserBounds::from_str("2").unwrap(),
+        ])
+        .is_sortable());
+
+        assert!(!UserBoundsList(vec![
+            UserBounds::from_str("-1").unwrap(),
+            UserBounds::from_str("1").unwrap(),
+        ])
+        .is_sortable());
+
+        assert!(!UserBoundsList(vec![
+            UserBounds::from_str("-1:").unwrap(),
+            UserBounds::from_str(":1").unwrap(),
+        ])
+        .is_sortable());
+    }
+
+    #[test]
+    fn test_vec_of_bounds_is_sorted() {
+        assert!(is_sorted(&[UserBounds::from_str("1").unwrap(),]));
+
+        assert!(is_sorted(&[
+            UserBounds::from_str("1").unwrap(),
+            UserBounds::from_str("2").unwrap(),
+        ]));
+
+        assert!(is_sorted(&[
+            UserBounds::from_str("-2").unwrap(),
+            UserBounds::from_str("-1").unwrap(),
+        ]));
+
+        assert!(is_sorted(&[
+            UserBounds::from_str(":1").unwrap(),
+            UserBounds::from_str("2:4").unwrap(),
+            UserBounds::from_str("5:").unwrap(),
+        ]));
+
+        assert!(is_sorted(&[
+            UserBounds::from_str("1").unwrap(),
+            UserBounds::from_str("1").unwrap(),
+            UserBounds::from_str("2").unwrap(),
+        ]));
+    }
 }
