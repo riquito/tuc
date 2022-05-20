@@ -32,6 +32,7 @@ FLAGS:
     -z, --zero-terminated         line delimiter is NUL (\0), not LF (\n)
     -h, --help                    Prints this help and exit
     -m, --complement              keep the opposite fields than the one selected
+    -j, --join                    write the delimiter between fields
 
 OPTIONS:
     -b, --bytes <fields>          Same as --fields, but it cuts on bytes instead
