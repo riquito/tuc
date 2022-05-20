@@ -21,6 +21,7 @@ FLAGS:
     -z, --zero-terminated         line delimiter is NUL (\\0), not LF (\\n)
     -h, --help                    Prints this help and exit
     -m, --complement              keep the opposite fields than the one selected
+    -j, --join                    write the delimiter between fields
 
 OPTIONS:
     -b, --bytes <fields>          Same as --fields, but it cuts on bytes instead
@@ -73,6 +74,7 @@ struct Opt {
     trim: Option<Trim>,
     version: bool,
     complement: bool,
+    join: bool,
 }
 
 fn parse_args() -> Result<Opt, pico_args::Error> {
@@ -115,6 +117,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         only_delimited: pargs.contains(["-s", "--only-delimited"]),
         compress_delimiter: pargs.contains(["-p", "--compress-delimiter"]),
         version: pargs.contains(["-V", "--version"]),
+        join: pargs.contains(["-j", "--join"]),
         eol: if pargs.contains(["-z", "--zero-terminated"]) {
             EOL::Zero
         } else {
@@ -511,32 +514,47 @@ fn cut_str(
             stdout.write_all(eol)?;
         }
         _ => {
-            opt.bounds.0.iter().try_for_each(|f| -> Result<()> {
-                let r_array = [bounds_to_std_range(bounds_as_ranges.len(), f)?];
-                let mut r_iter = r_array.iter();
-                let _complements;
+            opt.bounds
+                .0
+                .iter()
+                .enumerate()
+                .try_for_each(|(i, f)| -> Result<()> {
+                    let r_array = [bounds_to_std_range(bounds_as_ranges.len(), f)?];
+                    let mut r_iter = r_array.iter();
+                    let _complements;
+                    let mut n_ranges = 1;
 
-                if opt.complement {
-                    _complements = complement_std_range(bounds_as_ranges.len(), &r_array[0]);
-                    r_iter = _complements.iter();
-                }
-
-                for r in r_iter {
-                    let idx_start = bounds_as_ranges[r.start].start;
-                    let idx_end = bounds_as_ranges[r.end - 1].end;
-                    let output = &line[idx_start..idx_end];
-
-                    if let Some(replace_delimiter) = &opt.replace_delimiter {
-                        stdout.write_all(
-                            output.replace(&opt.delimiter, replace_delimiter).as_bytes(),
-                        )?;
-                    } else {
-                        stdout.write_all(output.as_bytes())?;
+                    if opt.complement {
+                        _complements = complement_std_range(bounds_as_ranges.len(), &r_array[0]);
+                        r_iter = _complements.iter();
+                        n_ranges = _complements.len();
                     }
-                }
 
-                Ok(())
-            })?;
+                    for (idx_r, r) in r_iter.enumerate() {
+                        let idx_start = bounds_as_ranges[r.start].start;
+                        let idx_end = bounds_as_ranges[r.end - 1].end;
+                        let output = &line[idx_start..idx_end];
+
+                        if let Some(replace_delimiter) = &opt.replace_delimiter {
+                            stdout.write_all(
+                                output.replace(&opt.delimiter, replace_delimiter).as_bytes(),
+                            )?;
+                        } else {
+                            stdout.write_all(output.as_bytes())?;
+                        }
+
+                        if opt.join && !(i == opt.bounds.0.len() - 1 && idx_r == n_ranges - 1) {
+                            stdout.write_all(
+                                opt.replace_delimiter
+                                    .as_ref()
+                                    .unwrap_or(&opt.delimiter)
+                                    .as_bytes(),
+                            )?;
+                        }
+                    }
+
+                    Ok(())
+                })?;
 
             stdout.write_all(eol)?;
         }

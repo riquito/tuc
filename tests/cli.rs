@@ -169,3 +169,33 @@ fn it_cuts_on_lines() {
 
     assert.success().stdout("ac");
 }
+
+#[test]
+fn it_join_fields() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-d", " ", "-f", "1,3", "-j"])
+        .write_stdin("a b c")
+        .assert();
+
+    assert.success().stdout("a c\n");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-d", " ", "-f", "1,3", "-j", "-r", "/"])
+        .write_stdin("a b c")
+        .assert();
+
+    assert.success().stdout("a/c\n");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-d", "-", "-f", "2", "-j", "-m"])
+        .write_stdin("a-b-c")
+        .assert();
+
+    assert.success().stdout("a-c\n");
+}
