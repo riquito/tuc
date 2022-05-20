@@ -31,21 +31,29 @@ FLAGS:
     -V, --version                 Prints version information
     -z, --zero-terminated         line delimiter is NUL (\0), not LF (\n)
     -h, --help                    Prints this help and exit
+    -m, --complement              keep the opposite fields than the one selected
 
 OPTIONS:
     -b, --bytes <fields>          Same as --fields, but it cuts on bytes instead
                                   (doesn't require a delimiter)
     -d, --delimiter <delimiter>   Delimiter to use to cut the text into pieces
-                                  [default: \\t]
+                                  [default: \t]
     -f, --fields <fields>         Fields to keep, 1-indexed, comma separated.
                                   Use colon for inclusive ranges.
                                   e.g. 1:3 or 3,2 or 1: or 3,1:2 or -3 or -3:-2
                                   [default 1:]
     -c, --characters <fields>     Same as --fields, but it keeps characters instead
                                   (doesn't require a delimiter)
+    -l, --lines <fields>          Same as --fields, but it keeps lines instead
+                                  (doesn't require a delimiter)
     -r, --replace-delimiter <s>   Replace the delimiter with the provided text
     -t, --trim <trim>             Trim the delimiter. Valid trim values are
                                   (l|L)eft, (r|R)ight, (b|B)oth
+
+Notes:
+    --trim and --compress-delimiter are applied before --fields
+    --lines does not load the whole input in memory if the fields are ordered
+      and non-negative (e.g. -l 1,3:4,4,7) and options -p/-m have not been set
 ```
 
 ## Examples
