@@ -19,7 +19,7 @@ cargo install tuc
 ## Help
 
 ```
-tuc 0.7.0 [UNRELEASED]
+tuc 0.8.0 [UNRELEASED]
 When cut doesn't cut it.
 
 USAGE:
