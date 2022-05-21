@@ -671,6 +671,12 @@ fn read_and_cut_lines(
                         // we exhausted the use of that bound, move on
                         bounds_idx += 1;
                         add_newline_next = false;
+
+                        // if opt.join and it was not the last matching bound
+                        if opt.join && bounds_idx != opt.bounds.0.len() {
+                            stdout.write_all(&[opt.eol as u8])?;
+                        }
+
                         continue; // let's see if the next bound matches too
                     }
                 }

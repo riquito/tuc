@@ -154,6 +154,15 @@ fn it_cuts_on_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
+        .args(&["--lines", "3,1"])
+        .write_stdin("a\nb\nc")
+        .assert();
+
+    assert.success().stdout("ca");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
         .args(&["--lines", "2:3"])
         .write_stdin("a\nb\nc")
         .assert();
@@ -198,4 +207,25 @@ fn it_join_fields() {
         .assert();
 
     assert.success().stdout("a-c\n");
+}
+
+#[test]
+fn it_join_lines() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-l", "1,3", "-j"])
+        .write_stdin("a\nb\nc")
+        .assert();
+
+    assert.success().stdout("a\nc");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-l", "3,1", "-j"])
+        .write_stdin("a\nb\nc")
+        .assert();
+
+    assert.success().stdout("c\na");
 }
