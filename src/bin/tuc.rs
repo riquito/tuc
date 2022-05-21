@@ -287,6 +287,9 @@ impl FromStr for UserBounds {
             (_, Side::Some(0)) => {
                 return Err("Field value 0 is not allowed (fields are 1-indexed)".into());
             }
+            (Side::Some(left), Side::Some(right)) if right < left => {
+                return Err("Field left value cannot be greater than right value".into());
+            }
             _ => (),
         }
 
@@ -813,6 +816,62 @@ mod tests {
             UserBounds::new(Side::Some(-1), Side::Some(-2)).to_string(),
             "-1:-2"
         );
+    }
+
+    #[test]
+    fn test_user_bounds_from_str() {
+        assert_eq!(
+            UserBounds::from_str("1").ok(),
+            Some(UserBounds::new(Side::Some(1), Side::Some(1))),
+        );
+        assert_eq!(
+            UserBounds::from_str("-1").ok(),
+            Some(UserBounds::new(Side::Some(-1), Side::Some(-1))),
+        );
+        assert_eq!(
+            UserBounds::from_str("1:2").ok(),
+            Some(UserBounds::new(Side::Some(1), Side::Some(2))),
+        );
+        assert_eq!(
+            UserBounds::from_str("-2:-1").ok(),
+            Some(UserBounds::new(Side::Some(-2), Side::Some(-1))),
+        );
+        assert_eq!(
+            UserBounds::from_str("1:").ok(),
+            Some(UserBounds::new(Side::Some(1), Side::Continue)),
+        );
+        assert_eq!(
+            UserBounds::from_str("-1:").ok(),
+            Some(UserBounds::new(Side::Some(-1), Side::Continue)),
+        );
+        assert_eq!(
+            UserBounds::from_str(":1").ok(),
+            Some(UserBounds::new(Side::Continue, Side::Some(1))),
+        );
+        assert_eq!(
+            UserBounds::from_str(":-1").ok(),
+            Some(UserBounds::new(Side::Continue, Side::Some(-1))),
+        );
+
+        {
+            #![allow(clippy::bind_instead_of_map)]
+            assert_eq!(
+                UserBounds::from_str("2:1")
+                    .err()
+                    .and_then(|x| Some(x.to_string())),
+                Some(String::from(
+                    "Field left value cannot be greater than right value"
+                ))
+            );
+            assert_eq!(
+                UserBounds::from_str("-1:-2")
+                    .err()
+                    .and_then(|x| Some(x.to_string())),
+                Some(String::from(
+                    "Field left value cannot be greater than right value"
+                ))
+            );
+        }
     }
 
     #[test]
