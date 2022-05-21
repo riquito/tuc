@@ -618,7 +618,7 @@ fn read_and_cut_lines(
         !opt.complement
         && !opt.compress_delimiter
         // indexes must be positive (negative indexes require to allocate the whole data)
-        && !opt.bounds.is_sortable()
+        && opt.bounds.is_sortable()
         // XXX 2022-05-18 nightly-only && opt.bounds.0.iter().is_sorted()
         && is_sorted(&opt.bounds.0)
     };
