@@ -340,7 +340,7 @@ impl Ord for UserBounds {
         }
 
         match (self.l, self.r, other.l, other.r) {
-            (_, Side::Some(s_r), Side::Some(o_l), _) if (s_r * o_l).is_positive() && s_r < o_l => {
+            (_, Side::Some(s_r), Side::Some(o_l), _) if (s_r * o_l).is_positive() && s_r <= o_l => {
                 Ordering::Less
             }
             _ => Ordering::Greater,
@@ -840,6 +840,11 @@ mod tests {
             UserBounds::from_str(":1").unwrap(),
             UserBounds::from_str("2:4").unwrap(),
             UserBounds::from_str("5:").unwrap(),
+        ]));
+
+        assert!(is_sorted(&[
+            UserBounds::from_str("1").unwrap(),
+            UserBounds::from_str("1:2").unwrap(),
         ]));
 
         assert!(is_sorted(&[
