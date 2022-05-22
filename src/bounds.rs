@@ -18,9 +18,72 @@ pub enum BoundOrFiller {
     Filler(String),
 }
 
+/**
+ * Parse bound string. It can contain formatting elements or not.
+ *
+ * Valid bounds formats are e.g. 1 / -1 / 1:3 / :3 / 1: / 1,4
+ * If '{' is present, the string is considered to be a format string:
+ * in that case everything inside {} is considered a bound, and the rest
+ * just some text to display when the bounds are found.
+ * e.g. "Hello {1}, found {1:3} and {2,4}"
+ */
 fn parse_bound_string(s: &str) -> Result<Vec<BoundOrFiller>> {
     if s.contains('{') {
-        Ok(Vec::new())
+        let esc_open = "__tuc_open";
+        let esc_close = "__tuc_close";
+        let s = s
+            .replace("{{", esc_open)
+            .replace("}}", esc_close)
+            .replace("\\n", "\n");
+
+        let mut v: Vec<BoundOrFiller> = Vec::new();
+        let mut prev_filler_start = 0;
+        let mut bound_idx_start = None;
+        let mut bound_idx_end = None;
+        for (i, c) in s.char_indices() {
+            if c == '}' && bound_idx_start == None {
+                bail!("Bounds format error");
+            }
+            if c == '{' && bound_idx_start != None {
+                bail!("Bounds format error");
+            }
+            if c == '{' {
+                bound_idx_start = Some(i);
+            } else if c == '}' {
+                if let Some(filler) = s.get(prev_filler_start..bound_idx_start.unwrap()) {
+                    if !filler.is_empty() {
+                        v.push(BoundOrFiller::Filler(
+                            filler
+                                .to_owned()
+                                .replace(esc_open, "{{")
+                                .replace(esc_close, "}}"),
+                        ));
+                    }
+                    prev_filler_start = i + 1;
+                }
+
+                // handle comma separated bounds
+                for maybe_bounds in s[bound_idx_start.unwrap() + 1..i].split(',') {
+                    v.push(BoundOrFiller::Bound(UserBounds::from_str(maybe_bounds)?));
+                }
+
+                bound_idx_start = None;
+                bound_idx_end = Some(i);
+            }
+        }
+
+        if let Some(last_bound_idx_end) = bound_idx_end {
+            if last_bound_idx_end < s.len() - 1 {
+                v.push(BoundOrFiller::Filler(
+                    s[last_bound_idx_end + 1..s.len()]
+                        .to_owned()
+                        .replace(esc_open, "{{")
+                        .replace(esc_close, "}}"),
+                ));
+            }
+        }
+
+        Ok(v)
     } else {
         let k: Result<Vec<BoundOrFiller>, _> = s
             .split(',')
