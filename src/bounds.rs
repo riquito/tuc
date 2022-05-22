@@ -12,7 +12,7 @@ pub enum BoundsType {
     Lines,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum BoundOrFiller {
     Bound(UserBounds),
     Filler(String),
@@ -27,8 +27,16 @@ pub enum BoundOrFiller {
  * just some text to display when the bounds are found.
  * e.g. "Hello {1}, found {1:3} and {2,4}"
  */
-fn parse_bound_string(s: &str) -> Result<Vec<BoundOrFiller>> {
-    if s.contains('{') {
+fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
+    if s.contains(&['{', '}']) {
+        if s.len() == 1 {
+            if s == "{" {
+                bail!("Field format error: missing closing parenthesis");
+            } else {
+                bail!("Field format error: missing opening parenthesis");
+            }
+        }
+
         let esc_open = "__tuc_open";
         let esc_close = "__tuc_close";
         let s = s
@@ -41,11 +49,11 @@ fn parse_bound_string(s: &str) -> Result<Vec<BoundOrFiller>> {
         let mut bound_idx_start = None;
         let mut bound_idx_end = None;
         for (i, c) in s.char_indices() {
-            if c == '}' && bound_idx_start == None {
-                bail!("Bounds format error");
+            if c == '}' && bound_idx_start.is_none() {
+                bail!("Field format error: missing opening parenthesis");
             }
-            if c == '{' && bound_idx_start != None {
-                bail!("Bounds format error");
+            if c == '{' && bound_idx_start.is_some() {
+                bail!("Field format error: missing closing parenthesis");
             }
             if c == '{' {
                 bound_idx_start = Some(i);
@@ -70,6 +78,10 @@ fn parse_bound_string(s: &str) -> Result<Vec<BoundOrFiller>> {
                 bound_idx_start = None;
                 bound_idx_end = Some(i);
             }
+        }
+
+        if bound_idx_start.is_some() {
+            bail!("Field format error: missing closing parenthesis");
         }
 
         if let Some(last_bound_idx_end) = bound_idx_end {
@@ -99,7 +111,7 @@ pub struct UserBoundsList(pub Vec<BoundOrFiller>);
 impl FromStr for UserBoundsList {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(UserBoundsList(parse_bound_string(s)?))
+        Ok(UserBoundsList(parse_bounds_list(s)?))
     }
 }
 
@@ -420,6 +432,82 @@ mod tests {
                 ))
             );
         }
+    }
+
+    #[test]
+    fn test_parse_bounds_list() {
+        // do not replicate tests from test_user_bounds_from_str, focus on
+        // multiple bounds, bounds with format, and special cases (empty/one)
+
+        assert_eq!(
+            &parse_bounds_list("").unwrap_err().to_string(),
+            "Field format error: empty field"
+        );
+
+        assert_eq!(
+            &parse_bounds_list("{").unwrap_err().to_string(),
+            "Field format error: missing closing parenthesis"
+        );
+
+        assert_eq!(
+            &parse_bounds_list("}").unwrap_err().to_string(),
+            "Field format error: missing opening parenthesis"
+        );
+
+        assert_eq!(
+            &parse_bounds_list("{1}{").unwrap_err().to_string(),
+            "Field format error: missing closing parenthesis"
+        );
+
+        // TODO these are going to give confusing error messages because
+        // we transform {{ and }} internally and the error message looks like
+        // the opposite case is happening (missing open/closed). At least it
+        // must return an error, in future we should parse properly the format
+        // string.
+        assert!(parse_bounds_list("{1}}").is_err());
+        assert!(parse_bounds_list("{{1}").is_err());
+
+        assert_eq!(
+            parse_bounds_list("1").unwrap(),
+            vec![BoundOrFiller::Bound(UserBounds::new(
+                Side::Some(1),
+                Side::Some(1)
+            ))],
+        );
+
+        assert_eq!(
+            parse_bounds_list("{1}").unwrap(),
+            vec![BoundOrFiller::Bound(UserBounds::new(
+                Side::Some(1),
+                Side::Some(1)
+            ))],
+        );
+
+        assert_eq!(
+            parse_bounds_list("{1:2}").unwrap(),
+            vec![BoundOrFiller::Bound(UserBounds::new(
+                Side::Some(1),
+                Side::Some(2)
+            ))],
+        );
+
+        assert_eq!(
+            parse_bounds_list("{1,2}").unwrap(),
+            vec![
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2)))
+            ],
+        );
+
+        assert_eq!(
+            parse_bounds_list("hello {1,2} world").unwrap(),
+            vec![
+                BoundOrFiller::Filler(String::from("hello ")),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Filler(String::from(" world")),
+            ],
+        );
     }
 
     #[test]
