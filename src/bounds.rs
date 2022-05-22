@@ -13,14 +13,30 @@ pub enum BoundsType {
 }
 
 #[derive(Debug)]
-pub struct UserBoundsList(pub Vec<UserBounds>);
+pub enum BoundOrFiller {
+    Bound(UserBounds),
+    Filler(String),
+}
+
+fn parse_bound_string(s: &str) -> Result<Vec<BoundOrFiller>> {
+    if s.contains('{') {
+        Ok(Vec::new())
+    } else {
+        let k: Result<Vec<BoundOrFiller>, _> = s
+            .split(',')
+            .map(|x| UserBounds::from_str(x).map(BoundOrFiller::Bound))
+            .collect();
+        Ok(k?)
+    }
+}
+
+#[derive(Debug)]
+pub struct UserBoundsList(pub Vec<BoundOrFiller>);
 
 impl FromStr for UserBoundsList {
-    type Err = Box<dyn std::error::Error>;
-
+    type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let k: Result<Vec<UserBounds>, _> = s.split(',').map(UserBounds::from_str).collect();
-        Ok(UserBoundsList(k?))
+        Ok(UserBoundsList(parse_bound_string(s)?))
     }
 }
 
@@ -28,29 +44,38 @@ impl UserBoundsList {
     pub fn is_sortable(&self) -> bool {
         let mut has_positive_idx = false;
         let mut has_negative_idx = false;
-        self.0.iter().for_each(|b| {
-            if let Side::Some(left) = b.l {
-                if left.is_positive() {
-                    has_positive_idx = true;
-                } else {
-                    has_negative_idx = true;
+        self.0
+            .iter()
+            .flat_map(|b| match b {
+                BoundOrFiller::Bound(x) => Some(x),
+                _ => None,
+            })
+            .for_each(|b| {
+                if let Side::Some(left) = b.l {
+                    if left.is_positive() {
+                        has_positive_idx = true;
+                    } else {
+                        has_negative_idx = true;
+                    }
                 }
-            }
 
-            if let Side::Some(right) = b.r {
-                if right.is_positive() {
-                    has_positive_idx = true;
-                } else {
-                    has_negative_idx = true;
+                if let Side::Some(right) = b.r {
+                    if right.is_positive() {
+                        has_positive_idx = true;
+                    } else {
+                        has_negative_idx = true;
+                    }
                 }
-            }
-        });
+            });
 
         !(has_negative_idx && has_positive_idx)
     }
 
     pub fn is_sorted(&self) -> bool {
-        self.0.windows(2).all(|w| w[0] <= w[1])
+        self.0.windows(2).all(|w| match (&w[0], &w[1]) {
+            (BoundOrFiller::Bound(x), BoundOrFiller::Bound(y)) => x <= y,
+            _ => true,
+        })
     }
 }
 
@@ -61,14 +86,14 @@ pub enum Side {
 }
 
 impl FromStr for Side {
-    type Err = Box<dyn std::error::Error>;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             "" => Side::Continue,
             _ => Side::Some(
                 s.parse::<i32>()
-                    .map_err(|_| format!("Not a number `{}`", s))?,
+                    .or_else(|_| bail!("Not a number `{}`", s))?,
             ),
         })
     }
@@ -100,13 +125,13 @@ impl fmt::Display for UserBounds {
 }
 
 impl FromStr for UserBounds {
-    type Err = Box<dyn std::error::Error>;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {
-            return Err("Field format error: empty field".into());
+            bail!("Field format error: empty field");
         } else if s == ":" {
-            return Err("Field format error, no numbers next to `:`".into());
+            bail!("Field format error, no numbers next to `:`");
         }
 
         let (l, r) = match s.find(':') {
@@ -128,13 +153,13 @@ impl FromStr for UserBounds {
 
         match (l, r) {
             (Side::Some(0), _) => {
-                return Err("Field value 0 is not allowed (fields are 1-indexed)".into());
+                bail!("Field value 0 is not allowed (fields are 1-indexed)");
             }
             (_, Side::Some(0)) => {
-                return Err("Field value 0 is not allowed (fields are 1-indexed)".into());
+                bail!("Field value 0 is not allowed (fields are 1-indexed)");
             }
             (Side::Some(left), Side::Some(right)) if right < left => {
-                return Err("Field left value cannot be greater than right value".into());
+                bail!("Field left value cannot be greater than right value");
             }
             _ => (),
         }
@@ -338,66 +363,72 @@ mod tests {
     fn test_user_bounds_is_sortable() {
         assert!(UserBoundsList(Vec::new()).is_sortable());
 
-        assert!(UserBoundsList(vec![UserBounds::from_str("1").unwrap(),]).is_sortable());
+        assert!(UserBoundsList(vec![BoundOrFiller::Bound(
+            UserBounds::from_str("1").unwrap()
+        ),])
+        .is_sortable());
 
         assert!(UserBoundsList(vec![
-            UserBounds::from_str("1").unwrap(),
-            UserBounds::from_str("2").unwrap(),
+            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
         ])
         .is_sortable());
 
         assert!(UserBoundsList(vec![
-            UserBounds::from_str("3").unwrap(),
-            UserBounds::from_str("2").unwrap(),
+            BoundOrFiller::Bound(UserBounds::from_str("3").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
         ])
         .is_sortable());
 
         assert!(!UserBoundsList(vec![
-            UserBounds::from_str("-1").unwrap(),
-            UserBounds::from_str("1").unwrap(),
+            BoundOrFiller::Bound(UserBounds::from_str("-1").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
         ])
         .is_sortable());
 
         assert!(!UserBoundsList(vec![
-            UserBounds::from_str("-1:").unwrap(),
-            UserBounds::from_str(":1").unwrap(),
+            BoundOrFiller::Bound(UserBounds::from_str("-1:").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str(":1").unwrap()),
         ])
         .is_sortable());
     }
 
     #[test]
     fn test_vec_of_bounds_is_sorted() {
-        assert!(UserBoundsList(vec![UserBounds::from_str("1").unwrap(),]).is_sorted());
+        assert!(UserBoundsList(vec![BoundOrFiller::Bound(
+            UserBounds::from_str("1").unwrap()
+        ),])
+        .is_sorted());
 
         assert!(UserBoundsList(vec![
-            UserBounds::from_str("1").unwrap(),
-            UserBounds::from_str("2").unwrap(),
+            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
         ])
         .is_sorted());
 
         assert!(UserBoundsList(vec![
-            UserBounds::from_str("-2").unwrap(),
-            UserBounds::from_str("-1").unwrap(),
+            BoundOrFiller::Bound(UserBounds::from_str("-2").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("-1").unwrap()),
         ])
         .is_sorted());
 
         assert!(UserBoundsList(vec![
-            UserBounds::from_str(":1").unwrap(),
-            UserBounds::from_str("2:4").unwrap(),
-            UserBounds::from_str("5:").unwrap(),
+            BoundOrFiller::Bound(UserBounds::from_str(":1").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("2:4").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("5:").unwrap()),
         ])
         .is_sorted());
 
         assert!(UserBoundsList(vec![
-            UserBounds::from_str("1").unwrap(),
-            UserBounds::from_str("1:2").unwrap(),
+            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("1:2").unwrap()),
         ])
         .is_sorted());
 
         assert!(UserBoundsList(vec![
-            UserBounds::from_str("1").unwrap(),
-            UserBounds::from_str("1").unwrap(),
-            UserBounds::from_str("2").unwrap(),
+            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
         ])
         .is_sorted());
     }
