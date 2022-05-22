@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::io::Write;
 use std::ops::Range;
 
-use crate::bounds::{bounds_to_std_range, BoundsType};
+use crate::bounds::{bounds_to_std_range, BoundOrFiller, BoundsType};
 use crate::options::{Opt, Trim};
 use crate::read_utils::read_line_with_eol;
 
@@ -123,8 +123,16 @@ pub fn cut_str(
                 .0
                 .iter()
                 .enumerate()
-                .try_for_each(|(i, f)| -> Result<()> {
-                    let r_array = [bounds_to_std_range(bounds_as_ranges.len(), f)?];
+                .try_for_each(|(i, bof)| -> Result<()> {
+                    let b = match bof {
+                        BoundOrFiller::Filler(f) => {
+                            stdout.write_all(f.as_bytes())?;
+                            return Ok(());
+                        }
+                        BoundOrFiller::Bound(b) => b,
+                    };
+
+                    let r_array = [bounds_to_std_range(bounds_as_ranges.len(), b)?];
                     let mut r_iter = r_array.iter();
                     let _complements;
                     let mut n_ranges = 1;

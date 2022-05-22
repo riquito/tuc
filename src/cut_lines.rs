@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::io::{Read, Write};
 use std::ops::Range;
 
-use crate::bounds::Side;
+use crate::bounds::{BoundOrFiller, Side};
 use crate::cut_str::cut_str;
 use crate::options::Opt;
 use crate::read_utils::read_line_with_eol;
@@ -40,7 +40,16 @@ pub fn read_and_cut_lines(
             // duplicated, e.g. 1-2,2,3 , so we may have to print the same
             // line multiple times
             while bounds_idx < opt.bounds.0.len() {
-                let b = opt.bounds.0.get(bounds_idx).unwrap();
+                let bof = opt.bounds.0.get(bounds_idx).unwrap();
+
+                let b = match bof {
+                    BoundOrFiller::Filler(f) => {
+                        stdout.write_all(f.as_bytes())?;
+                        bounds_idx += 1;
+                        continue;
+                    }
+                    BoundOrFiller::Bound(b) => b,
+                };
 
                 if b.matches(line_idx).unwrap_or(false) {
                     if add_newline_next {
