@@ -35,18 +35,32 @@ FLAGS:
     -j, --join                    write the delimiter between fields
 
 OPTIONS:
-    -b, --bytes <fields>          Same as --fields, but it cuts on bytes instead
-                                  (doesn't require a delimiter)
-    -d, --delimiter <delimiter>   Delimiter to use to cut the text into pieces
-                                  [default: \t]
-    -f, --fields <fields>         Fields to keep, 1-indexed, comma separated.
-                                  Use colon for inclusive ranges.
-                                  e.g. 1:3 or 3,2 or 1: or 3,1:2 or -3 or -3:-2
+    -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
+                                  Use colon to include everything in a range.
                                   [default 1:]
-    -c, --characters <fields>     Same as --fields, but it keeps characters instead
-                                  (doesn't require a delimiter)
-    -l, --lines <fields>          Same as --fields, but it keeps lines instead
-                                  (doesn't require a delimiter)
+
+                                  e.g. cutting on '-' the string 'a-b-c-d'
+                                    1     => a
+                                    1:    => a-b-c-d
+                                    1:3   => a-b-c
+                                    3,2   => cb
+                                    3,1:2 => ca-b
+                                    -3:-2 => b-c
+
+                                  To re-add the delimiter check -j, to replace
+                                  it check -r.
+
+                                  You can also format the output using {} syntax
+                                  e.g.
+                                  '["{1}", "{2}", "{3}"]' => ["a", "b", "c"]
+
+                                  You can escape { and } using {{ and }}.
+
+    -b, --bytes <bounds>          Same as --fields, but it keeps bytes
+    -c, --characters <bounds>     Same as --fields, but it keeps characters
+    -l, --lines <bounds>          Same as --fields, but it keeps lines
+    -d, --delimiter <delimiter>   Delimiter used by -f to cut the text
+                                  [default: \t]
     -r, --replace-delimiter <s>   Replace the delimiter with the provided text
     -t, --trim <trim>             Trim the delimiter. Valid trim values are
                                   (l|L)eft, (r|R)ight, (b|B)oth
@@ -63,6 +77,12 @@ Notes:
 # Cut using a greedy delimiter
 ❯ echo "foo    bar   baz" | tuc -d ' ' -f 2:
 bar   baz
+```
+
+```sh
+# Format output
+❯ echo "foo bar baz" | tuc -d ' ' -f '{1}, {2} and lastly {3}'
+foo, bar and lastly baz
 ```
 
 ```sh
