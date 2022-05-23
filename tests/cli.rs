@@ -243,3 +243,15 @@ fn it_format_fields() {
         .success()
         .stdout("Say hello to our world.\nJust {saying}\n");
 }
+
+#[test]
+fn it_cuts_using_a_greedy_delimiter() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-g", "-d", "-", "-f", "1,2"])
+        .write_stdin("a---b")
+        .assert();
+
+    assert.success().stdout("ab\n");
+}

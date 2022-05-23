@@ -19,23 +19,31 @@ fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usiz
     }
 }
 
-/*
- * Split a string into parts and build a vector of ranges that match those parts.
- *
- * `buffer` - empty vector that will be filled with ranges
- * `line` - the string to split
- * `delimiter` - what to search to split the string
- */
-fn build_ranges_vec(buffer: &mut Vec<Range<usize>>, line: &str, delimiter: &str) {
+// Split a string into parts and build a vector of ranges that match those parts.
+//
+// `buffer` - vector that will be filled with ranges
+// `line` - the string to split
+// `delimiter` - what to search to split the string
+// `greedy` - whether to consider consecutive delimiters as one or not
+fn build_ranges_vec(buffer: &mut Vec<Range<usize>>, line: &str, delimiter: &str, greedy: bool) {
+    buffer.clear();
+
+    if line.is_empty() {
+        return;
+    }
+
     let delimiter_length = delimiter.len();
     let mut next_part_start = 0;
 
-    for mat in line.match_indices(&delimiter) {
-        buffer.push(Range {
-            start: next_part_start,
-            end: mat.0,
-        });
-        next_part_start = mat.0 + delimiter_length;
+    for (idx, _) in line.match_indices(&delimiter) {
+        if !(greedy && idx == next_part_start) {
+            buffer.push(Range {
+                start: next_part_start,
+                end: idx,
+            });
+        }
+
+        next_part_start = idx + delimiter_length;
     }
 
     buffer.push(Range {
@@ -91,8 +99,7 @@ pub fn cut_str(
         return Ok(());
     }
 
-    bounds_as_ranges.clear();
-    build_ranges_vec(bounds_as_ranges, line, &opt.delimiter);
+    build_ranges_vec(bounds_as_ranges, line, &opt.delimiter, opt.greedy_delimiter);
 
     if opt.compress_delimiter
         && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines)
@@ -100,8 +107,7 @@ pub fn cut_str(
         compressed_line_buf.clear();
         compress_delimiter(bounds_as_ranges, line, &opt.delimiter, compressed_line_buf);
         line = compressed_line_buf;
-        bounds_as_ranges.clear();
-        build_ranges_vec(bounds_as_ranges, line, &opt.delimiter);
+        build_ranges_vec(bounds_as_ranges, line, &opt.delimiter, opt.greedy_delimiter);
     }
 
     if opt.bounds_type == BoundsType::Characters && bounds_as_ranges.len() > 2 {
@@ -230,5 +236,65 @@ mod tests {
         assert_eq!(complement_std_range(2, &(0..2)), vec![]);
         assert_eq!(complement_std_range(2, &(0..1)), vec![1..2]);
         assert_eq!(complement_std_range(2, &(1..2)), vec![0..1]);
+    }
+
+    #[test]
+    fn test_build_ranges_vec() {
+        let mut v_range: Vec<Range<usize>> = Vec::new();
+
+        // non greedy
+
+        v_range.clear();
+        build_ranges_vec(&mut v_range, "", "-", false);
+        assert_eq!(v_range, vec![]);
+
+        v_range.clear();
+        build_ranges_vec(&mut v_range, "a", "-", false);
+        assert_eq!(v_range, vec![Range { start: 0, end: 1 }]);
+
+        v_range.clear();
+        build_ranges_vec(&mut v_range, "a-b", "-", false);
+        assert_eq!(
+            v_range,
+            vec![Range { start: 0, end: 1 }, Range { start: 2, end: 3 }]
+        );
+
+        v_range.clear();
+        build_ranges_vec(&mut v_range, "-a-", "-", false);
+        assert_eq!(
+            v_range,
+            vec![
+                Range { start: 0, end: 0 },
+                Range { start: 1, end: 2 },
+                Range { start: 3, end: 3 }
+            ]
+        );
+
+        v_range.clear();
+        build_ranges_vec(&mut v_range, "a--", "-", false);
+        assert_eq!(
+            v_range,
+            vec![
+                Range { start: 0, end: 1 },
+                Range { start: 2, end: 2 },
+                Range { start: 3, end: 3 }
+            ]
+        );
+
+        // greedy
+
+        v_range.clear();
+        build_ranges_vec(&mut v_range, "a--b", "-", true);
+        assert_eq!(
+            v_range,
+            vec![Range { start: 0, end: 1 }, Range { start: 3, end: 4 }]
+        );
+
+        v_range.clear();
+        build_ranges_vec(&mut v_range, "a--", "-", true);
+        assert_eq!(
+            v_range,
+            vec![Range { start: 0, end: 1 }, Range { start: 3, end: 3 }]
+        );
     }
 }
