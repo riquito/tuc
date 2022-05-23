@@ -35,7 +35,7 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
 
         let mut iter = s.char_indices().peekable();
         while let Some((idx, w0)) = iter.next() {
-            let w1 = iter.peek().or(Some(&(0, 'x'))).unwrap().1;
+            let w1 = iter.peek().unwrap_or(&(0, 'x')).1;
 
             if w0 == w1 && (w0 == '{' || w0 == '}') {
                 // escaped bracket, ignore it, we will replace it later
