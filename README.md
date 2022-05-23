@@ -26,6 +26,7 @@ USAGE:
     tuc [FLAGS] [OPTIONS]
 
 FLAGS:
+    -g, --greedy-delimiter        Split fields using a greedy delimiter
     -p, --compress-delimiter      Collapse any sequence of delimiters
     -s, --only-delimited          Do not print lines not containing delimiters
     -V, --version                 Prints version information
@@ -74,9 +75,21 @@ Notes:
 ## Examples
 
 ```sh
+# Cut and rearrange fields
+❯ echo "foo bar baz" | tuc -d ' ' -f 3,2,1
+bazbarfoo
+```
+
+```sh
+# Keep ranges
+❯ echo "foo bar baz" | tuc -d ' ' -f 2:
+bar baz
+```
+
+```sh
 # Cut using a greedy delimiter
-❯ echo "foo    bar   baz" | tuc -d ' ' -f 2:
-bar   baz
+❯ echo "foo    bar" | tuc -g -d ' ' -f 1,2
+foobar
 ```
 
 ```sh

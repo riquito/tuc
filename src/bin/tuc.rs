@@ -17,6 +17,7 @@ USAGE:
     tuc [FLAGS] [OPTIONS]
 
 FLAGS:
+    -g, --greedy-delimiter        Split fields using a greedy delimiter
     -p, --compress-delimiter      Collapse any sequence of delimiters
     -s, --only-delimited          Do not print lines not containing delimiters
     -V, --version                 Prints version information
@@ -101,6 +102,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let args = Opt {
         complement: pargs.contains(["-m", "--complement"]),
         only_delimited: pargs.contains(["-s", "--only-delimited"]),
+        greedy_delimiter: pargs.contains(["-g", "--greedy-delimiter"]),
         compress_delimiter: pargs.contains(["-p", "--compress-delimiter"]),
         version: pargs.contains(["-V", "--version"]),
         join: pargs.contains(["-j", "--join"]),

@@ -16,6 +16,7 @@ pub struct Opt {
     pub bounds: UserBoundsList,
     pub bounds_type: BoundsType,
     pub only_delimited: bool,
+    pub greedy_delimiter: bool,
     pub compress_delimiter: bool,
     pub replace_delimiter: Option<String>,
     pub trim: Option<Trim>,
