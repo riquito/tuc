@@ -27,85 +27,7 @@ pub enum BoundOrFiller {
  * just some text to display when the bounds are found.
  * e.g. "Hello {1}, found {1:3} and {2,4}"
  */
-fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
-    if s.contains(&['{', '}']) {
-        if s.len() == 1 {
-            if s == "{" {
-                bail!("Field format error: missing closing parenthesis");
-            } else {
-                bail!("Field format error: missing opening parenthesis");
-            }
-        }
-
-        let esc_open = "__tuc_open";
-        let esc_close = "__tuc_close";
-        let s = s
-            .replace("{{", esc_open)
-            .replace("}}", esc_close)
-            .replace("\\n", "\n");
-
-        let mut v: Vec<BoundOrFiller> = Vec::new();
-        let mut prev_filler_start = 0;
-        let mut bound_idx_start = None;
-        let mut bound_idx_end = None;
-        for (i, c) in s.char_indices() {
-            if c == '}' && bound_idx_start.is_none() {
-                bail!("Field format error: missing opening parenthesis");
-            }
-            if c == '{' && bound_idx_start.is_some() {
-                bail!("Field format error: missing closing parenthesis");
-            }
-            if c == '{' {
-                bound_idx_start = Some(i);
-            } else if c == '}' {
-                if let Some(filler) = s.get(prev_filler_start..bound_idx_start.unwrap()) {
-                    if !filler.is_empty() {
-                        v.push(BoundOrFiller::Filler(
-                            filler
-                                .to_owned()
-                                .replace(esc_open, "{{")
-                                .replace(esc_close, "}}"),
-                        ));
-                    }
-                    prev_filler_start = i + 1;
-                }
-
-                // handle comma separated bounds
-                for maybe_bounds in s[bound_idx_start.unwrap() + 1..i].split(',') {
-                    v.push(BoundOrFiller::Bound(UserBounds::from_str(maybe_bounds)?));
-                }
-
-                bound_idx_start = None;
-                bound_idx_end = Some(i);
-            }
-        }
-
-        if bound_idx_start.is_some() {
-            bail!("Field format error: missing closing parenthesis");
-        }
-
-        if let Some(last_bound_idx_end) = bound_idx_end {
-            if last_bound_idx_end < s.len() - 1 {
-                v.push(BoundOrFiller::Filler(
-                    s[last_bound_idx_end + 1..s.len()]
-                        .to_owned()
-                        .replace(esc_open, "{{")
-                        .replace(esc_close, "}}"),
-                ));
-            }
-        }
-
-        Ok(v)
-    } else {
-        let k: Result<Vec<BoundOrFiller>, _> = s
-            .split(',')
-            .map(|x| UserBounds::from_str(x).map(BoundOrFiller::Bound))
-            .collect();
-        Ok(k?)
-    }
-}
-
-pub fn parse_bounds_list_2(s: &str) -> Result<Vec<BoundOrFiller>> {
+pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
     if s.contains(&['{', '}']) {
         let mut bof: Vec<BoundOrFiller> = Vec::new();
         let mut inside_bound = false;
@@ -512,13 +434,15 @@ mod tests {
             "Field format error: missing closing parenthesis"
         );
 
-        // TODO these are going to give confusing error messages because
-        // we transform {{ and }} internally and the error message looks like
-        // the opposite case is happening (missing open/closed). At least it
-        // must return an error, in future we should parse properly the format
-        // string.
-        assert!(parse_bounds_list("{1}}").is_err());
-        assert!(parse_bounds_list("{{1}").is_err());
+        assert_eq!(
+            &parse_bounds_list("{1}}").unwrap_err().to_string(),
+            "Field format error: missing closing parenthesis"
+        );
+
+        assert_eq!(
+            &parse_bounds_list("{{1}").unwrap_err().to_string(),
+            "Field format error: missing opening parenthesis"
+        );
 
         assert_eq!(
             parse_bounds_list("1").unwrap(),
