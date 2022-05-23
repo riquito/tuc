@@ -33,7 +33,7 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
         let mut inside_bound = false;
         let mut part_start = 0;
 
-        let mut iter = s.chars().enumerate().peekable();
+        let mut iter = s.char_indices().peekable();
         while let Some((idx, w0)) = iter.next() {
             let w1 = iter.peek().or(Some(&(0, 'x'))).unwrap().1;
 
@@ -487,6 +487,15 @@ mod tests {
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
                 BoundOrFiller::Filler(String::from(" {world}")),
+            ],
+        );
+
+        assert_eq!(
+            parse_bounds_list("{1}😎{2}").unwrap(),
+            vec![
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Filler(String::from("😎")),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2)))
             ],
         );
     }
