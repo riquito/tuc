@@ -108,57 +108,49 @@ fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
 pub fn parse_bounds_list_2(s: &str) -> Result<Vec<BoundOrFiller>> {
     if s.contains(&['{', '}']) {
         let mut bof: Vec<BoundOrFiller> = Vec::new();
-        let mut idx = 0;
         let mut double_bracket = false;
         let mut inside_bound = false;
         let mut bound_chars = Vec::new();
         let mut filler_chars = Vec::new();
-        let chars = s.chars().chain(std::iter::once('x')).collect::<Vec<char>>();
 
-        for w in chars.windows(2) {
-            // the last char is fake
-            if idx == chars.len() - 1 {
-                break; // or continue, it's the end anyway
-            }
+        let mut iter = s.chars().peekable();
+        while let Some(w0) = iter.next() {
+            let w1 = *iter.peek().or(Some(&'x')).unwrap();
 
-            if let &[w0, w1, ..] = w {
-                if double_bracket {
-                    // skip
-                    double_bracket = false;
-                } else if w0 == w1 && (w0 == '{' || w0 == '}') {
-                    // escaped bracket. Write it once
-                    double_bracket = true;
-                    filler_chars.push(w0);
-                } else if w0 == '}' && !inside_bound {
-                    bail!("Field format error: missing opening parenthesis",);
-                } else if w0 == '{' {
-                    // starting a new bound
-                    inside_bound = true;
+            if double_bracket {
+                // skip
+                double_bracket = false;
+            } else if w0 == w1 && (w0 == '{' || w0 == '}') {
+                // escaped bracket. Write it once
+                double_bracket = true;
+                filler_chars.push(w0);
+            } else if w0 == '}' && !inside_bound {
+                bail!("Field format error: missing opening parenthesis",);
+            } else if w0 == '{' {
+                // starting a new bound
+                inside_bound = true;
 
-                    if !filler_chars.is_empty() {
-                        bof.push(BoundOrFiller::Filler(filler_chars.iter().collect()));
-                        filler_chars.clear();
-                    }
-                } else if w0 == '}' {
-                    // ending a bound
-                    inside_bound = false;
-                    let tmp_bound_str: String = bound_chars.iter().collect();
+                if !filler_chars.is_empty() {
+                    bof.push(BoundOrFiller::Filler(filler_chars.iter().collect()));
+                    filler_chars.clear();
+                }
+            } else if w0 == '}' {
+                // ending a bound
+                inside_bound = false;
+                let tmp_bound_str: String = bound_chars.iter().collect();
 
-                    // consider also comma separated bounds
-                    for maybe_bounds in tmp_bound_str.split(',') {
-                        bof.push(BoundOrFiller::Bound(UserBounds::from_str(maybe_bounds)?));
-                    }
-
-                    bound_chars.clear();
-                } else if inside_bound {
-                    // collecting chars inside a bound
-                    bound_chars.push(w0);
-                } else {
-                    // filler
-                    filler_chars.push(w0);
+                // consider also comma separated bounds
+                for maybe_bounds in tmp_bound_str.split(',') {
+                    bof.push(BoundOrFiller::Bound(UserBounds::from_str(maybe_bounds)?));
                 }
 
-                idx += 1;
+                bound_chars.clear();
+            } else if inside_bound {
+                // collecting chars inside a bound
+                bound_chars.push(w0);
+            } else {
+                // filler
+                filler_chars.push(w0);
             }
         }
 
