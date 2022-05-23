@@ -48,7 +48,10 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
 
                 if idx - part_start > 0 {
                     bof.push(BoundOrFiller::Filler(
-                        s[part_start..idx].replace("{{", "{").replace("}}", "}"),
+                        s[part_start..idx]
+                            .replace("{{", "{")
+                            .replace("}}", "}")
+                            .replace("\\n", "\n"),
                     ));
                 }
 
@@ -70,7 +73,10 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
             bail!("Field format error: missing closing parenthesis");
         } else if s.len() - part_start > 0 {
             bof.push(BoundOrFiller::Filler(
-                s[part_start..].replace("{{", "{").replace("}}", "}"),
+                s[part_start..]
+                    .replace("{{", "{")
+                    .replace("}}", "}")
+                    .replace("\\n", "\n"),
             ));
         }
 

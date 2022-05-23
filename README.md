@@ -83,6 +83,11 @@ bar   baz
 # Format output
 ❯ echo "foo bar baz" | tuc -d ' ' -f '{1}, {2} and lastly {3}'
 foo, bar and lastly baz
+# Support \n
+❯ echo "100Kb README.txt 2049-02-01" | tuc -d ' ' -f '{2}\n├── {1}\n└── {3}'
+README.txt
+├── 100Kb
+└── 2049-02-01
 ```
 
 ```sh
