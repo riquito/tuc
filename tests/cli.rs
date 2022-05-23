@@ -229,3 +229,17 @@ fn it_join_lines() {
 
     assert.success().stdout("c\na");
 }
+
+#[test]
+fn it_format_fields() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-f", "Say {1} to our {2}. Just {{saying}}"])
+        .write_stdin("hello\tworld")
+        .assert();
+
+    assert
+        .success()
+        .stdout("Say hello to our world. Just {saying}\n");
+}

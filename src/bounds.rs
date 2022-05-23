@@ -47,7 +47,9 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
                 inside_bound = true;
 
                 if idx - part_start > 0 {
-                    bof.push(BoundOrFiller::Filler(s[part_start..idx].to_string()));
+                    bof.push(BoundOrFiller::Filler(
+                        s[part_start..idx].replace("{{", "{").replace("}}", "}"),
+                    ));
                 }
 
                 part_start = idx + 1;
@@ -67,7 +69,9 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
         if inside_bound {
             bail!("Field format error: missing closing parenthesis");
         } else if s.len() - part_start > 0 {
-            bof.push(BoundOrFiller::Filler(s[part_start..].to_string()));
+            bof.push(BoundOrFiller::Filler(
+                s[part_start..].replace("{{", "{").replace("}}", "}"),
+            ));
         }
 
         Ok(bof)
@@ -477,12 +481,12 @@ mod tests {
         );
 
         assert_eq!(
-            parse_bounds_list("hello {1,2} world").unwrap(),
+            parse_bounds_list("hello {1,2} {{world}}").unwrap(),
             vec![
                 BoundOrFiller::Filler(String::from("hello ")),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
-                BoundOrFiller::Filler(String::from(" world")),
+                BoundOrFiller::Filler(String::from(" {world}")),
             ],
         );
     }
