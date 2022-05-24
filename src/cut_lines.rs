@@ -136,6 +136,16 @@ mod tests {
         r: Side::Some(2),
     });
 
+    const BOF_F3: BoundOrFiller = BoundOrFiller::Bound(UserBounds {
+        l: Side::Some(3),
+        r: Side::Some(3),
+    });
+
+    const BOF_R2_3: BoundOrFiller = BoundOrFiller::Bound(UserBounds {
+        l: Side::Some(2),
+        r: Side::Some(3),
+    });
+
     #[test]
     fn fwd_cut_one_field() {
         let mut opt = make_lines_opt();
@@ -156,5 +166,28 @@ mod tests {
         let mut output = Vec::with_capacity(100);
         cut_lines_forward_only(&mut input, &mut output, opt).unwrap();
         assert_eq!(output, b"ab");
+    }
+
+    #[test]
+    fn fwd_support_ranges() {
+        let mut opt = make_lines_opt();
+        opt.bounds = UserBoundsList(vec![BOF_F1, BOF_R2_3]);
+
+        let mut input = b"a\nb\nc".as_slice();
+        let mut output = Vec::with_capacity(100);
+        cut_lines_forward_only(&mut input, &mut output, opt).unwrap();
+        assert_eq!(output, b"ab\nc");
+    }
+
+    #[test]
+    fn fwd_supports_join() {
+        let mut opt = make_lines_opt();
+        opt.bounds = UserBoundsList(vec![BOF_F1, BOF_F3]);
+        opt.join = true;
+
+        let mut input = b"a\nb\nc".as_slice();
+        let mut output = Vec::with_capacity(100);
+        cut_lines_forward_only(&mut input, &mut output, opt).unwrap();
+        assert_eq!(output, b"a\nc");
     }
 }
