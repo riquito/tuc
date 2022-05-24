@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use std::io::{BufRead, Read, Write};
 use std::ops::Range;
 
@@ -67,6 +67,12 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
             // no need to read the rest, we don't have other bounds to test
             break;
         }
+    }
+
+    // Outout is finished. Did we output every bound?
+    if let Some(BoundOrFiller::Bound(b)) = opt.bounds.0.get(bounds_idx) {
+        // not good, we still have bounds to print but the input is exhausted
+        bail!("Out of bounds: {}", b);
     }
 
     Ok(())
@@ -189,5 +195,17 @@ mod tests {
         let mut output = Vec::with_capacity(100);
         cut_lines_forward_only(&mut input, &mut output, opt).unwrap();
         assert_eq!(output, b"a\nc");
+    }
+
+    #[test]
+    fn fwd_handle_out_of_bounds() {
+        let mut opt = make_lines_opt();
+        opt.bounds = UserBoundsList(vec![BOF_F3]);
+        opt.join = true;
+
+        let mut input = b"a\nb".as_slice();
+        let mut output = Vec::with_capacity(100);
+        let res = cut_lines_forward_only(&mut input, &mut output, opt);
+        assert_eq!(res.unwrap_err().to_string(), "Out of bounds: 3");
     }
 }
