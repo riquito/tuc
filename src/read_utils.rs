@@ -1,8 +1,8 @@
 use crate::options::EOL;
 use std::io::{BufRead, Read};
 
-pub fn read_bytes_to_end<'buf>(
-    reader: &mut std::io::BufReader<std::io::StdinLock>,
+pub fn read_bytes_to_end<'buf, T: Read>(
+    reader: &mut T,
     buffer: &'buf mut Vec<u8>,
 ) -> Option<std::io::Result<&'buf mut Vec<u8>>> {
     buffer.clear();
@@ -13,8 +13,8 @@ pub fn read_bytes_to_end<'buf>(
         .transpose()
 }
 
-pub fn read_line_with_eol<'buf>(
-    reader: &mut std::io::BufReader<std::io::StdinLock>,
+pub fn read_line_with_eol<'buf, T: BufRead>(
+    reader: &mut T,
     buffer: &'buf mut String,
     eol: EOL,
 ) -> Option<std::io::Result<&'buf mut String>> {
