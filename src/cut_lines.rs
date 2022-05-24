@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 use std::ops::Range;
 
 use crate::bounds::{BoundOrFiller, Side};
@@ -7,9 +7,9 @@ use crate::cut_str::cut_str;
 use crate::options::Opt;
 use crate::read_utils::read_line_with_eol;
 
-fn cut_lines_forward_only(
-    stdin: &mut std::io::BufReader<std::io::StdinLock>,
-    stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
+fn cut_lines_forward_only<A: BufRead, B: Write>(
+    stdin: &mut A,
+    stdout: &mut B,
     opt: Opt,
 ) -> Result<()> {
     let mut line_buf = String::with_capacity(1024);
