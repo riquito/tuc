@@ -111,3 +111,50 @@ pub fn read_and_cut_lines(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::bounds::{BoundsType, UserBounds, UserBoundsList};
+
+    use super::*;
+
+    fn make_lines_opt() -> Opt {
+        Opt {
+            bounds_type: BoundsType::Lines,
+            delimiter: String::from("\n"),
+            ..Opt::default()
+        }
+    }
+
+    const BOF_F1: BoundOrFiller = BoundOrFiller::Bound(UserBounds {
+        l: Side::Some(1),
+        r: Side::Some(1),
+    });
+
+    const BOF_F2: BoundOrFiller = BoundOrFiller::Bound(UserBounds {
+        l: Side::Some(2),
+        r: Side::Some(2),
+    });
+
+    #[test]
+    fn fwd_cut_one_field() {
+        let mut opt = make_lines_opt();
+        opt.bounds = UserBoundsList(vec![BOF_F1]);
+
+        let mut input = b"a\nb".as_slice();
+        let mut output = Vec::with_capacity(100);
+        cut_lines_forward_only(&mut input, &mut output, opt).unwrap();
+        assert_eq!(output, b"a");
+    }
+
+    #[test]
+    fn fwd_cut_multiple_fields() {
+        let mut opt = make_lines_opt();
+        opt.bounds = UserBoundsList(vec![BOF_F1, BOF_F2]);
+
+        let mut input = b"a\nb".as_slice();
+        let mut output = Vec::with_capacity(100);
+        cut_lines_forward_only(&mut input, &mut output, opt).unwrap();
+        assert_eq!(output, b"ab");
+    }
+}
