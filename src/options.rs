@@ -25,6 +25,25 @@ pub struct Opt {
     pub join: bool,
 }
 
+impl Default for Opt {
+    fn default() -> Self {
+        Opt {
+            delimiter: String::from("-"),
+            eol: EOL::Newline,
+            bounds: UserBoundsList(Vec::new()),
+            bounds_type: BoundsType::Fields,
+            only_delimited: false,
+            greedy_delimiter: false,
+            compress_delimiter: false,
+            replace_delimiter: None,
+            trim: None,
+            version: false,
+            complement: false,
+            join: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Trim {
     Left,
