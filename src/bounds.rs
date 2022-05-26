@@ -492,6 +492,22 @@ mod tests {
         );
 
         assert_eq!(
+            parse_bounds_list("1,2").unwrap(),
+            vec![
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+            ],
+        );
+
+        assert_eq!(
+            parse_bounds_list("-1,1").unwrap(),
+            vec![
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(-1), Side::Some(-1))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+            ],
+        );
+
+        assert_eq!(
             parse_bounds_list("{1}").unwrap(),
             vec![BoundOrFiller::Bound(UserBounds::new(
                 Side::Some(1),
