@@ -75,10 +75,10 @@ fn compress_delimiter(
     });
 }
 
-pub fn cut_str(
+pub fn cut_str<W: Write>(
     line: &str,
     opt: &Opt,
-    stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
+    stdout: &mut W,
     bounds_as_ranges: &mut Vec<Range<usize>>,
     compressed_line_buf: &mut String,
     eol: &[u8],
