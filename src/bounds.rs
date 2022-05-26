@@ -555,103 +555,44 @@ mod tests {
     fn test_user_bounds_is_sortable() {
         assert!(UserBoundsList(Vec::new()).is_sortable());
 
-        assert!(UserBoundsList(vec![BoundOrFiller::Bound(
-            UserBounds::from_str("1").unwrap()
-        ),])
-        .is_sortable());
+        assert!(UserBoundsList::from_str("1").unwrap().is_sortable());
 
-        assert!(UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
-        ])
-        .is_sortable());
+        assert!(UserBoundsList::from_str("1,2").unwrap().is_sortable());
 
-        assert!(UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("3").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
-        ])
-        .is_sortable());
+        assert!(UserBoundsList::from_str("3,2").unwrap().is_sortable());
 
-        assert!(!UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("-1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-        ])
-        .is_sortable());
+        assert!(!UserBoundsList::from_str("-1,1").unwrap().is_sortable());
 
-        assert!(UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("-1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("-2").unwrap()),
-        ])
-        .is_sortable());
+        assert!(UserBoundsList::from_str("-1,-2").unwrap().is_sortable());
 
-        assert!(!UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("-1:").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str(":1").unwrap()),
-        ])
-        .is_sortable());
+        assert!(!UserBoundsList::from_str("-1:,:1").unwrap().is_sortable());
     }
 
     #[test]
     fn test_vec_of_bounds_is_sorted() {
-        assert!(UserBoundsList(vec![BoundOrFiller::Bound(
-            UserBounds::from_str("1").unwrap()
-        ),])
-        .is_sorted());
+        assert!(UserBoundsList::from_str("1").unwrap().is_sorted());
 
-        assert!(UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
-        ])
-        .is_sorted());
+        assert!(UserBoundsList::from_str("1,2").unwrap().is_sorted());
 
-        assert!(UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("-2").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("-1").unwrap()),
-        ])
-        .is_sorted());
+        assert!(UserBoundsList::from_str("-2,-1").unwrap().is_sorted());
 
-        assert!(UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str(":1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("2:4").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("5:").unwrap()),
-        ])
-        .is_sorted());
+        assert!(UserBoundsList::from_str(":1,2:4,5:").unwrap().is_sorted());
 
-        assert!(UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("1:2").unwrap()),
-        ])
-        .is_sorted());
+        assert!(UserBoundsList::from_str("1,1:2").unwrap().is_sorted());
 
-        assert!(UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
-        ])
-        .is_sorted());
+        assert!(UserBoundsList::from_str("1,1,2").unwrap().is_sorted());
 
-        assert!(UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
-        ])
-        .is_sorted());
+        assert!(!UserBoundsList::from_str("1,2,1").unwrap().is_sorted());
     }
 
     #[test]
     fn test_vec_of_bounds_is_forward_only() {
-        assert!(UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-            BoundOrFiller::Filler(String::from("foo")),
-            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
-        ])
-        .is_forward_only());
+        assert!(UserBoundsList::from_str("{1}foo{2}")
+            .unwrap()
+            .is_forward_only());
 
-        assert!(!UserBoundsList(vec![
-            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
-            BoundOrFiller::Filler(String::from("foo")),
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-        ])
-        .is_forward_only());
+        assert!(!UserBoundsList::from_str("{2}foo{1}")
+            .unwrap()
+            .is_forward_only());
     }
 }
