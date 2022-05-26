@@ -101,41 +101,70 @@ impl FromStr for UserBoundsList {
 }
 
 impl UserBoundsList {
-    pub fn is_sortable(&self) -> bool {
+    fn is_sortable(&self) -> bool {
         let mut has_positive_idx = false;
         let mut has_negative_idx = false;
-        self.0
-            .iter()
-            .flat_map(|b| match b {
-                BoundOrFiller::Bound(x) => Some(x),
-                _ => None,
-            })
-            .for_each(|b| {
-                if let Side::Some(left) = b.l {
-                    if left.is_positive() {
-                        has_positive_idx = true;
-                    } else {
-                        has_negative_idx = true;
-                    }
+        self.get_userbounds_only().for_each(|b| {
+            if let Side::Some(left) = b.l {
+                if left.is_positive() {
+                    has_positive_idx = true;
+                } else {
+                    has_negative_idx = true;
                 }
+            }
 
-                if let Side::Some(right) = b.r {
-                    if right.is_positive() {
-                        has_positive_idx = true;
-                    } else {
-                        has_negative_idx = true;
-                    }
+            if let Side::Some(right) = b.r {
+                if right.is_positive() {
+                    has_positive_idx = true;
+                } else {
+                    has_negative_idx = true;
                 }
-            });
+            }
+        });
 
         !(has_negative_idx && has_positive_idx)
     }
 
-    pub fn is_sorted(&self) -> bool {
-        self.0.windows(2).all(|w| match (&w[0], &w[1]) {
-            (BoundOrFiller::Bound(x), BoundOrFiller::Bound(y)) => x <= y,
-            _ => true,
+    fn get_userbounds_only(&self) -> impl Iterator<Item = &UserBounds> + '_ {
+        self.0.iter().flat_map(|b| match b {
+            BoundOrFiller::Bound(x) => Some(x),
+            _ => None,
         })
+    }
+
+    fn is_sorted(&self) -> bool {
+        let mut prev_b: Option<&UserBounds> = None;
+        for b in self.get_userbounds_only() {
+            if prev_b.is_none() || prev_b <= Some(b) {
+                prev_b = Some(b);
+            } else {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn has_negative_indices(&self) -> bool {
+        self.get_userbounds_only().any(|b| {
+            if let Side::Some(left) = b.l {
+                if left.is_negative() {
+                    return true;
+                }
+            }
+
+            if let Side::Some(right) = b.r {
+                if right.is_negative() {
+                    return true;
+                }
+            }
+
+            false
+        })
+    }
+
+    pub fn is_forward_only(&self) -> bool {
+        self.is_sortable() && self.is_sorted() && !self.has_negative_indices()
     }
 }
 
@@ -533,6 +562,12 @@ mod tests {
         ])
         .is_sortable());
 
+        assert!(UserBoundsList(vec![
+            BoundOrFiller::Bound(UserBounds::from_str("-1").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("-2").unwrap()),
+        ])
+        .is_sortable());
+
         assert!(!UserBoundsList(vec![
             BoundOrFiller::Bound(UserBounds::from_str("-1:").unwrap()),
             BoundOrFiller::Bound(UserBounds::from_str(":1").unwrap()),
@@ -578,5 +613,29 @@ mod tests {
             BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
         ])
         .is_sorted());
+
+        assert!(UserBoundsList(vec![
+            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
+            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
+        ])
+        .is_sorted());
+    }
+
+    #[test]
+    fn test_vec_of_bounds_is_forward_only() {
+        assert!(UserBoundsList(vec![
+            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
+            BoundOrFiller::Filler(String::from("foo")),
+            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
+        ])
+        .is_forward_only());
+
+        assert!(!UserBoundsList(vec![
+            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
+            BoundOrFiller::Filler(String::from("foo")),
+            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
+        ])
+        .is_forward_only());
     }
 }
