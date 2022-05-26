@@ -28,6 +28,10 @@ pub enum BoundOrFiller {
  * e.g. "Hello {1}, found {1:3} and {2,4}"
  */
 pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
+    if s.is_empty() {
+        return Ok(Vec::new());
+    }
+
     if s.contains(&['{', '}']) {
         let mut bof: Vec<BoundOrFiller> = Vec::new();
         let mut inside_bound = false;
@@ -453,8 +457,10 @@ mod tests {
         // do not replicate tests from test_user_bounds_from_str, focus on
         // multiple bounds, bounds with format, and special cases (empty/one)
 
+        assert_eq!(parse_bounds_list("").unwrap(), Vec::new());
+
         assert_eq!(
-            &parse_bounds_list("").unwrap_err().to_string(),
+            &parse_bounds_list(",").unwrap_err().to_string(),
             "Field format error: empty field"
         );
 
@@ -570,6 +576,8 @@ mod tests {
 
     #[test]
     fn test_vec_of_bounds_is_sorted() {
+        assert!(UserBoundsList::from_str("").unwrap().is_sorted());
+
         assert!(UserBoundsList::from_str("1").unwrap().is_sorted());
 
         assert!(UserBoundsList::from_str("1,2").unwrap().is_sorted());
