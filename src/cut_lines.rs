@@ -10,7 +10,7 @@ use crate::read_utils::read_line_with_eol;
 fn cut_lines_forward_only<A: BufRead, B: Write>(
     stdin: &mut A,
     stdout: &mut B,
-    opt: Opt,
+    opt: &Opt,
 ) -> Result<()> {
     let mut line_buf = String::with_capacity(1024);
     let mut line_idx = 0;
@@ -78,7 +78,7 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
     Ok(())
 }
 
-fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: Opt) -> Result<()> {
+fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> Result<()> {
     let mut buffer: Vec<u8> = Vec::with_capacity(32 * 1024);
     stdin.read_to_end(&mut buffer)?;
     let buffer_as_str = std::str::from_utf8(&buffer)?;
@@ -88,7 +88,7 @@ fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: Opt) -> R
     // Just use cut_str, we're cutting a (big) string whose delimiter is newline
     cut_str(
         buffer_as_str,
-        &opt,
+        opt,
         stdout,
         &mut bounds_as_ranges,
         &mut compressed_line_buf,
@@ -99,7 +99,7 @@ fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: Opt) -> R
 pub fn read_and_cut_lines<A: BufRead, B: Write>(
     stdin: &mut A,
     stdout: &mut B,
-    opt: Opt,
+    opt: &Opt,
 ) -> Result<()> {
     // If bounds cut from left to right and do not internally overlap
     // (e.g. 1:2,2,4:5,8) then we can use a streaming algorithm and avoid
@@ -162,7 +162,7 @@ mod tests {
 
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
-        cut_lines_forward_only(&mut input, &mut output, opt).unwrap();
+        cut_lines_forward_only(&mut input, &mut output, &opt).unwrap();
         assert_eq!(output, b"a");
     }
 
@@ -173,7 +173,7 @@ mod tests {
 
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
-        cut_lines_forward_only(&mut input, &mut output, opt).unwrap();
+        cut_lines_forward_only(&mut input, &mut output, &opt).unwrap();
         assert_eq!(output, b"ab");
     }
 
@@ -184,7 +184,7 @@ mod tests {
 
         let mut input = b"a\nb\nc".as_slice();
         let mut output = Vec::with_capacity(100);
-        cut_lines_forward_only(&mut input, &mut output, opt).unwrap();
+        cut_lines_forward_only(&mut input, &mut output, &opt).unwrap();
         assert_eq!(output, b"ab\nc");
     }
 
@@ -196,7 +196,7 @@ mod tests {
 
         let mut input = b"a\nb\nc".as_slice();
         let mut output = Vec::with_capacity(100);
-        cut_lines_forward_only(&mut input, &mut output, opt).unwrap();
+        cut_lines_forward_only(&mut input, &mut output, &opt).unwrap();
         assert_eq!(output, b"a\nc");
     }
 
@@ -208,7 +208,7 @@ mod tests {
 
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
-        let res = cut_lines_forward_only(&mut input, &mut output, opt);
+        let res = cut_lines_forward_only(&mut input, &mut output, &opt);
         assert_eq!(res.unwrap_err().to_string(), "Out of bounds: 3");
     }
 
@@ -219,7 +219,7 @@ mod tests {
 
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
-        cut_lines(&mut input, &mut output, opt).unwrap();
+        cut_lines(&mut input, &mut output, &opt).unwrap();
         assert_eq!(output, b"b");
     }
 }
