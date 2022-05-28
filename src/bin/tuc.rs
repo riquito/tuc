@@ -24,7 +24,7 @@ FLAGS:
     -z, --zero-terminated         line delimiter is NUL (\\0), not LF (\\n)
     -h, --help                    Prints this help and exit
     -m, --complement              keep the opposite fields than the one selected
-    -j, --join                    write the delimiter between fields
+    -j, --(no-)join               write the delimiter between fields
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
@@ -50,7 +50,8 @@ OPTIONS:
 
     -b, --bytes <bounds>          Same as --fields, but it keeps bytes
     -c, --characters <bounds>     Same as --fields, but it keeps characters
-    -l, --lines <bounds>          Same as --fields, but it keeps lines
+    -l, --lines <bounds>          Same as --fields, but it keeps lines.
+                                  Implies --join (use --no-join to concat lines)
     -d, --delimiter <delimiter>   Delimiter used by -f to cut the text
                                   [default: \\t]
     -r, --replace-delimiter <s>   Replace the delimiter with the provided text
@@ -99,18 +100,22 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         _ => String::new(),
     };
 
+    let has_join = pargs.contains(["-j", "--join"]);
+    let has_no_join = pargs.contains("--no-join");
+    let join = has_join || (bounds_type == BoundsType::Lines && !has_no_join);
+
     let args = Opt {
         complement: pargs.contains(["-m", "--complement"]),
         only_delimited: pargs.contains(["-s", "--only-delimited"]),
         greedy_delimiter: pargs.contains(["-g", "--greedy-delimiter"]),
         compress_delimiter: pargs.contains(["-p", "--compress-delimiter"]),
         version: pargs.contains(["-V", "--version"]),
-        join: pargs.contains(["-j", "--join"]),
         eol: if pargs.contains(["-z", "--zero-terminated"]) {
             EOL::Zero
         } else {
             EOL::Newline
         },
+        join,
         delimiter,
         bounds_type,
         bounds: maybe_fields

@@ -33,6 +33,11 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
                 BoundOrFiller::Filler(f) => {
                     stdout.write_all(f.as_bytes())?;
                     bounds_idx += 1;
+
+                    if opt.join && bounds_idx != opt.bounds.0.len() {
+                        stdout.write_all(&[opt.eol as u8])?;
+                    }
+
                     continue;
                 }
                 BoundOrFiller::Bound(b) => b,
@@ -75,6 +80,8 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
         bail!("Out of bounds: {}", b);
     }
 
+    stdout.write_all(&[opt.eol as u8])?;
+
     Ok(())
 }
 
@@ -85,6 +92,10 @@ fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> 
     let mut bounds_as_ranges: Vec<Range<usize>> = Vec::with_capacity(100);
     let mut compressed_line_buf = String::new();
 
+    let buffer_as_str = buffer_as_str
+        .strip_suffix(opt.eol as u8 as char)
+        .unwrap_or(buffer_as_str);
+
     // Just use cut_str, we're cutting a (big) string whose delimiter is newline
     cut_str(
         buffer_as_str,
@@ -92,7 +103,7 @@ fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> 
         stdout,
         &mut bounds_as_ranges,
         &mut compressed_line_buf,
-        b"",
+        b"\n",
     )
 }
 
@@ -126,6 +137,7 @@ mod tests {
         Opt {
             bounds_type: BoundsType::Lines,
             delimiter: String::from("\n"),
+            join: true,
             ..Opt::default()
         }
     }
@@ -163,7 +175,7 @@ mod tests {
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
         cut_lines_forward_only(&mut input, &mut output, &opt).unwrap();
-        assert_eq!(output, b"a");
+        assert_eq!(output, b"a\n");
     }
 
     #[test]
@@ -174,7 +186,7 @@ mod tests {
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
         cut_lines_forward_only(&mut input, &mut output, &opt).unwrap();
-        assert_eq!(output, b"ab");
+        assert_eq!(output, b"a\nb\n");
     }
 
     #[test]
@@ -185,19 +197,19 @@ mod tests {
         let mut input = b"a\nb\nc".as_slice();
         let mut output = Vec::with_capacity(100);
         cut_lines_forward_only(&mut input, &mut output, &opt).unwrap();
-        assert_eq!(output, b"ab\nc");
+        assert_eq!(output, b"a\nb\nc\n");
     }
 
     #[test]
-    fn fwd_supports_join() {
+    fn fwd_supports_no_join() {
         let mut opt = make_lines_opt();
         opt.bounds = UserBoundsList(vec![BOF_F1, BOF_F3]);
-        opt.join = true;
+        opt.join = false;
 
         let mut input = b"a\nb\nc".as_slice();
         let mut output = Vec::with_capacity(100);
         cut_lines_forward_only(&mut input, &mut output, &opt).unwrap();
-        assert_eq!(output, b"a\nc");
+        assert_eq!(output, b"ac\n");
     }
 
     #[test]
@@ -213,6 +225,24 @@ mod tests {
     }
 
     #[test]
+    fn fwd_ignore_last_empty() {
+        let mut opt = make_lines_opt();
+        opt.bounds = UserBoundsList(vec![BOF_F3]);
+
+        let mut input1 = b"a\nb".as_slice();
+        let mut input2 = b"a\nb\n".as_slice();
+        let mut output = Vec::new();
+
+        output.clear();
+        let res = cut_lines_forward_only(&mut input1, &mut output, &opt);
+        assert_eq!(res.unwrap_err().to_string(), "Out of bounds: 3");
+
+        output.clear();
+        let res = cut_lines_forward_only(&mut input2, &mut output, &opt);
+        assert_eq!(res.unwrap_err().to_string(), "Out of bounds: 3");
+    }
+
+    #[test]
     fn cut_lines_handle_negative_idx() {
         let mut opt = make_lines_opt();
         opt.bounds = UserBoundsList(vec![BOF_NEG1]);
@@ -220,6 +250,42 @@ mod tests {
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
         cut_lines(&mut input, &mut output, &opt).unwrap();
-        assert_eq!(output, b"b");
+        assert_eq!(output, b"b\n");
+    }
+
+    #[test]
+    fn cut_lines_ignore_last_empty_when_using_positive_idx() {
+        let mut opt = make_lines_opt();
+        opt.bounds = UserBoundsList(vec![BOF_F3]);
+
+        let mut input1 = b"a\nb".as_slice();
+        let mut input2 = b"a\nb\n".as_slice();
+        let mut output = Vec::new();
+
+        output.clear();
+        let res = cut_lines(&mut input1, &mut output, &opt);
+        assert_eq!(res.unwrap_err().to_string(), "Out of bounds: 3");
+
+        output.clear();
+        let res = cut_lines(&mut input2, &mut output, &opt);
+        assert_eq!(res.unwrap_err().to_string(), "Out of bounds: 3");
+    }
+
+    #[test]
+    fn cut_lines_ignore_last_empty_when_using_negative_idx() {
+        let mut opt = make_lines_opt();
+        opt.bounds = UserBoundsList(vec![BOF_NEG1]);
+
+        let mut input1 = b"a\nb".as_slice();
+        let mut input2 = b"a\nb\n".as_slice();
+        let mut output = Vec::new();
+
+        output.clear();
+        cut_lines(&mut input1, &mut output, &opt).unwrap();
+        assert_eq!(output, b"b\n");
+
+        output.clear();
+        cut_lines(&mut input2, &mut output, &opt).unwrap();
+        assert_eq!(output, b"b\n");
     }
 }
