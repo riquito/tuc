@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+//use pretty_assertions::assert_eq;
 
 #[test]
 fn it_echo_non_delimited_line() {
@@ -149,7 +150,7 @@ fn it_cuts_on_lines() {
         .write_stdin("a\nb\nc")
         .assert();
 
-    assert.success().stdout("ac");
+    assert.success().stdout("a\nc\n");
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
@@ -158,7 +159,7 @@ fn it_cuts_on_lines() {
         .write_stdin("a\nb\nc")
         .assert();
 
-    assert.success().stdout("ca");
+    assert.success().stdout("c\na\n");
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
@@ -167,7 +168,7 @@ fn it_cuts_on_lines() {
         .write_stdin("a\nb\nc")
         .assert();
 
-    assert.success().stdout("b\nc");
+    assert.success().stdout("b\nc\n");
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
@@ -176,7 +177,7 @@ fn it_cuts_on_lines() {
         .write_stdin("a\nb\nc")
         .assert();
 
-    assert.success().stdout("ac");
+    assert.success().stdout("a\nc\n");
 }
 
 #[test]
@@ -213,21 +214,33 @@ fn it_join_fields() {
 fn it_join_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd
-        .args(&["-l", "1,3", "-j"])
-        .write_stdin("a\nb\nc")
-        .assert();
+    let assert = cmd.args(&["-l", "1,3"]).write_stdin("a\nb\nc").assert();
 
-    assert.success().stdout("a\nc");
+    assert.success().stdout("a\nc\n");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(&["-l", "3,1"]).write_stdin("a\nb\nc").assert();
+
+    assert.success().stdout("c\na\n");
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-l", "3,1", "-j"])
+        .args(&["-l", "1,3", "--no-join"])
         .write_stdin("a\nb\nc")
         .assert();
 
-    assert.success().stdout("c\na");
+    assert.success().stdout("ac\n");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-l", "3,1", "--no-join"])
+        .write_stdin("a\nb\nc")
+        .assert();
+
+    assert.success().stdout("ca\n");
 }
 
 #[test]
