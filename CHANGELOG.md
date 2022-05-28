@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- Fixed a bug that broke --lines with negative indexes
+- Internal improvements for --lines
+
 ## [0.8.0] - 2022-05-23
 - Add support for --greedy-delimiter
 - Bounds can be formatted
