@@ -34,10 +34,10 @@ fn cut_bytes(
 pub fn read_and_cut_bytes(
     stdin: &mut std::io::BufReader<std::io::StdinLock>,
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
-    opt: Opt,
+    opt: &Opt,
 ) -> Result<()> {
     let mut buffer: Vec<u8> = Vec::with_capacity(32 * 1024);
     read_bytes_to_end(stdin, &mut buffer);
-    cut_bytes(&buffer, &opt, stdout)?;
+    cut_bytes(&buffer, opt, stdout)?;
     Ok(())
 }

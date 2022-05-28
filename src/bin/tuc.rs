@@ -148,9 +148,9 @@ fn main() -> Result<()> {
     let mut stdout = std::io::BufWriter::with_capacity(32 * 1024, stdout.lock());
 
     if opt.bounds_type == BoundsType::Bytes {
-        read_and_cut_bytes(&mut stdin, &mut stdout, opt)?;
+        read_and_cut_bytes(&mut stdin, &mut stdout, &opt)?;
     } else if opt.bounds_type == BoundsType::Lines {
-        read_and_cut_lines(&mut stdin, &mut stdout, opt)?;
+        read_and_cut_lines(&mut stdin, &mut stdout, &opt)?;
     } else {
         read_and_cut_str(&mut stdin, &mut stdout, opt)?;
     }
