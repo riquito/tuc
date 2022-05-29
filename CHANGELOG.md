@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- fix: right side of a range can be negative
+- fix: emit proper error if right side of a range is behind left side
+- breaking: --lines output each bound on their own line
 - Fixed a bug that broke --lines with negative indexes
 - Internal improvements for --lines
 
