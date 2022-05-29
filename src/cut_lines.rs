@@ -103,7 +103,7 @@ fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> 
         stdout,
         &mut bounds_as_ranges,
         &mut compressed_line_buf,
-        b"\n",
+        &[opt.eol as u8],
     )
 }
 
@@ -129,7 +129,10 @@ pub fn read_and_cut_lines<A: BufRead, B: Write>(
 
 #[cfg(test)]
 mod tests {
-    use crate::bounds::{BoundsType, UserBounds, UserBoundsList};
+    use crate::{
+        bounds::{BoundsType, UserBounds, UserBoundsList},
+        options::EOL,
+    };
 
     use super::*;
 
@@ -287,5 +290,31 @@ mod tests {
         output.clear();
         cut_lines(&mut input2, &mut output, &opt).unwrap();
         assert_eq!(output, b"b\n");
+    }
+
+    #[test]
+    fn fwd_cut_zero_delimited() {
+        let mut opt = make_lines_opt();
+        opt.bounds = UserBoundsList(vec![BOF_F1]);
+        opt.eol = EOL::Zero;
+        opt.delimiter = String::from("\0");
+
+        let mut input = b"a\0b".as_slice();
+        let mut output = Vec::new();
+        cut_lines_forward_only(&mut input, &mut output, &opt).unwrap();
+        assert_eq!(output, b"a\0");
+    }
+
+    #[test]
+    fn cut_lines_zero_delimited() {
+        let mut opt = make_lines_opt();
+        opt.bounds = UserBoundsList(vec![BOF_F1]);
+        opt.eol = EOL::Zero;
+        opt.delimiter = String::from("\0");
+
+        let mut input = b"a\0b".as_slice();
+        let mut output = Vec::new();
+        cut_lines(&mut input, &mut output, &opt).unwrap();
+        assert_eq!(output, b"a\0");
     }
 }
