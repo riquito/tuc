@@ -146,11 +146,8 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
 fn main() -> Result<()> {
     let opt: Opt = parse_args()?;
 
-    let stdin = std::io::stdin();
-    let mut stdin = std::io::BufReader::with_capacity(32 * 1024, stdin.lock());
-
-    let stdout = std::io::stdout();
-    let mut stdout = std::io::BufWriter::with_capacity(32 * 1024, stdout.lock());
+    let mut stdin = std::io::BufReader::new(std::io::stdin().lock());
+    let mut stdout = std::io::BufWriter::new(std::io::stdout().lock());
 
     if opt.bounds_type == BoundsType::Bytes {
         read_and_cut_bytes(&mut stdin, &mut stdout, &opt)?;
