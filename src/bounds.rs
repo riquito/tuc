@@ -251,7 +251,9 @@ impl FromStr for UserBounds {
             (_, Side::Some(0)) => {
                 bail!("Field value 0 is not allowed (fields are 1-indexed)");
             }
-            (Side::Some(left), Side::Some(right)) if right < left => {
+            (Side::Some(left), Side::Some(right))
+                if right < left && (right * left).is_positive() =>
+            {
                 bail!("Field left value cannot be greater than right value");
             }
             _ => (),
