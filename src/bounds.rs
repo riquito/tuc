@@ -367,6 +367,11 @@ pub fn bounds_to_std_range(parts_length: usize, bounds: &UserBounds) -> Result<R
         }
     };
 
+    if end <= start {
+        // `end` must always be 1 or more greater than start
+        bail!("Field left value cannot be greater than right value");
+    }
+
     Ok(Range { start, end })
 }
 
