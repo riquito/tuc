@@ -268,3 +268,20 @@ fn it_cuts_using_a_greedy_delimiter() {
 
     assert.success().stdout("ab\n");
 }
+
+#[test]
+fn it_accept_any_kind_of_range_as_long_as_its_safe() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(&["-l", "2:-2"]).write_stdin("a\nb\nc\nd").assert();
+
+    assert.success().stdout("b\nc\n");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(&["-l", "2:-4"]).write_stdin("a\nb\nc\nd").assert();
+
+    assert
+        .failure()
+        .stderr("Error: Field left value cannot be greater than right value\n");
+}
