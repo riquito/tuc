@@ -33,7 +33,7 @@ FLAGS:
     -z, --zero-terminated         line delimiter is NUL (\0), not LF (\n)
     -h, --help                    Prints this help and exit
     -m, --complement              keep the opposite fields than the one selected
-    -j, --join                    write the delimiter between fields
+    -j, --(no-)join               write the delimiter between fields
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
@@ -60,6 +60,7 @@ OPTIONS:
     -b, --bytes <bounds>          Same as --fields, but it keeps bytes
     -c, --characters <bounds>     Same as --fields, but it keeps characters
     -l, --lines <bounds>          Same as --fields, but it keeps lines
+                                  Implies --join (use --no-join to concat lines)
     -d, --delimiter <delimiter>   Delimiter used by -f to cut the text
                                   [default: \t]
     -r, --replace-delimiter <s>   Replace the delimiter with the provided text
@@ -101,6 +102,20 @@ foo, bar and lastly baz
 README.txt
 ├── 100Kb
 └── 2049-02-01
+```
+
+```sh
+# Cut lines
+❯ printf "a\nb\nc\nd\ne" | tuc -l 2:-2
+b
+c
+d
+```
+
+```sh
+# Concat lines
+❯ printf "a\nb\nc\nd\ne" | tuc -l 1,2 --no-join
+ab
 ```
 
 ```sh
