@@ -187,8 +187,8 @@ pub fn read_and_cut_str(
     stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
     opt: Opt,
 ) -> Result<()> {
-    let mut line_buf = String::with_capacity(1024);
-    let mut bounds_as_ranges: Vec<Range<usize>> = Vec::with_capacity(100);
+    let mut line_buf = String::with_capacity(256);
+    let mut bounds_as_ranges: Vec<Range<usize>> = Vec::with_capacity(16);
     let mut compressed_line_buf = if opt.compress_delimiter {
         String::with_capacity(line_buf.capacity())
     } else {
