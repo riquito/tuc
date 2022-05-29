@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::io::Write;
+use std::io::{BufRead, Write};
 use std::ops::Range;
 
 use crate::bounds::{bounds_to_std_range, BoundOrFiller, BoundsType};
@@ -182,9 +182,9 @@ pub fn cut_str<W: Write>(
     Ok(())
 }
 
-pub fn read_and_cut_str(
-    stdin: &mut std::io::BufReader<std::io::StdinLock>,
-    stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
+pub fn read_and_cut_str<B: BufRead, W: Write>(
+    stdin: &mut B,
+    stdout: &mut W,
     opt: Opt,
 ) -> Result<()> {
     let mut line_buf = String::with_capacity(256);

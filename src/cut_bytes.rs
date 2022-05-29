@@ -1,15 +1,11 @@
 use anyhow::Result;
-use std::io::Write;
+use std::io::{Read, Write};
 
 use crate::bounds::{bounds_to_std_range, BoundOrFiller};
 use crate::options::Opt;
 use crate::read_utils::read_bytes_to_end;
 
-fn cut_bytes(
-    data: &[u8],
-    opt: &Opt,
-    stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
-) -> Result<()> {
+fn cut_bytes<W: Write>(data: &[u8], opt: &Opt, stdout: &mut W) -> Result<()> {
     if data.is_empty() {
         return Ok(());
     }
@@ -31,9 +27,9 @@ fn cut_bytes(
     Ok(())
 }
 
-pub fn read_and_cut_bytes(
-    stdin: &mut std::io::BufReader<std::io::StdinLock>,
-    stdout: &mut std::io::BufWriter<std::io::StdoutLock>,
+pub fn read_and_cut_bytes<R: Read, W: Write>(
+    stdin: &mut R,
+    stdout: &mut W,
     opt: &Opt,
 ) -> Result<()> {
     let mut buffer: Vec<u8> = Vec::with_capacity(32 * 1024);
