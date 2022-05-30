@@ -7,6 +7,9 @@ use tuc::cut_lines::read_and_cut_lines;
 use tuc::cut_str::read_and_cut_str;
 use tuc::options::{Opt, EOL};
 
+#[cfg(feature = "regex")]
+use regex::Regex;
+
 const HELP: &str = concat!(
     "tuc ",
     env!("CARGO_PKG_VERSION"),
@@ -25,6 +28,7 @@ FLAGS:
     -h, --help                    Prints this help and exit
     -m, --complement              keep the opposite fields than the one selected
     -j, --(no-)join               write the delimiter between fields
+    -E, --regex                   use --delimiter as a regular expression
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
@@ -104,10 +108,27 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let has_no_join = pargs.contains("--no-join");
     let join = has_join || (bounds_type == BoundsType::Lines && !has_no_join);
 
+    let greedy_delimiter = pargs.contains(["-g", "--greedy-delimiter"]);
+    let parse_delimiter_as_regex = pargs.contains(["-E", "--regex"]);
+
+    #[cfg(not(feature = "regex"))]
+    let regex = None;
+
+    #[cfg(feature = "regex")]
+    let regex: Option<Regex> = if parse_delimiter_as_regex {
+        Some(if greedy_delimiter {
+            Regex::new(&format!("{}+", &delimiter)).unwrap()
+        } else {
+            Regex::new(&delimiter).unwrap()
+        })
+    } else {
+        None
+    };
+
     let args = Opt {
         complement: pargs.contains(["-m", "--complement"]),
         only_delimited: pargs.contains(["-s", "--only-delimited"]),
-        greedy_delimiter: pargs.contains(["-g", "--greedy-delimiter"]),
+        greedy_delimiter,
         compress_delimiter: pargs.contains(["-p", "--compress-delimiter"]),
         version: pargs.contains(["-V", "--version"]),
         eol: if pargs.contains(["-z", "--zero-terminated"]) {
@@ -125,6 +146,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             .unwrap(),
         replace_delimiter: pargs.opt_value_from_str(["-r", "--replace-delimiter"])?,
         trim: pargs.opt_value_from_str(["-t", "--trim"])?,
+        regex,
     };
 
     let remaining = pargs.finish();
@@ -137,6 +159,11 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     if !remaining.is_empty() {
         eprintln!("tuc: unexpected arguments {:?}", remaining);
         eprintln!("Try 'tuc --help' for more information.");
+        std::process::exit(1);
+    }
+
+    if parse_delimiter_as_regex && !cfg!(feature = "regex") {
+        eprintln!("tuc: runtime error. This version of tuc was compiled without regex support");
         std::process::exit(1);
     }
 

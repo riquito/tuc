@@ -2,6 +2,9 @@ use crate::bounds::{BoundsType, UserBoundsList};
 use anyhow::Result;
 use std::str::FromStr;
 
+#[cfg(feature = "regex")]
+use regex::Regex;
+
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum EOL {
@@ -23,6 +26,10 @@ pub struct Opt {
     pub version: bool,
     pub complement: bool,
     pub join: bool,
+    #[cfg(feature = "regex")]
+    pub regex: Option<Regex>,
+    #[cfg(not(feature = "regex"))]
+    pub regex: Option<()>,
 }
 
 impl Default for Opt {
@@ -40,6 +47,7 @@ impl Default for Opt {
             version: false,
             complement: false,
             join: false,
+            regex: None,
         }
     }
 }
