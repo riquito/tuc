@@ -6,6 +6,9 @@ use crate::bounds::{bounds_to_std_range, BoundOrFiller, BoundsType};
 use crate::options::{Opt, Trim};
 use crate::read_utils::read_line_with_eol;
 
+#[cfg(feature = "regex")]
+use regex::Regex;
+
 fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usize>> {
     match (r.start, r.end) {
         // full match => no match
@@ -52,6 +55,31 @@ fn build_ranges_vec(buffer: &mut Vec<Range<usize>>, line: &str, delimiter: &str,
     });
 }
 
+#[cfg(feature = "regex")]
+fn build_ranges_vec_from_regex(buffer: &mut Vec<Range<usize>>, line: &str, re: &Regex) {
+    buffer.clear();
+
+    if line.is_empty() {
+        return;
+    }
+
+    let mut next_part_start = 0;
+
+    for mat in re.find_iter(line) {
+        buffer.push(Range {
+            start: next_part_start,
+            end: mat.start(),
+        });
+
+        next_part_start = mat.end();
+    }
+
+    buffer.push(Range {
+        start: next_part_start,
+        end: line.len(),
+    });
+}
+
 fn compress_delimiter(
     bounds_as_ranges: &[Range<usize>],
     line: &str,
@@ -83,6 +111,9 @@ pub fn cut_str<W: Write>(
     compressed_line_buf: &mut String,
     eol: &[u8],
 ) -> Result<()> {
+    assert!(!(opt.regex.is_some() && opt.trim.is_some()));
+    assert!(!(opt.regex.is_some() && opt.compress_delimiter));
+
     let mut line: &str = match opt.trim {
         None => line,
         Some(Trim::Both) => line
@@ -99,15 +130,20 @@ pub fn cut_str<W: Write>(
         return Ok(());
     }
 
-    build_ranges_vec(bounds_as_ranges, line, &opt.delimiter, opt.greedy_delimiter);
-
-    if opt.compress_delimiter
-        && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines)
-    {
-        compressed_line_buf.clear();
-        compress_delimiter(bounds_as_ranges, line, &opt.delimiter, compressed_line_buf);
-        line = compressed_line_buf;
+    if opt.regex.is_some() {
+        #[cfg(feature = "regex")]
+        build_ranges_vec_from_regex(bounds_as_ranges, line, opt.regex.as_ref().unwrap());
+    } else {
         build_ranges_vec(bounds_as_ranges, line, &opt.delimiter, opt.greedy_delimiter);
+
+        if opt.compress_delimiter
+            && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines)
+        {
+            compressed_line_buf.clear();
+            compress_delimiter(bounds_as_ranges, line, &opt.delimiter, compressed_line_buf);
+            line = compressed_line_buf;
+            build_ranges_vec(bounds_as_ranges, line, &opt.delimiter, opt.greedy_delimiter);
+        }
     }
 
     if opt.bounds_type == BoundsType::Characters && bounds_as_ranges.len() > 2 {
