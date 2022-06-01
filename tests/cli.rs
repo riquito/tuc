@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-//use pretty_assertions::assert_eq;
 
 #[test]
 fn it_echo_non_delimited_line() {
