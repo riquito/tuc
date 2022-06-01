@@ -103,6 +103,28 @@ fn compress_delimiter(
     });
 }
 
+#[cfg(feature = "regex")]
+fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a, str> {
+    if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
+        if let Some(re) = &opt.regex {
+            re.replace_all(text, new_delimiter)
+        } else {
+            std::borrow::Cow::Owned(text.replace(&opt.delimiter, new_delimiter))
+        }
+    } else {
+        std::borrow::Cow::Borrowed(text)
+    }
+}
+
+#[cfg(not(feature = "regex"))]
+fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a, str> {
+    if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
+        std::borrow::Cow::Owned(text.replace(&opt.delimiter, new_delimiter))
+    } else {
+        std::borrow::Cow::Borrowed(text)
+    }
+}
+
 pub fn cut_str<W: Write>(
     line: &str,
     opt: &Opt,
@@ -190,13 +212,7 @@ pub fn cut_str<W: Write>(
                         let idx_end = bounds_as_ranges[r.end - 1].end;
                         let output = &line[idx_start..idx_end];
 
-                        if let Some(replace_delimiter) = &opt.replace_delimiter {
-                            stdout.write_all(
-                                output.replace(&opt.delimiter, replace_delimiter).as_bytes(),
-                            )?;
-                        } else {
-                            stdout.write_all(output.as_bytes())?;
-                        }
+                        stdout.write_all(maybe_replace_delimiter(output, opt).as_bytes())?;
 
                         if opt.join && !(i == opt.bounds.0.len() - 1 && idx_r == n_ranges - 1) {
                             stdout.write_all(
