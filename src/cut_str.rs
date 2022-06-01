@@ -133,8 +133,7 @@ pub fn cut_str<W: Write>(
     compressed_line_buf: &mut String,
     eol: &[u8],
 ) -> Result<()> {
-    assert!(!(opt.regex.is_some() && opt.trim.is_some()));
-    assert!(!(opt.regex.is_some() && opt.compress_delimiter));
+    assert!(!(opt.regex.is_some() && (opt.trim.is_some() || opt.join || opt.compress_delimiter)));
 
     let mut line: &str = match opt.trim {
         None => line,
