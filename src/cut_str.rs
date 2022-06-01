@@ -264,9 +264,8 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use crate::{bounds::UserBoundsList, options::EOL};
+    use std::str::FromStr;
 
     use super::*;
 
@@ -419,6 +418,21 @@ mod tests {
         assert_eq!(output, b"a\n".as_slice());
     }
 
+    #[cfg(feature = "regex")]
+    #[test]
+    fn cut_str_regex_it_cut_a_field() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a.b,c";
+        opt.bounds = UserBoundsList::from_str("1,2,3").unwrap();
+        opt.regex = Some(Regex::from_str("[.,]").unwrap());
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"abc\n".as_slice());
+    }
+
     #[test]
     fn cut_str_it_cut_consecutive_delimiters() {
         let mut opt = make_fields_opt();
@@ -461,6 +475,23 @@ mod tests {
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"-a-b-\n".as_slice());
+    }
+
+    #[ignore]
+    #[cfg(feature = "regex")]
+    #[test]
+    fn cut_str_regex_it_compress_delimiters() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = ".,a,,,b..c";
+        opt.bounds = UserBoundsList::from_str("2,3,4").unwrap();
+        opt.regex = Some(Regex::from_str("[.,]").unwrap());
+        opt.compress_delimiter = true;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"abc\n".as_slice());
     }
 
     #[test]
@@ -521,6 +552,57 @@ mod tests {
     }
 
     #[test]
+    fn cut_str_it_join_fields_with_a_custom_delimiter() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a-b-c";
+        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
+        opt.join = true;
+        opt.replace_delimiter = Some(String::from("*"));
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"a*c\n".as_slice());
+    }
+
+    #[ignore]
+    #[cfg(feature = "regex")]
+    #[test]
+    fn cut_str_regex_it_cannot_join_fields_without_a_custom_delimiter() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a,,b..c";
+        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
+        opt.delimiter = String::from("[.,]");
+        opt.regex = Some(Regex::from_str(&opt.delimiter).unwrap());
+        opt.join = true;
+
+        assert!(cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).is_err());
+    }
+
+    #[ignore]
+    #[cfg(feature = "regex")]
+    #[test]
+    fn cut_str_regex_it_join_fields_with_a_custom_delimiter() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a,,b..c";
+        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
+        opt.delimiter = String::from("[.,]");
+        opt.regex = Some(Regex::from_str(&opt.delimiter).unwrap());
+        opt.join = true;
+        opt.replace_delimiter = Some(String::from("-+"));
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"a-c\n".as_slice());
+    }
+
+    #[test]
     fn cut_str_it_format_fields() {
         let mut opt = make_fields_opt();
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
@@ -559,6 +641,30 @@ mod tests {
         assert_eq!(output, b"b---c\n".as_slice());
     }
 
+    #[cfg(feature = "regex")]
+    #[test]
+    fn cut_str_regex_supports_greedy_delimiter() {
+        // also check that, contrary to compress_delimiter, the delimiter is kept long
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a,,.,b..,,c";
+        opt.bounds = UserBoundsList::from_str("2:3").unwrap();
+
+        // This is a bit unhintuitive. It doesn't need `greedy_delimiter`
+        // (it expects that the regex has been constructed, once, taking
+        // opt.greedy_delimiter into account). Is more safe to have a test
+        // on the cli side (and there should be one there)
+        opt.greedy_delimiter = true;
+        opt.delimiter = String::from("[.,]");
+        opt.regex = Some(Regex::from_str("([.,])+").unwrap());
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        dbg!(std::str::from_utf8(&output).unwrap());
+        assert_eq!(output, b"b..,,c\n".as_slice());
+    }
+
     #[test]
     fn cut_str_it_trim_fields() {
         let mut opt = make_fields_opt();
@@ -584,6 +690,40 @@ mod tests {
 
         // check Trim::Right
         let line = "-a-b-c-";
+        opt.trim = Some(Trim::Right);
+
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"c\n".as_slice());
+    }
+
+    #[ignore]
+    #[cfg(feature = "regex")]
+    #[test]
+    fn cut_str_regex_it_trim_fields() {
+        let mut opt = make_fields_opt();
+        let eol = &[EOL::Newline as u8];
+        let line = ".a,b.c,";
+
+        opt.bounds = UserBoundsList::from_str("1,-1").unwrap();
+        opt.delimiter = String::from("[.,]");
+        opt.regex = Some(Regex::from_str(&opt.delimiter).unwrap());
+
+        // check Trim::Both
+        opt.trim = Some(Trim::Both);
+
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"ac\n".as_slice());
+
+        // check Trim::Left
+        opt.trim = Some(Trim::Left);
+
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"a\n".as_slice());
+
+        // check Trim::Right
         opt.trim = Some(Trim::Right);
 
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
