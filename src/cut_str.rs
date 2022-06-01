@@ -246,9 +246,22 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
     }
     Ok(())
 }
+
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use crate::{bounds::UserBoundsList, options::EOL};
+
     use super::*;
+
+    fn make_fields_opt() -> Opt {
+        Opt {
+            bounds_type: BoundsType::Fields,
+            delimiter: String::from("-"),
+            ..Opt::default()
+        }
+    }
 
     #[test]
     fn test_complement_std_range() {
@@ -332,5 +345,234 @@ mod tests {
             v_range,
             vec![Range { start: 0, end: 1 }, Range { start: 3, end: 3 }]
         );
+    }
+
+    #[test]
+    fn test_read_and_cut_str_echo_non_delimited_strings() {
+        // read_and_cut_str is difficult to test, let's verify at least
+        // that it reads the input and appears to call cut_str
+
+        let opt = make_fields_opt();
+        let mut input = b"foo".as_slice();
+        let mut output = Vec::new();
+        read_and_cut_str(&mut input, &mut output, opt).unwrap();
+        assert_eq!(output, b"foo\n".as_slice());
+    }
+
+    fn make_cut_str_buffers() -> (Vec<u8>, Vec<Range<usize>>, String) {
+        let output = Vec::new();
+        let bounds_as_ranges = Vec::new();
+        let compressed_line_buffer = String::new();
+        (output, bounds_as_ranges, compressed_line_buffer)
+    }
+
+    #[test]
+    fn cut_str_echo_non_delimited_strings() {
+        let opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "foo";
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"foo\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_skip_non_delimited_strings_when_requested() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        opt.only_delimited = true;
+        let line = "foo";
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_cut_a_field() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a-b-c";
+        opt.bounds = UserBoundsList::from_str("1").unwrap();
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"a\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_cut_consecutive_delimiters() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a-b-c";
+        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"ac\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_compress_delimiters() {
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("2").unwrap();
+
+        let line = "--a---b--";
+        let eol = &[EOL::Newline as u8];
+
+        // first we verify we get an empty string without compressing delimiters
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        opt.compress_delimiter = false;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"\n".as_slice());
+
+        // now we do it again while compressing delimiters
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        opt.compress_delimiter = true;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"a\n".as_slice());
+
+        // and again but this time requesting a full range
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        opt.bounds = UserBoundsList::from_str("1:").unwrap();
+        opt.compress_delimiter = true;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"-a-b-\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_cut_characters() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "😁🤩😝😎";
+        opt.bounds = UserBoundsList::from_str("2").unwrap();
+        opt.bounds_type = BoundsType::Characters;
+        opt.delimiter = String::new();
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, "🤩\n".as_bytes());
+    }
+
+    #[test]
+    fn cut_str_it_supports_zero_terminated_lines() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Zero as u8];
+
+        let line = "a-b-c";
+        opt.bounds = UserBoundsList::from_str("2").unwrap();
+        opt.eol = EOL::Zero;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"b\0".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_complement_ranges() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a-b-c";
+        opt.bounds = UserBoundsList::from_str("2").unwrap();
+        opt.complement = true;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"ac\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_join_fields() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a-b-c";
+        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
+        opt.join = true;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"a-c\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_format_fields() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a-b-c";
+        opt.bounds = UserBoundsList::from_str("{1} < {3} > {2}").unwrap();
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"a < c > b\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_supports_greedy_delimiter() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a---b---c";
+        opt.bounds = UserBoundsList::from_str("2").unwrap();
+        opt.greedy_delimiter = true;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"b\n".as_slice());
+
+        // check that, opposite to compress_delimiter, the delimiter is kept long
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a---b---c";
+        opt.bounds = UserBoundsList::from_str("2:3").unwrap();
+        opt.greedy_delimiter = true;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"b---c\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_trim_fields() {
+        let mut opt = make_fields_opt();
+        let eol = &[EOL::Newline as u8];
+
+        opt.bounds = UserBoundsList::from_str("1,-1").unwrap();
+
+        // check Trim::Both
+        let line = "-a-b-c-";
+        opt.trim = Some(Trim::Both);
+
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"ac\n".as_slice());
+
+        // check Trim::Left
+        let line = "-a-b-c-";
+        opt.trim = Some(Trim::Left);
+
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"a\n".as_slice());
+
+        // check Trim::Right
+        let line = "-a-b-c-";
+        opt.trim = Some(Trim::Right);
+
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"c\n".as_slice());
     }
 }
