@@ -268,6 +268,19 @@ fn it_cuts_using_a_greedy_delimiter() {
     assert.success().stdout("ab\n");
 }
 
+#[cfg(feature = "regex")]
+#[test]
+fn it_cuts_using_a_greedy_delimiter_and_a_regex() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(&["-g", "-E", "-d", "[.,]", "-f", "1,2"])
+        .write_stdin("a..,,b")
+        .assert();
+
+    assert.success().stdout("ab\n");
+}
+
 #[test]
 fn it_accept_any_kind_of_range_as_long_as_its_safe() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
