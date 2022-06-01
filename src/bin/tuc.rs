@@ -115,14 +115,25 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let regex = None;
 
     #[cfg(feature = "regex")]
-    let regex: Option<Regex> = if parse_delimiter_as_regex {
-        Some(if greedy_delimiter {
-            Regex::new(&format!("{}+", &delimiter)).unwrap()
+    let (regex, delimiter): (Option<Regex>, String) = if parse_delimiter_as_regex {
+        let delimiter = if greedy_delimiter {
+            format!("({})+", &delimiter)
         } else {
-            Regex::new(&delimiter).unwrap()
-        })
+            delimiter
+        };
+
+        (
+            Some(Regex::new(&delimiter).unwrap_or_else(|e| {
+                eprintln!(
+                    "tuc: runtime error. The regular expression is malformed. {}",
+                    e
+                );
+                std::process::exit(1);
+            })),
+            delimiter,
+        )
     } else {
-        None
+        (None, delimiter)
     };
 
     let args = Opt {
