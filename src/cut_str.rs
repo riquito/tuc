@@ -80,27 +80,26 @@ fn build_ranges_vec_from_regex(buffer: &mut Vec<Range<usize>>, line: &str, re: &
     });
 }
 
-fn compress_delimiter(
-    bounds_as_ranges: &[Range<usize>],
-    line: &str,
-    delimiter: &str,
-    output: &mut String,
-) {
-    bounds_as_ranges.iter().enumerate().for_each(|(i, r)| {
-        if r.start == r.end {
-            return;
-        }
+fn compress_delimiter(line: &str, delimiter: &str, output: &mut String) {
+    output.clear();
+    let mut prev_idx = 0;
 
-        if output.is_empty() && r.start > 0 {
+    for (idx, _) in line.match_indices(delimiter) {
+        let prev_part = &line[prev_idx..idx];
+
+        if idx == 0 {
+            output.push_str(delimiter);
+        } else if !prev_part.is_empty() {
+            output.push_str(prev_part);
             output.push_str(delimiter);
         }
 
-        output.push_str(&line[r.start..r.end]);
+        prev_idx = idx + delimiter.len();
+    }
 
-        if (i < bounds_as_ranges.len() - 1) || (r.end < line.len() - 1) {
-            output.push_str(delimiter);
-        }
-    });
+    if prev_idx < line.len() {
+        output.push_str(&line[prev_idx..]);
+    }
 }
 
 #[cfg(feature = "regex")]
@@ -151,20 +150,18 @@ pub fn cut_str<W: Write>(
         return Ok(());
     }
 
+    if opt.compress_delimiter
+        && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines)
+    {
+        compress_delimiter(line, &opt.delimiter, compressed_line_buf);
+        line = compressed_line_buf;
+    }
+
     if opt.regex.is_some() {
         #[cfg(feature = "regex")]
         build_ranges_vec_from_regex(bounds_as_ranges, line, opt.regex.as_ref().unwrap());
     } else {
         build_ranges_vec(bounds_as_ranges, line, &opt.delimiter, opt.greedy_delimiter);
-
-        if opt.compress_delimiter
-            && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines)
-        {
-            compressed_line_buf.clear();
-            compress_delimiter(bounds_as_ranges, line, &opt.delimiter, compressed_line_buf);
-            line = compressed_line_buf;
-            build_ranges_vec(bounds_as_ranges, line, &opt.delimiter, opt.greedy_delimiter);
-        }
     }
 
     if opt.bounds_type == BoundsType::Characters && bounds_as_ranges.len() > 2 {
@@ -475,6 +472,15 @@ mod tests {
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"-a-b-\n".as_slice());
+
+        // let's check with a line that doesn't start/end with delimiters
+        let line = "a---b";
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        opt.bounds = UserBoundsList::from_str("1:").unwrap();
+        opt.compress_delimiter = true;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"a-b\n".as_slice());
     }
 
     #[ignore]
