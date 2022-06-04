@@ -141,11 +141,18 @@ pub fn cut_str<W: Write>(
     compressed_line_buf: &mut String,
     eol: &[u8],
 ) -> Result<()> {
-    assert!(!(opt.regex.is_some() && (opt.trim.is_some() || opt.join)));
+    assert!(!(opt.regex.is_some() && opt.trim.is_some()));
 
-    if opt.regex.is_some() && opt.compress_delimiter && opt.replace_delimiter.is_none() {
-        // TODO return a proper error; do not tie cli options to errors at this level
-        bail!("Cannot use --regex and --compress-delimiter without --replace-delimiter");
+    if opt.regex.is_some() {
+        if opt.compress_delimiter && opt.replace_delimiter.is_none() {
+            // TODO return a proper error; do not tie cli options to errors at this level
+            bail!("Cannot use --regex and --compress-delimiter without --replace-delimiter");
+        }
+
+        if opt.join && opt.replace_delimiter.is_none() {
+            // TODO return a proper error; do not tie cli options to errors at this level
+            bail!("Cannot use --regex and --join without --replace-delimiter");
+        }
     }
 
     let mut line: &str = match opt.trim {
@@ -547,6 +554,30 @@ mod tests {
 
     #[cfg(feature = "regex")]
     #[test]
+    fn cut_str_regex_it_cannot_compress_delimiters_without_replace_delimiter() {
+        let mut opt = make_fields_opt();
+        let eol = &[EOL::Newline as u8];
+
+        let line = ".,a,,,b..c";
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        opt.bounds = UserBoundsList::from_str("2,3,4").unwrap();
+        opt.compress_delimiter = true;
+        opt.regex = Some(Regex::from_str("[.,]").unwrap());
+        opt.replace_delimiter = None;
+
+        assert_eq!(
+            cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol)
+                .err()
+                .map(|x| x.to_string()),
+            Some(
+                "Cannot use --regex and --compress-delimiter without --replace-delimiter"
+                    .to_owned()
+            )
+        );
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
     fn cut_str_regex_it_compress_delimiters() {
         let mut opt = make_fields_opt();
         let eol = &[EOL::Newline as u8];
@@ -644,10 +675,9 @@ mod tests {
         assert_eq!(output, b"a*c\n".as_slice());
     }
 
-    #[ignore]
     #[cfg(feature = "regex")]
     #[test]
-    fn cut_str_regex_it_cannot_join_fields_without_a_custom_delimiter() {
+    fn cut_str_regex_it_cannot_join_fields_without_replace_delimiter() {
         let mut opt = make_fields_opt();
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
@@ -658,10 +688,14 @@ mod tests {
         opt.regex = Some(Regex::from_str(&opt.delimiter).unwrap());
         opt.join = true;
 
-        assert!(cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).is_err());
+        assert_eq!(
+            cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol)
+                .err()
+                .map(|x| x.to_string()),
+            Some("Cannot use --regex and --join without --replace-delimiter".to_owned())
+        );
     }
 
-    #[ignore]
     #[cfg(feature = "regex")]
     #[test]
     fn cut_str_regex_it_join_fields_with_a_custom_delimiter() {
@@ -669,15 +703,15 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a,,b..c";
+        let line = "a.b,c";
         opt.bounds = UserBoundsList::from_str("1,3").unwrap();
         opt.delimiter = String::from("[.,]");
         opt.regex = Some(Regex::from_str(&opt.delimiter).unwrap());
         opt.join = true;
-        opt.replace_delimiter = Some(String::from("-+"));
+        opt.replace_delimiter = Some(String::from("<->"));
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
-        assert_eq!(output, b"a-c\n".as_slice());
+        assert_eq!(output, b"a<->c\n".as_slice());
     }
 
     #[test]
