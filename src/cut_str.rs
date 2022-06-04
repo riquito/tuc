@@ -7,6 +7,8 @@ use crate::options::{Opt, Trim};
 use crate::read_utils::read_line_with_eol;
 
 #[cfg(feature = "regex")]
+use anyhow::bail;
+#[cfg(feature = "regex")]
 use regex::Regex;
 
 fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usize>> {
@@ -103,6 +105,15 @@ fn compress_delimiter(line: &str, delimiter: &str, output: &mut String) {
 }
 
 #[cfg(feature = "regex")]
+fn compress_delimiter_with_regex<'a>(
+    line: &'a str,
+    re: &Regex,
+    new_delimiter: &str,
+) -> std::borrow::Cow<'a, str> {
+    re.replace_all(line, new_delimiter)
+}
+
+#[cfg(feature = "regex")]
 fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a, str> {
     if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
         if let Some(re) = &opt.regex {
@@ -132,7 +143,7 @@ pub fn cut_str<W: Write>(
     compressed_line_buf: &mut String,
     eol: &[u8],
 ) -> Result<()> {
-    assert!(!(opt.regex.is_some() && (opt.trim.is_some() || opt.join || opt.compress_delimiter)));
+    assert!(!(opt.regex.is_some() && (opt.trim.is_some() || opt.join)));
 
     let mut line: &str = match opt.trim {
         None => line,
@@ -150,18 +161,39 @@ pub fn cut_str<W: Write>(
         return Ok(());
     }
 
-    if opt.compress_delimiter
-        && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines)
-    {
-        compress_delimiter(line, &opt.delimiter, compressed_line_buf);
-        line = compressed_line_buf;
+    #[allow(unused_variables)]
+    let line_holder: std::borrow::Cow<str>;
+    #[allow(unused_mut)]
+    let mut should_build_ranges_using_regex = opt.regex.is_some() && cfg!(feature = "regex");
+    #[allow(unused_mut)]
+    let mut delimiter = &opt.delimiter;
+    let should_compress_delimiter = opt.compress_delimiter
+        && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines);
+
+    if should_compress_delimiter {
+        if opt.regex.is_some() && cfg!(feature = "regex") {
+            #[cfg(feature = "regex")]
+            if let Some(new_delimiter) = &opt.replace_delimiter {
+                line_holder =
+                    compress_delimiter_with_regex(line, opt.regex.as_ref().unwrap(), new_delimiter);
+                line = &line_holder;
+                should_build_ranges_using_regex = false;
+                delimiter = new_delimiter
+            } else {
+                // TODO return a proper error; do not tie cli options to errors at this level
+                bail!("Cannot use --regex and --compress-delimiter without --replace-delimiter");
+            }
+        } else {
+            compress_delimiter(line, &opt.delimiter, compressed_line_buf);
+            line = compressed_line_buf;
+        }
     }
 
-    if opt.regex.is_some() {
+    if should_build_ranges_using_regex {
         #[cfg(feature = "regex")]
         build_ranges_vec_from_regex(bounds_as_ranges, line, opt.regex.as_ref().unwrap());
     } else {
-        build_ranges_vec(bounds_as_ranges, line, &opt.delimiter, opt.greedy_delimiter);
+        build_ranges_vec(bounds_as_ranges, line, delimiter, opt.greedy_delimiter);
     }
 
     if opt.bounds_type == BoundsType::Characters && bounds_as_ranges.len() > 2 {
@@ -513,21 +545,31 @@ mod tests {
         assert_eq!(output, b"a-b\n".as_slice());
     }
 
-    #[ignore]
     #[cfg(feature = "regex")]
     #[test]
     fn cut_str_regex_it_compress_delimiters() {
         let mut opt = make_fields_opt();
-        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
         let line = ".,a,,,b..c";
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         opt.bounds = UserBoundsList::from_str("2,3,4").unwrap();
-        opt.regex = Some(Regex::from_str("[.,]").unwrap());
         opt.compress_delimiter = true;
+        opt.regex = Some(Regex::from_str("([.,])+").unwrap());
+        opt.replace_delimiter = Some(String::from("-"));
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"abc\n".as_slice());
+
+        let line = ".,a,,,b..c";
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        opt.bounds = UserBoundsList::from_str("1:").unwrap();
+        opt.compress_delimiter = true;
+        opt.regex = Some(Regex::from_str("([.,])+").unwrap());
+        opt.replace_delimiter = Some(String::from("-"));
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"-a-b-c\n".as_slice());
     }
 
     #[test]
