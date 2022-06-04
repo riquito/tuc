@@ -39,7 +39,7 @@ fn build_ranges_vec(buffer: &mut Vec<Range<usize>>, line: &str, delimiter: &str,
     let mut next_part_start = 0;
 
     for (idx, _) in line.match_indices(&delimiter) {
-        if !(greedy && idx == next_part_start) {
+        if !(greedy && idx == next_part_start && idx != 0) {
             buffer.push(Range {
                 start: next_part_start,
                 end: idx,
@@ -313,6 +313,13 @@ mod tests {
         assert_eq!(v_range, vec![Range { start: 0, end: 1 }]);
 
         v_range.clear();
+        build_ranges_vec(&mut v_range, "-", "-", true);
+        assert_eq!(
+            v_range,
+            vec![Range { start: 0, end: 0 }, Range { start: 1, end: 1 }]
+        );
+
+        v_range.clear();
         build_ranges_vec(&mut v_range, "a-b", "-", false);
         assert_eq!(
             v_range,
@@ -344,17 +351,40 @@ mod tests {
         // greedy
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "a--b", "-", true);
+        build_ranges_vec(&mut v_range, "", "-", true);
+        assert_eq!(v_range, vec![]);
+
+        v_range.clear();
+        build_ranges_vec(&mut v_range, "a", "-", true);
+        assert_eq!(v_range, vec![Range { start: 0, end: 1 }]);
+
+        v_range.clear();
+        build_ranges_vec(&mut v_range, "-", "-", true);
         assert_eq!(
             v_range,
-            vec![Range { start: 0, end: 1 }, Range { start: 3, end: 4 }]
+            vec![Range { start: 0, end: 0 }, Range { start: 1, end: 1 }]
         );
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "a--", "-", true);
+        build_ranges_vec(&mut v_range, "-a--b", "-", true);
         assert_eq!(
             v_range,
-            vec![Range { start: 0, end: 1 }, Range { start: 3, end: 3 }]
+            vec![
+                Range { start: 0, end: 0 },
+                Range { start: 1, end: 2 },
+                Range { start: 4, end: 5 }
+            ]
+        );
+
+        v_range.clear();
+        build_ranges_vec(&mut v_range, "-a--", "-", true);
+        assert_eq!(
+            v_range,
+            vec![
+                Range { start: 0, end: 0 },
+                Range { start: 1, end: 2 },
+                Range { start: 4, end: 4 }
+            ]
         );
     }
 
