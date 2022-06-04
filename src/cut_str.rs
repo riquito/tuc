@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use std::io::{BufRead, Write};
 use std::ops::Range;
 
@@ -6,8 +6,6 @@ use crate::bounds::{bounds_to_std_range, BoundOrFiller, BoundsType};
 use crate::options::{Opt, Trim};
 use crate::read_utils::read_line_with_eol;
 
-#[cfg(feature = "regex")]
-use anyhow::bail;
 #[cfg(feature = "regex")]
 use regex::Regex;
 
@@ -145,6 +143,11 @@ pub fn cut_str<W: Write>(
 ) -> Result<()> {
     assert!(!(opt.regex.is_some() && (opt.trim.is_some() || opt.join)));
 
+    if opt.regex.is_some() && opt.compress_delimiter && opt.replace_delimiter.is_none() {
+        // TODO return a proper error; do not tie cli options to errors at this level
+        bail!("Cannot use --regex and --compress-delimiter without --replace-delimiter");
+    }
+
     let mut line: &str = match opt.trim {
         None => line,
         Some(Trim::Both) => line
@@ -173,15 +176,12 @@ pub fn cut_str<W: Write>(
     if should_compress_delimiter {
         if opt.regex.is_some() && cfg!(feature = "regex") {
             #[cfg(feature = "regex")]
-            if let Some(new_delimiter) = &opt.replace_delimiter {
+            {
+                delimiter = opt.replace_delimiter.as_ref().unwrap(); // we checked earlier the invariant
                 line_holder =
-                    compress_delimiter_with_regex(line, opt.regex.as_ref().unwrap(), new_delimiter);
+                    compress_delimiter_with_regex(line, opt.regex.as_ref().unwrap(), delimiter);
                 line = &line_holder;
                 should_build_ranges_using_regex = false;
-                delimiter = new_delimiter
-            } else {
-                // TODO return a proper error; do not tie cli options to errors at this level
-                bail!("Cannot use --regex and --compress-delimiter without --replace-delimiter");
             }
         } else {
             compress_delimiter(line, &opt.delimiter, compressed_line_buf);
