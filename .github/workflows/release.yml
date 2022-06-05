@@ -75,7 +75,7 @@ jobs:
         run: cargo build --release --locked --features ${{ matrix.features }}
 
       - name: Upload "no features" binary to release
-        if: ${{ matrix.features == "default" }}
+        if: matrix.features == 'default'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -85,7 +85,7 @@ jobs:
           overwrite: true
 
       - name: Upload "regex" binary to release
-        if: ${{ matrix.features == "regex" }}
+        if: matrix.features == 'regex'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -114,7 +114,7 @@ jobs:
         run: cargo build --release --target=aarch64-apple-darwin --locked --features ${{ matrix.features }}
 
       - name: Upload "no features" binary to release
-        if: ${{ matrix.features == "default" }}
+        if: matrix.features == 'default'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -124,7 +124,7 @@ jobs:
           overwrite: true
 
       - name: Upload "regex" binary to release
-        if: ${{ matrix.features == "regex" }}
+        if: matrix.features == 'regex'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
