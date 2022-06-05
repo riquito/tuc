@@ -58,9 +58,13 @@ jobs:
       matrix:
         features: [default, regex]
         partial_os: [ubuntu, macos, windows]
-        ext: [""]
-        include:
+        ext: ["", ".exe"]
+        exclude:
           - partial_os: windows
+            ext: ""
+          - partial_os: ubuntu
+            ext: ".exe"
+          - partial_os: macos
             ext: ".exe"
     steps:
       - name: Checkout code
