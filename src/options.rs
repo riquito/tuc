@@ -5,6 +5,13 @@ use std::str::FromStr;
 #[cfg(feature = "regex")]
 use regex::Regex;
 
+#[cfg(feature = "regex")]
+#[derive(Debug)]
+pub struct RegexBag {
+    pub normal: Regex,
+    pub greedy: Regex,
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum EOL {
@@ -27,9 +34,9 @@ pub struct Opt {
     pub complement: bool,
     pub join: bool,
     #[cfg(feature = "regex")]
-    pub regex: Option<Regex>,
+    pub regex_bag: Option<RegexBag>,
     #[cfg(not(feature = "regex"))]
-    pub regex: Option<()>,
+    pub regex_bag: Option<()>,
 }
 
 impl Default for Opt {
@@ -47,7 +54,7 @@ impl Default for Opt {
             version: false,
             complement: false,
             join: false,
-            regex: None,
+            regex_bag: None,
         }
     }
 }

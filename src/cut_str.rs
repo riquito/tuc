@@ -114,8 +114,8 @@ fn compress_delimiter_with_regex<'a>(
 #[cfg(feature = "regex")]
 fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a, str> {
     if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
-        if let Some(re) = &opt.regex {
-            re.replace_all(text, new_delimiter)
+        if let Some(re_bag) = &opt.regex_bag {
+            re_bag.normal.replace_all(text, new_delimiter)
         } else {
             std::borrow::Cow::Owned(text.replace(&opt.delimiter, new_delimiter))
         }
@@ -133,6 +133,41 @@ fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a,
     }
 }
 
+fn trim<'a>(line: &'a str, trim_kind: &Trim, delimiter: &str) -> &'a str {
+    match trim_kind {
+        Trim::Both => line
+            .trim_start_matches(delimiter)
+            .trim_end_matches(delimiter),
+        Trim::Left => line.trim_start_matches(delimiter),
+        Trim::Right => line.trim_end_matches(delimiter),
+    }
+}
+
+#[cfg(feature = "regex")]
+fn trim_regex<'a>(line: &'a str, trim_kind: &Trim, re: &Regex) -> &'a str {
+    let mut iter = re.find_iter(line);
+    let mut idx_start = 0;
+    let mut idx_end = line.len();
+
+    if trim_kind == &Trim::Both || trim_kind == &Trim::Left {
+        if let Some(m) = iter.next() {
+            if m.start() == 0 {
+                idx_start = m.end();
+            }
+        }
+    }
+
+    if trim_kind == &Trim::Both || trim_kind == &Trim::Right {
+        if let Some(m) = iter.last() {
+            if m.end() == line.len() {
+                idx_end = m.start();
+            }
+        }
+    }
+
+    &line[idx_start..idx_end]
+}
+
 pub fn cut_str<W: Write>(
     line: &str,
     opt: &Opt,
@@ -141,9 +176,7 @@ pub fn cut_str<W: Write>(
     compressed_line_buf: &mut String,
     eol: &[u8],
 ) -> Result<()> {
-    assert!(!(opt.regex.is_some() && opt.trim.is_some()));
-
-    if opt.regex.is_some() {
+    if opt.regex_bag.is_some() {
         if opt.compress_delimiter && opt.replace_delimiter.is_none() {
             // TODO return a proper error; do not tie cli options to errors at this level
             bail!("Cannot use --regex and --compress-delimiter without --replace-delimiter");
@@ -155,14 +188,18 @@ pub fn cut_str<W: Write>(
         }
     }
 
-    let mut line: &str = match opt.trim {
-        None => line,
-        Some(Trim::Both) => line
-            .trim_start_matches(&opt.delimiter)
-            .trim_end_matches(&opt.delimiter),
-        Some(Trim::Left) => line.trim_start_matches(&opt.delimiter),
-        Some(Trim::Right) => line.trim_end_matches(&opt.delimiter),
-    };
+    let mut line = line;
+
+    if let Some(trim_kind) = opt.trim {
+        if opt.regex_bag.is_some() {
+            #[cfg(feature = "regex")]
+            {
+                line = trim_regex(line, &trim_kind, &opt.regex_bag.as_ref().unwrap().greedy);
+            }
+        } else {
+            line = trim(line, &trim_kind, &opt.delimiter);
+        }
+    }
 
     if line.is_empty() {
         if !opt.only_delimited {
@@ -174,19 +211,22 @@ pub fn cut_str<W: Write>(
     #[allow(unused_variables)]
     let line_holder: std::borrow::Cow<str>;
     #[allow(unused_mut)]
-    let mut should_build_ranges_using_regex = opt.regex.is_some() && cfg!(feature = "regex");
+    let mut should_build_ranges_using_regex = opt.regex_bag.is_some() && cfg!(feature = "regex");
     #[allow(unused_mut)]
     let mut delimiter = &opt.delimiter;
     let should_compress_delimiter = opt.compress_delimiter
         && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines);
 
     if should_compress_delimiter {
-        if opt.regex.is_some() && cfg!(feature = "regex") {
+        if opt.regex_bag.is_some() && cfg!(feature = "regex") {
             #[cfg(feature = "regex")]
             {
                 delimiter = opt.replace_delimiter.as_ref().unwrap(); // we checked earlier the invariant
-                line_holder =
-                    compress_delimiter_with_regex(line, opt.regex.as_ref().unwrap(), delimiter);
+                line_holder = compress_delimiter_with_regex(
+                    line,
+                    &opt.regex_bag.as_ref().unwrap().greedy,
+                    delimiter,
+                );
                 line = &line_holder;
                 should_build_ranges_using_regex = false;
             }
@@ -198,7 +238,15 @@ pub fn cut_str<W: Write>(
 
     if should_build_ranges_using_regex {
         #[cfg(feature = "regex")]
-        build_ranges_vec_from_regex(bounds_as_ranges, line, opt.regex.as_ref().unwrap());
+        build_ranges_vec_from_regex(
+            bounds_as_ranges,
+            line,
+            if opt.greedy_delimiter {
+                &opt.regex_bag.as_ref().unwrap().greedy
+            } else {
+                &opt.regex_bag.as_ref().unwrap().normal
+            },
+        );
     } else {
         build_ranges_vec(bounds_as_ranges, line, delimiter, opt.greedy_delimiter);
     }
@@ -301,6 +349,10 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
 #[cfg(test)]
 mod tests {
     use crate::{bounds::UserBoundsList, options::EOL};
+
+    #[cfg(feature = "regex")]
+    use crate::options::RegexBag;
+
     use std::str::FromStr;
 
     use super::*;
@@ -310,6 +362,14 @@ mod tests {
             bounds_type: BoundsType::Fields,
             delimiter: String::from("-"),
             ..Opt::default()
+        }
+    }
+
+    #[cfg(feature = "regex")]
+    fn make_regex_bag() -> RegexBag {
+        RegexBag {
+            normal: Regex::from_str("[.,]").unwrap(),
+            greedy: Regex::from_str("([.,])+").unwrap(),
         }
     }
 
@@ -493,7 +553,7 @@ mod tests {
 
         let line = "a.b,c";
         opt.bounds = UserBoundsList::from_str("1,2,3").unwrap();
-        opt.regex = Some(Regex::from_str("[.,]").unwrap());
+        opt.regex_bag = Some(make_regex_bag());
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"abc\n".as_slice());
@@ -562,7 +622,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         opt.bounds = UserBoundsList::from_str("2,3,4").unwrap();
         opt.compress_delimiter = true;
-        opt.regex = Some(Regex::from_str("[.,]").unwrap());
+        opt.regex_bag = Some(make_regex_bag());
         opt.replace_delimiter = None;
 
         assert_eq!(
@@ -586,7 +646,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         opt.bounds = UserBoundsList::from_str("2,3,4").unwrap();
         opt.compress_delimiter = true;
-        opt.regex = Some(Regex::from_str("([.,])+").unwrap());
+        opt.regex_bag = Some(make_regex_bag());
         opt.replace_delimiter = Some(String::from("-"));
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
@@ -596,7 +656,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         opt.bounds = UserBoundsList::from_str("1:").unwrap();
         opt.compress_delimiter = true;
-        opt.regex = Some(Regex::from_str("([.,])+").unwrap());
+        opt.regex_bag = Some(make_regex_bag());
         opt.replace_delimiter = Some(String::from("-"));
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
@@ -685,7 +745,7 @@ mod tests {
         let line = "a,,b..c";
         opt.bounds = UserBoundsList::from_str("1,3").unwrap();
         opt.delimiter = String::from("[.,]");
-        opt.regex = Some(Regex::from_str(&opt.delimiter).unwrap());
+        opt.regex_bag = Some(make_regex_bag());
         opt.join = true;
 
         assert_eq!(
@@ -706,7 +766,7 @@ mod tests {
         let line = "a.b,c";
         opt.bounds = UserBoundsList::from_str("1,3").unwrap();
         opt.delimiter = String::from("[.,]");
-        opt.regex = Some(Regex::from_str(&opt.delimiter).unwrap());
+        opt.regex_bag = Some(make_regex_bag());
         opt.join = true;
         opt.replace_delimiter = Some(String::from("<->"));
 
@@ -764,13 +824,9 @@ mod tests {
         let line = "a,,.,b..,,c";
         opt.bounds = UserBoundsList::from_str("2:3").unwrap();
 
-        // This is a bit unhintuitive. It doesn't need `greedy_delimiter`
-        // (it expects that the regex has been constructed, once, taking
-        // opt.greedy_delimiter into account). Is more safe to have a test
-        // on the cli side (and there should be one there)
         opt.greedy_delimiter = true;
         opt.delimiter = String::from("[.,]");
-        opt.regex = Some(Regex::from_str("([.,])+").unwrap());
+        opt.regex_bag = Some(make_regex_bag());
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         dbg!(std::str::from_utf8(&output).unwrap());
@@ -781,65 +837,65 @@ mod tests {
     fn cut_str_it_trim_fields() {
         let mut opt = make_fields_opt();
         let eol = &[EOL::Newline as u8];
-
-        opt.bounds = UserBoundsList::from_str("1,-1").unwrap();
+        let line = "--a--b--c--";
 
         // check Trim::Both
-        let line = "-a-b-c-";
         opt.trim = Some(Trim::Both);
+        opt.bounds = UserBoundsList::from_str("1,3,-1").unwrap();
 
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
-        assert_eq!(output, b"ac\n".as_slice());
+        assert_eq!(output, b"abc\n".as_slice());
 
         // check Trim::Left
-        let line = "-a-b-c-";
         opt.trim = Some(Trim::Left);
+        opt.bounds = UserBoundsList::from_str("1,3,-3").unwrap();
 
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
-        assert_eq!(output, b"a\n".as_slice());
+        assert_eq!(output, b"abc\n".as_slice());
 
         // check Trim::Right
-        let line = "-a-b-c-";
         opt.trim = Some(Trim::Right);
+        opt.bounds = UserBoundsList::from_str("3,5,-1").unwrap();
 
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
-        assert_eq!(output, b"c\n".as_slice());
+        assert_eq!(output, b"abc\n".as_slice());
     }
 
-    #[ignore]
     #[cfg(feature = "regex")]
     #[test]
     fn cut_str_regex_it_trim_fields() {
         let mut opt = make_fields_opt();
         let eol = &[EOL::Newline as u8];
-        let line = ".a,b.c,";
+        let line = "..a,.b..c,,";
 
-        opt.bounds = UserBoundsList::from_str("1,-1").unwrap();
         opt.delimiter = String::from("[.,]");
-        opt.regex = Some(Regex::from_str(&opt.delimiter).unwrap());
+        opt.regex_bag = Some(make_regex_bag());
 
         // check Trim::Both
         opt.trim = Some(Trim::Both);
+        opt.bounds = UserBoundsList::from_str("1,3,-1").unwrap();
 
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
-        assert_eq!(output, b"ac\n".as_slice());
+        assert_eq!(output, b"abc\n".as_slice());
 
         // check Trim::Left
         opt.trim = Some(Trim::Left);
+        opt.bounds = UserBoundsList::from_str("1,3,-3").unwrap();
 
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
-        assert_eq!(output, b"a\n".as_slice());
+        assert_eq!(output, b"abc\n".as_slice());
 
         // check Trim::Right
         opt.trim = Some(Trim::Right);
+        opt.bounds = UserBoundsList::from_str("3,5,-1").unwrap();
 
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
-        assert_eq!(output, b"c\n".as_slice());
+        assert_eq!(output, b"abc\n".as_slice());
     }
 }
