@@ -38,6 +38,16 @@ jobs:
         with:
           command: test
 
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all-features
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features
+
   dependabot:
     needs: check_if_safe_to_merge
     runs-on: ubuntu-latest
