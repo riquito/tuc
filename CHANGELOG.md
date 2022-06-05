@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.9.0] - 2022-06-05
+
 - breaking: --lines output each bound on their own line
 - feat: --regex support
 - feat: minor tuning of buffers
@@ -16,17 +18,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - fix: --greedy-delimiter was cutting wrongly lines starting with delimiter
 
 ## [0.8.0] - 2022-05-23
+
 - Add support for --greedy-delimiter
 - Bounds can be formatted
 - Major refactoring for better code maintainability
 
 ## [0.7.0] - 2022-05-21
+
 - Add support for --join
 - Add support for --lines
 - Add support for --complement
 - Add support for --zero-terminated
 
 ## [0.6.0] - 2022-05-13
+
 - Add split-by-byte using --bytes
 - Add split-by-character using --characters
 - Faster performance when -p (compress delimiters) is on
