@@ -3,7 +3,9 @@
 ![ci](https://github.com/riquito/tuc/actions/workflows/ci.yml/badge.svg)
 [![license](https://img.shields.io/crates/l/tuc.svg)](https://crates.io/crates/tuc)
 
-We've all been there. You want to `cut` some string on a delimiter repeated in a non-deterministic way. Maybe you even want to use negative indexes or replace the delimiters in the cut part with something else...
+You want to `cut` on more than just a character, perhaps using negative indexes 
+or format the selected fields as you want...
+Maybe you want to cut on lines (ever needed to drop first and last line?)...
 That's where `tuc` can help.
 
 ## Install
@@ -34,6 +36,7 @@ FLAGS:
     -h, --help                    Prints this help and exit
     -m, --complement              keep the opposite fields than the one selected
     -j, --(no-)join               write the delimiter between fields
+    -E, --regex                   use --delimiter as a regular expression
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
@@ -64,7 +67,7 @@ OPTIONS:
     -d, --delimiter <delimiter>   Delimiter used by -f to cut the text
                                   [default: \t]
     -r, --replace-delimiter <s>   Replace the delimiter with the provided text
-    -t, --trim <trim>             Trim the delimiter. Valid trim values are
+    -t, --trim <trim>             Trim the delimiter (greedy). Valid values are
                                   (l|L)eft, (r|R)ight, (b|B)oth
 
 Notes:
@@ -137,6 +140,12 @@ cba
 ```
 
 ```sh
+# Accept regular expressions (requires a release with the feature enabled)
+❯ echo "a,b, c" | tuc -E -d '[, ]+' -f 1,3
+ac
+```
+
+```sh
 # Delimiters can be any number of characters long
 ❯ echo "a<sep>b<sep>c" | tuc -d '<sep>' -f 1,3
 ac
@@ -162,7 +171,7 @@ ac
 
 ```sh
 # Can keep the opposite fields
-echo "a b c" | tuc --complement -d ' ' -f 2
+❯ echo "a b c" | tuc --complement -d ' ' -f 2
 ac
 ```
 
