@@ -61,7 +61,7 @@ jobs:
         ext: [""]
         include:
           - partial_os: windows
-          - ext: ".exe"
+            ext: ".exe"
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
