@@ -8,6 +8,9 @@ use tuc::cut_str::read_and_cut_str;
 use tuc::options::{Opt, EOL};
 
 #[cfg(feature = "regex")]
+use tuc::options::RegexBag;
+
+#[cfg(feature = "regex")]
 use regex::Regex;
 
 const HELP: &str = concat!(
@@ -112,28 +115,28 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let parse_delimiter_as_regex = pargs.contains(["-E", "--regex"]);
 
     #[cfg(not(feature = "regex"))]
-    let regex = None;
+    let regex_bag = None;
 
     #[cfg(feature = "regex")]
-    let (regex, delimiter): (Option<Regex>, String) = if parse_delimiter_as_regex {
-        let delimiter = if greedy_delimiter {
-            format!("({})+", &delimiter)
-        } else {
-            delimiter
-        };
-
-        (
-            Some(Regex::new(&delimiter).unwrap_or_else(|e| {
+    let regex_bag: Option<RegexBag> = if parse_delimiter_as_regex {
+        Some(RegexBag {
+            normal: Regex::new(&delimiter).unwrap_or_else(|e| {
                 eprintln!(
                     "tuc: runtime error. The regular expression is malformed. {}",
                     e
                 );
                 std::process::exit(1);
-            })),
-            delimiter,
-        )
+            }),
+            greedy: Regex::new(&format!("({})+", &delimiter)).unwrap_or_else(|e| {
+                eprintln!(
+                    "tuc: runtime error. The regular expression is malformed. {}",
+                    e
+                );
+                std::process::exit(1);
+            }),
+        })
     } else {
-        (None, delimiter)
+        None
     };
 
     let args = Opt {
@@ -157,7 +160,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             .unwrap(),
         replace_delimiter: pargs.opt_value_from_str(["-r", "--replace-delimiter"])?,
         trim: pargs.opt_value_from_str(["-t", "--trim"])?,
-        regex,
+        regex_bag,
     };
 
     let remaining = pargs.finish();
