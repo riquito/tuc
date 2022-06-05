@@ -40,40 +40,65 @@ jobs:
         with:
           command: test
 
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all-features
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features
+
   release:
     needs: check_if_safe
     name: Build and Release
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        features: [default, regex]
         include:
           - os: ubuntu-latest
             artifact_name: tuc
-            asset_name: tuc-linux-amd64
+            asset_suffix: linux-amd64
           - os: macos-latest
             artifact_name: tuc
-            asset_name: tuc-macos-amd64
+            asset_suffix: macos-amd64
           - os: windows-latest
             artifact_name: tuc.exe
-            asset_name: tuc-windows-amd64
+            asset_suffix: windows-amd64
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
       - name: Build project
-        run: cargo build --release --locked
+        run: cargo build --release --locked --features ${{ matrix.features }}
 
-      - name: Upload binary to release
+      - name: Upload "no features" binary to release
+        if: ${{ matrix.features == "default" }}
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/release/${{ matrix.artifact_name }}
-          asset_name: ${{ matrix.asset_name }}
+          asset_name: tuc-${{ matrix.asset_suffix }}
+          tag: ${{ github.ref }}
+          overwrite: true
+
+      - name: Upload "regex" binary to release
+        if: ${{ matrix.features == "regex" }}
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/release/${{ matrix.artifact_name }}
+          asset_name: tuc-regex-${{ matrix.asset_suffix }}
           tag: ${{ github.ref }}
           overwrite: true
 
   macos_arm:
     needs: check_if_safe
+    strategy:
+      matrix:
+        features: [default, regex]
     runs-on: macos-latest
 
     steps:
@@ -86,13 +111,24 @@ jobs:
         run: cargo test --release
 
       - name: Build ARM
-        run: cargo build --release --target=aarch64-apple-darwin
+        run: cargo build --release --target=aarch64-apple-darwin --locked --features ${{ matrix.features }}
 
-      - name: Upload binary to release
+      - name: Upload "no features" binary to release
+        if: ${{ matrix.features == "default" }}
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/release/tuc
           asset_name: tuc-macos-aarch64
+          tag: ${{ github.ref }}
+          overwrite: true
+
+      - name: Upload "regex" binary to release
+        if: ${{ matrix.features == "regex" }}
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/release/tuc
+          asset_name: tuc-regex-macos-aarch64
           tag: ${{ github.ref }}
           overwrite: true
