@@ -53,20 +53,15 @@ jobs:
   release:
     needs: check_if_safe
     name: Build and Release
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.partial_os }}-latest
     strategy:
       matrix:
         features: [default, regex]
+        partial_os: [ubuntu, macos, windows]
+        ext: [""]
         include:
-          - os: ubuntu-latest
-            artifact_name: tuc
-            asset_suffix: linux-amd64
-          - os: macos-latest
-            artifact_name: tuc
-            asset_suffix: macos-amd64
-          - os: windows-latest
-            artifact_name: tuc.exe
-            asset_suffix: windows-amd64
+          - partial_os: windows
+          - ext: ".exe"
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -79,8 +74,8 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/${{ matrix.artifact_name }}
-          asset_name: tuc-${{ matrix.asset_suffix }}
+          file: target/release/tuc
+          asset_name: tuc-${{ matrix.partial_os }}-amd64${{ matrix.ext }}
           tag: ${{ github.ref }}
           overwrite: true
 
@@ -89,8 +84,8 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/${{ matrix.artifact_name }}
-          asset_name: tuc-regex-${{ matrix.asset_suffix }}
+          file: target/release/tuc
+          asset_name: tuc-regex-${{ matrix.partial_os }}-amd64${{ matrix.ext }}
           tag: ${{ github.ref }}
           overwrite: true
 
