@@ -6,12 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-- Minor tuning of buffers
+- breaking: --lines output each bound on their own line
+- feat: --regex support
+- feat: minor tuning of buffers
+- feat: internal improvements for --lines
 - fix: right side of a range can be negative
 - fix: emit proper error if right side of a range is behind left side
-- breaking: --lines output each bound on their own line
-- Fixed a bug that broke --lines with negative indexes
-- Internal improvements for --lines
+- fix: --lines with negative indexes were broken
+- fix: --greedy-delimiter was cutting wrongly lines starting with delimiter
 
 ## [0.8.0] - 2022-05-23
 - Add support for --greedy-delimiter
