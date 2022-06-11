@@ -22,7 +22,10 @@ cargo install tuc
 
 ```
 tuc 0.10.0 [UNRELEASED]
-When cut doesn't cut it.
+Cut text (or bytes) at delimiter, then keep the desired parts.
+A default delimiter is set when cutting lines, characters or bytes.
+
+The data is read from standard input.
 
 USAGE:
     tuc [FLAGS] [OPTIONS]
