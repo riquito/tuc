@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- doc: added man page
+
 ## [0.9.0] - 2022-06-05
 
 - breaking: --lines output each bound on their own line
