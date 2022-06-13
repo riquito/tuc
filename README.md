@@ -163,7 +163,7 @@ cba
 
 ```sh
 # Cut using regular expressions (requires a release with regex features enabled)
-❯ echo "a,b, c" | tuc -E -d '[, ]+' -f 1,3
+❯ echo "a,b, c" | tuc -e '[, ]+' -f 1,3
 ac
 ```
 
@@ -174,25 +174,19 @@ ac
 ```
 
 ```sh
-# Can split on unicode scalar values (it expects UTF-8 encoding)
-❯ echo "a𝌆b𝌆c" | tuc -d '𝌆' -f 1,3
-ac
-```
-
-```sh
-# Can split on characters
+# Cut characters (expects UTF-8 input)
 ❯ echo "😁🤩😝😎" | tuc -c 4,3,2,1
 😎😝🤩😁
 ```
 
 ```sh
-# Can split on bytes (the following emoji are 4 bytes each)
+# Cut bytes (the following emoji are 4 bytes each)
 ❯ echo "😁🤩😝😎" | tuc -b 5:8
 🤩
 ```
 
 ```sh
-# Can keep non-matching fields
+# Keep non-matching fields
 ❯ echo "a b c" | tuc --complement -d ' ' -f 2
 ac
 ```
