@@ -10,7 +10,7 @@ NAME
 SYNOPSIS
 ========
 
-| **cut** \[FLAGS]... \[OPTIONS]...
+| **tuc** \[FLAGS]... \[OPTIONS]...
 
 DESCRIPTION
 ===========
