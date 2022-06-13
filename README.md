@@ -14,7 +14,7 @@ Download one of the [prebuilt binaries](https://github.com/riquito/tuc/releases)
 
 or run
 
-```
+```sh
 cargo install tuc # append `--features regex` if you want regex support
 ```
 
