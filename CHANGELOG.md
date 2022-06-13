@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- breaking: -E is now an option (-e), and accept the regex as value
 - doc: added man page
 - chore: updated pico-args
 
