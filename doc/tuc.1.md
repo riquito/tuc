@@ -23,7 +23,7 @@ FLAGS
 =====
 
 -g, --greedy-delimiter
-:   Match consecutive delmiters as if it was one
+:   Match consecutive delimiters as if it was one
 
 -p, --compress-delimiter
 :   Print only the first delimiter of a sequence
