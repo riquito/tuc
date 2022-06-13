@@ -15,7 +15,7 @@ Download one of the [prebuilt binaries](https://github.com/riquito/tuc/releases)
 or run
 
 ```sh
-# requires rustc <= 1.61.0
+# requires rustc >= 1.61.0
 cargo install tuc # append `--features regex` if you want regex support
 ```
 
