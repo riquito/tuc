@@ -21,7 +21,7 @@ cargo install tuc
 ## Help
 
 ```
-tuc 0.10.0 [UNRELEASED]
+tuc 0.11.0 [UNRELEASED]
 Cut text (or bytes) where a delimiter matches, then keep the desired parts.
 
 The data is read from standard input.
