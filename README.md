@@ -39,7 +39,7 @@ FLAGS:
     -h, --help                    Prints this help and exit
     -m, --complement              keep the opposite fields than the one selected
     -j, --(no-)join               write the delimiter between fields
-    -E, --regex                   use --delimiter as a regular expression
+    -e, --regex                   use --delimiter as a regular expression
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
