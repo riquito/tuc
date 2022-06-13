@@ -74,10 +74,12 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
         }
     }
 
-    // Outout is finished. Did we output every bound?
+    // Output is finished. Did we output every bound?
     if let Some(BoundOrFiller::Bound(b)) = opt.bounds.0.get(bounds_idx) {
-        // not good, we still have bounds to print but the input is exhausted
-        bail!("Out of bounds: {}", b);
+        if b.r != Side::Continue {
+            // not good, we still have bounds to print but the input is exhausted
+            bail!("Out of bounds: {}", b);
+        }
     }
 
     stdout.write_all(&[opt.eol as u8])?;
@@ -170,6 +172,11 @@ mod tests {
         r: Side::Some(-1),
     });
 
+    const BOF_F1_TO_END: BoundOrFiller = BoundOrFiller::Bound(UserBounds {
+        l: Side::Some(1),
+        r: Side::Continue,
+    });
+
     #[test]
     fn fwd_cut_one_field() {
         let mut opt = make_lines_opt();
@@ -213,6 +220,17 @@ mod tests {
         let mut output = Vec::with_capacity(100);
         cut_lines_forward_only(&mut input, &mut output, &opt).unwrap();
         assert_eq!(output, b"ac\n");
+    }
+
+    #[test]
+    fn fwd_supports_no_right_bound() {
+        let mut opt = make_lines_opt();
+        opt.bounds = UserBoundsList(vec![BOF_F1_TO_END]);
+
+        let mut input = b"a\nb".as_slice();
+        let mut output = Vec::with_capacity(100);
+        cut_lines_forward_only(&mut input, &mut output, &opt).unwrap();
+        assert_eq!(output, b"a\nb\n");
     }
 
     #[test]
