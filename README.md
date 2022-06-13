@@ -31,7 +31,7 @@ USAGE:
     tuc [FLAGS] [OPTIONS]
 
 FLAGS:
-    -g, --greedy-delimiter        Match consecutive delmiters as if it was one
+    -g, --greedy-delimiter        Match consecutive delimiters as if it was one
     -p, --compress-delimiter      Print only the first delimiter of a sequence
     -s, --only-delimited          Print only lines containing the delimiter
     -V, --version                 Print version information
