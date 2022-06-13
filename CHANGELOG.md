@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - breaking: -E is now an option (-e), and accept the regex as value
 - doc: added man page
+- doc: improved documentation
 - chore: updated pico-args
 
 ## [0.9.0] - 2022-06-05
