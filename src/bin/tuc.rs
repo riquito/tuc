@@ -34,7 +34,7 @@ FLAGS:
     -h, --help                    Prints this help and exit
     -m, --complement              keep the opposite fields than the one selected
     -j, --(no-)join               write the delimiter between fields
-    -E, --regex                   use --delimiter as a regular expression
+    -e, --regex                   use --delimiter as a regular expression
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
@@ -115,32 +115,37 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let join = has_join || (bounds_type == BoundsType::Lines && !has_no_join);
 
     let greedy_delimiter = pargs.contains(["-g", "--greedy-delimiter"]);
-    let parse_delimiter_as_regex = pargs.contains(["-E", "--regex"]);
 
     #[cfg(not(feature = "regex"))]
     let regex_bag = None;
 
     #[cfg(feature = "regex")]
-    let regex_bag: Option<RegexBag> = if parse_delimiter_as_regex {
-        Some(RegexBag {
-            normal: Regex::new(&delimiter).unwrap_or_else(|e| {
-                eprintln!(
-                    "tuc: runtime error. The regular expression is malformed. {}",
-                    e
-                );
-                std::process::exit(1);
-            }),
-            greedy: Regex::new(&format!("({})+", &delimiter)).unwrap_or_else(|e| {
-                eprintln!(
-                    "tuc: runtime error. The regular expression is malformed. {}",
-                    e
-                );
-                std::process::exit(1);
-            }),
-        })
-    } else {
-        None
-    };
+    let regex_bag: Option<RegexBag> =
+        if let Ok(Some(regex_text)) = pargs.opt_value_from_str::<_, String>(["-e", "--regex"]) {
+            Some(RegexBag {
+                normal: Regex::new(&regex_text).unwrap_or_else(|e| {
+                    eprintln!(
+                        "tuc: runtime error. The regular expression is malformed. {}",
+                        e
+                    );
+                    std::process::exit(1);
+                }),
+                greedy: Regex::new(&format!("({})+", &regex_text)).unwrap_or_else(|e| {
+                    eprintln!(
+                        "tuc: runtime error. The regular expression is malformed. {}",
+                        e
+                    );
+                    std::process::exit(1);
+                }),
+            })
+        } else {
+            None
+        };
+
+    if regex_bag.is_some() && !cfg!(feature = "regex") {
+        eprintln!("tuc: runtime error. This version of tuc was compiled without regex support");
+        std::process::exit(1);
+    }
 
     let args = Opt {
         complement: pargs.contains(["-m", "--complement"]),
@@ -176,11 +181,6 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     if !remaining.is_empty() {
         eprintln!("tuc: unexpected arguments {:?}", remaining);
         eprintln!("Try 'tuc --help' for more information.");
-        std::process::exit(1);
-    }
-
-    if parse_delimiter_as_regex && !cfg!(feature = "regex") {
-        eprintln!("tuc: runtime error. This version of tuc was compiled without regex support");
         std::process::exit(1);
     }
 
