@@ -15,8 +15,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-Cut text (or bytes) at delimiter, then keep the desired parts.  
-A default delimiter is set when cutting lines, characters or bytes.  
+Cut text (or bytes) where a delimiter matches, then keep the desired parts.  
 
 The data is read from standard input.
 
@@ -24,31 +23,28 @@ FLAGS
 =====
 
 -g, --greedy-delimiter
-:   Split fields using a greedy delimiter
+:   Match consecutive delmiters as if it was one
 
 -p, --compress-delimiter
-:   Collapse any sequence of delimiters
+:   Print only the first delimiter of a sequence
 
 -s, --only-delimited
-:   Do not print lines not containing delimiters
+:   Print only lines containing the delimiter
 
 -V, --version
-:   Prints version information
+:   Print version information
 
 -z, --zero-terminated
-:   line delimiter is NUL (\0), not LF (\n)
+:   Line delimiter is NUL (\0), not LF (\n)
 
 -h, --help
-:   Prints this help and exit
+:   Print this help and exit
 
 -m, --complement
-:   keep the opposite fields than the one selected
+:   Invert fields (e.g. '2' becomes '1,3:')
 
 -j, --(no-)join
-:   write the delimiter between fields
-
--E, --regex
-:   use --delimiter as a regular expression
+:   Print selected parts with delimiter inbetween
 
 
 OPTIONS
@@ -57,6 +53,7 @@ OPTIONS
 | **-f**, **--fields** [bounds]
 |        Fields to keep, 1-indexed, comma separated.
 |        Use colon to include everything in a range.
+|        Fields can be negative (-1 is the last field).
 
 |        [default 1:]
 
@@ -68,8 +65,8 @@ OPTIONS
 |          3,1:2 => ca-b
 |          -3:-2 => b-c
 
-|        To re-add the delimiter check -j, to replace
-|        it check -r.
+|        To re-apply the delimiter add -j, to replace
+|        it add -r (followed by the new delimiter)
 
 |        You can also format the output using {} syntax
 |        e.g.
@@ -85,10 +82,10 @@ OPTIONS
 
 | **-l**, **--lines** [bounds]
 |        Same as --fields, but it keeps lines
-|        Implies --join (use --no-join to concat lines)
+|        Implies --join. To merge lines, use --no-join
 
 | **-d**, **--delimiter** [delimiter]
-|        Delimiter used by -f to cut the text
+|        Delimiter used by --fields to cut the text
 |        [default: \\t]
 
 | **-r**, **--replace-delimiter** [new delimiter]
@@ -98,6 +95,21 @@ OPTIONS
 |        Trim the delimiter (greedy).
 |        Valid values are (l|L)eft, (r|R)ight, (b|B)oth
 
+OPTIONS PRECEDENCE
+==================
+
+--trim and --compress-delimiter are applied before --fields or similar
+
+MEMORY CONSUMPTION
+==================
+
+--characters and --fields read and allocate memory one line at a time  
+
+--lines allocate memory one line at a time as long as the requested fields are
+ ordered and non-negative (e.g. -l 1,3:4,4,7), otherwise it allocates
+ the whole input in memory (it also happens when -p or -m are being used)  
+
+--bytes allocate the whole input in memory
 
 BUGS
 ====
