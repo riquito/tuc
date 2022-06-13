@@ -11,57 +11,50 @@
 [OPTIONS]...
 .SH DESCRIPTION
 .PP
-Cut text (or bytes) at delimiter, then keep the desired parts.
-.PD 0
-.P
-.PD
-A default delimiter is set when cutting lines, characters or bytes.
+Cut text (or bytes) where a delimiter matches, then keep the desired
+parts.
 .PP
 The data is read from standard input.
 .SH FLAGS
 .TP
 .B \-g, \-\-greedy\-delimiter
-Split fields using a greedy delimiter
+Match consecutive delmiters as if it was one
 .RS
 .RE
 .TP
 .B \-p, \-\-compress\-delimiter
-Collapse any sequence of delimiters
+Print only the first delimiter of a sequence
 .RS
 .RE
 .TP
 .B \-s, \-\-only\-delimited
-Do not print lines not containing delimiters
+Print only lines containing the delimiter
 .RS
 .RE
 .TP
 .B \-V, \-\-version
-Prints version information
+Print version information
 .RS
 .RE
 .TP
 .B \-z, \-\-zero\-terminated
-line delimiter is NUL (), not LF ()
+Line delimiter is NUL (), not LF ()
 .RS
 .RE
 .TP
 .B \-h, \-\-help
-Prints this help and exit
+Print this help and exit
 .RS
 .RE
 .TP
 .B \-m, \-\-complement
-keep the opposite fields than the one selected
+Invert fields (e.g.
+\[aq]2\[aq] becomes \[aq]1,3:\[aq])
 .RS
 .RE
 .TP
 .B \-j, \-\-(no\-)join
-write the delimiter between fields
-.RS
-.RE
-.TP
-.B \-E, \-\-regex
-use \-\-delimiter as a regular expression
+Print selected parts with delimiter inbetween
 .RS
 .RE
 .SH OPTIONS
@@ -75,6 +68,10 @@ use \-\-delimiter as a regular expression
 .P
 .PD
 \ \ \ \ \ \ \ Use colon to include everything in a range.
+.PD 0
+.P
+.PD
+\ \ \ \ \ \ \ Fields can be negative (\-1 is the last field).
 .PP
 \ \ \ \ \ \ \ [default 1:]
 .PP
@@ -105,11 +102,11 @@ cutting on \[aq]\-\[aq] the string \[aq]a\-b\-c\-d\[aq]
 .PD
 \ \ \ \ \ \ \ \ \ \-3:\-2 => b\-c
 .PP
-\ \ \ \ \ \ \ To re\-add the delimiter check \-j, to replace
+\ \ \ \ \ \ \ To re\-apply the delimiter add \-j, to replace
 .PD 0
 .P
 .PD
-\ \ \ \ \ \ \ it check \-r.
+\ \ \ \ \ \ \ it add \-r (followed by the new delimiter)
 .PP
 \ \ \ \ \ \ \ You can also format the output using {} syntax
 .PD 0
@@ -143,13 +140,14 @@ cutting on \[aq]\-\[aq] the string \[aq]a\-b\-c\-d\[aq]
 .PD 0
 .P
 .PD
-\ \ \ \ \ \ \ Implies \-\-join (use \-\-no\-join to concat lines)
+\ \ \ \ \ \ \ Implies \-\-join.
+To merge lines, use \-\-no\-join
 .PP
 \f[B]\-d\f[], \f[B]\-\-delimiter\f[] [delimiter]
 .PD 0
 .P
 .PD
-\ \ \ \ \ \ \ Delimiter used by \-f to cut the text
+\ \ \ \ \ \ \ Delimiter used by \-\-fields to cut the text
 .PD 0
 .P
 .PD
@@ -170,6 +168,21 @@ cutting on \[aq]\-\[aq] the string \[aq]a\-b\-c\-d\[aq]
 .P
 .PD
 \ \ \ \ \ \ \ Valid values are (l|L)eft, (r|R)ight, (b|B)oth
+.SH OPTIONS PRECEDENCE
+.PP
+\-\-trim and \-\-compress\-delimiter are applied before \-\-fields or
+similar
+.SH MEMORY CONSUMPTION
+.PP
+\-\-characters and \-\-fields read and allocate memory one line at a
+time
+.PP
+\-\-lines allocate memory one line at a time as long as the requested
+fields are ordered and non\-negative (e.g.
+\-l 1,3:4,4,7), otherwise it allocates the whole input in memory (it
+also happens when \-p or \-m are being used)
+.PP
+\-\-bytes allocate the whole input in memory
 .SH BUGS
 .PP
 See GitHub Issues: <https://github.com/riquito/tuc/issues>
