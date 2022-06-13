@@ -1,6 +1,6 @@
-% tuc(1) Tuc 0.9.0 | Tuc Manual
+% tuc(1) Tuc 0.10.0 | Tuc Manual
 %
-% Jun 10, 2022
+% Jun 13, 2022
 
 NAME
 ====
