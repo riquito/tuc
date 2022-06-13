@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- fix: --lines could throw out of bounds with -f 1: in some situations
+
 ## [0.10.0] - 2022-06-13
 
 - breaking: -E is now an option (-e), and accept the regex as value
