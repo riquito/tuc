@@ -19,12 +19,7 @@ or run
 cargo install tuc # append `--features regex` if you want regex support
 ```
 
-Community-Managed Packages:
-
-- [MacPorts](https://www.macports.org/) (on macOS):
-  ```sh
-  sudo port install tuc
-  ```
+For other installation methods, check below the [community managed packages](#community-managed-packages)
 
 ## Help
 
@@ -198,6 +193,13 @@ ac
 ❯ echo "a b c" | tuc --complement -d ' ' -f 2
 ac
 ```
+
+## Community-Managed Packages
+
+- [MacPorts](https://www.macports.org/) (on macOS):
+  ```sh
+  sudo port install tuc
+  ```
 
 ## LICENSE
 
