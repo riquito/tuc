@@ -19,6 +19,13 @@ or run
 cargo install tuc # append `--features regex` if you want regex support
 ```
 
+Community-Managed Packages:
+
+- [MacPorts](https://www.macports.org/) (on macOS):
+  ```sh
+  sudo port install tuc
+  ```
+
 ## Help
 
 ```
