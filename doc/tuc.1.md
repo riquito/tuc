@@ -1,4 +1,4 @@
-% tuc(1) Tuc 0.10.0 | Tuc Manual
+% tuc(1) Tuc 0.11.0 | Tuc Manual
 %
 % Jun 13, 2022
 
