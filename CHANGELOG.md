@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.11.0] - 2022-06-20
+
 - fix: --lines could throw out of bounds with -f 1: in some situations
+- chore: dependency updates
+- doc: fixed typos
+- doc: new section about community-managed install methods (macports)
+- doc: man page generated using the mode modern pandoc 2.5
 
 ## [0.10.0] - 2022-06-13
 
