@@ -196,7 +196,20 @@ ac
 
 ## Community-Managed Packages
 
-- [MacPorts](https://www.macports.org/) (on macOS):
+[![Packaging status](https://repology.org/badge/vertical-allrepos/tuc-cut.svg)](https://repology.org/project/tuc-cut/versions)
+
+- [ArchLinux](https://aur.archlinux.org/packages/tuc):
+  ```sh
+  yay -S tuc # compile from source
+  yay -S tuc-bin # install pre-built binaries tuc and tuc-regex
+  ```
+
+- [Brew](https://formulae.brew.sh/formula/tuc):
+  ```sh
+  brew install tuc
+  ```
+
+- [MacPorts](https://ports.macports.org/port/tuc/):
   ```sh
   sudo port install tuc
   ```
