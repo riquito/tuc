@@ -130,14 +130,17 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let regex_bag: Option<RegexBag> =
         if let Ok(Some(regex_text)) = pargs.opt_value_from_str::<_, String>(["-e", "--regex"]) {
             Some(RegexBag {
-                normal: Regex::new(&regex_text).unwrap_or_else(|e| {
+                // (?-u) disables unicode to make \w, \d, \s work with the
+                // unicode features disabled. We use the regex crate without
+                // unicode to significantly reduce the binary size.
+                normal: Regex::new(&format!("(?-u){}", &regex_text)).unwrap_or_else(|e| {
                     eprintln!(
                         "tuc: runtime error. The regular expression is malformed. {}",
                         e
                     );
                     std::process::exit(1);
                 }),
-                greedy: Regex::new(&format!("({})+", &regex_text)).unwrap_or_else(|e| {
+                greedy: Regex::new(&format!("(?-u)({})+", &regex_text)).unwrap_or_else(|e| {
                     eprintln!(
                         "tuc: runtime error. The regular expression is malformed. {}",
                         e
