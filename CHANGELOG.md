@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- feat: smaller binaries by removing unnecessary (to us) regex features
+
 ## [0.11.0] - 2022-06-20
 
 - fix: --lines could throw out of bounds with -f 1: in some situations
