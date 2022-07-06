@@ -342,11 +342,11 @@ pub fn bounds_to_std_range(parts_length: usize, bounds: &UserBounds) -> Result<R
     let start: usize = match bounds.l {
         Side::Continue => 0,
         Side::Some(v) => {
-            if v.abs() as usize > parts_length {
+            if v.unsigned_abs() as usize > parts_length {
                 bail!("Out of bounds: {}", v);
             }
             if v < 0 {
-                parts_length - v.abs() as usize
+                parts_length - v.unsigned_abs() as usize
             } else {
                 v as usize - 1
             }
@@ -356,11 +356,11 @@ pub fn bounds_to_std_range(parts_length: usize, bounds: &UserBounds) -> Result<R
     let end: usize = match bounds.r {
         Side::Continue => parts_length,
         Side::Some(v) => {
-            if v.abs() as usize > parts_length {
+            if v.unsigned_abs() as usize > parts_length {
                 bail!("Out of bounds: {}", v);
             }
             if v < 0 {
-                parts_length - v.abs() as usize + 1
+                parts_length - v.unsigned_abs() as usize + 1
             } else {
                 v as usize
             }
