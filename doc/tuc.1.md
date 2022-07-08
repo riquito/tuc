@@ -44,7 +44,7 @@ FLAGS
 :   Invert fields (e.g. '2' becomes '1,3:')
 
 -j, --(no-)join
-:   Print selected parts with delimiter inbetween
+:   Print selected parts with delimiter in between
 
 
 OPTIONS
