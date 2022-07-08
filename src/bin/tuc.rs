@@ -32,7 +32,7 @@ FLAGS:
     -z, --zero-terminated         Line delimiter is NUL (\0), not LF (\n)
     -h, --help                    Print this help and exit
     -m, --complement              Invert fields (e.g. '2' becomes '1,3:')
-    -j, --(no-)join               Print selected parts with delimiter inbetween
+    -j, --(no-)join               Print selected parts with delimiter in between
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
