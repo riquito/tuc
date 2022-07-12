@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html charset="utf-8">
+<head>
+  <link rel="icon" href="data:,">
+  <script src="./polyfill.js"></script>
+  <style>
+    h1 {
+      margin: 8px 0;
+    }
+    h4 {
+      margin: 4px 0;
+    }
+    html {
+      display: flex;
+      min-height: 100%;
+      background-color: #6f758e;
+    }
+    body {
+      display: flex;
+      flex: 1 0 auto;
+      flex-direction: column;
+      max-width: min(100%, 1200px);
+      margin: 0 auto;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    #command-line {
+      flex: 1 0 wrap;
+
+      background-color: #0b0d22;
+      color: #63df51;
+      font-weight: bold;
+      padding: 8px;
+      border: 0;
+    }
+    #input-output-container {
+      display: flex;
+      flex: 1 0 auto;
+      justify-content: space-between;
+    }
+    #title-cmd {
+      display: flex;
+      flex: 0 0 auto;
+      justify-content: space-between;
+    }
+    #input-container, #output-container, h1, #cmd-container {
+      display: flex;
+      flex: 1 0 auto;
+      flex-direction: column;
+      max-width: 49%;
+    }
+    #input, #output {
+      flex: 1 0 auto;
+
+      background-color: #0b0d22;
+      color: #63df51;
+      border: 0;
+      padding: 8px;
+      font-family: mono;
+      font-size: 12px;
+      max-height: 600px;
+    }
+
+    h1 {
+      justify-content: center;
+      align-items: center;
+    }
+
+    #input:focus, #output:focus, #command-line:focus {
+      outline-color: #d0c03d;
+      outline-style: solid;
+      outline-width: medium;
+    }
+  </style>
+</head>
+<body>
+  <div id="title-cmd">
+    <h1>TUC playground</h1>
+    <div id="cmd-container">
+      <h4>Editable Command Line (type "tuc -h" if you're lost)</h4>
+      <input id="command-line" type="text" placeholder="tuc -h" />
+    </div>
+  </div>
+  <div id="input-output-container">
+    <div id="input-container">
+      <h4>PIPED INPUT</h4>
+      <textarea id="input"></textarea>
+    </div>
+    <div id="output-container">
+      <h4>OUTPUT</h4>
+      <textarea id="output" disabled ></textarea>
+    </div>
+  </div>
+
+<script>
+
+
+/**
+ * Split a command line string into its components
+ *
+ * e.g. --foo "hello world" -x '' -d 5
+ * => ["--foo", "hello world", "-x", "", "-d", "5"]
+ */
+function parse_args(args) {
+  args = args.trim()
+
+  let parts = ['']
+  let in_single_quote = false
+  let in_double_quote = false
+
+  for (let c of args) {
+    if (c === ' ' && !in_single_quote && !in_double_quote) {
+      if (parts[parts.length - 1] !== '') {
+        parts.push('')
+      }
+    } else if (c === '"') {
+      if (in_double_quote) {
+        // closing quotes, moving to next arg
+        in_double_quote = false
+        parts.push('')
+      } else if (in_single_quote) {
+        // no special meaning
+        parts[parts.length - 1] += c;
+      } else {
+        // we are starting a double quoted string
+        in_double_quote = true
+        if (parts[parts.length - 1] !== '') {
+          parts.push('')
+        }
+      }
+    } else if (c === "'") {
+      if (in_single_quote) {
+        // closing quotes, moving to next arg
+        in_single_quote = false
+        parts.push('')
+      } else if (in_double_quote) {
+        // no special meaning
+        parts[parts.length - 1] += c;
+      } else {
+        // we are starting a single quoted string
+        in_single_quote = true
+        if (parts[parts.length - 1] !== '') {
+          parts.push('')
+        }
+      }
+    } else {
+      parts[parts.length - 1] += c;
+    }
+  }
+
+  if (parts.length === 1 && parts[0] === '') {
+    return []
+  }
+
+  return parts
+}
+
+function buildImportModuleData() {
+  let already_read = false;
+
+  let stdin = new Stdio({ read: (len) => {
+    console.log('STDIN read',len,'bytes')
+    if (!already_read) {
+      already_read = true
+      return [new TextEncoder().encode(document.getElementById('input').value), 0]
+    } else {
+      return [new Uint8Array(), 0]
+    }
+  }})
+
+  let stdout = new Stdio({ write: (data) => {
+    console.log('STDOUT', new TextDecoder('utf-8').decode(data))
+    document.getElementById('output').value = new TextDecoder('utf-8').decode(data)
+    return 0
+  }})
+
+  let stderr = new Stdio({ write: (data) => {
+    console.error('STDERR', new TextDecoder('utf-8').decode(data))
+    return 0
+  }})
+
+  let args = parse_args(document.getElementById('command-line').value || "tuc -h");
+  let env = ['RUSTC_LOG=trace','RUST_BACKTRACE=1'];
+  let fds = [
+    stdin,
+    stdout,
+    stderr,
+    new PreopenDirectory('/tmp', {}),
+  ];
+
+  return [args, env, fds]
+}
+
+(async function () {
+  //document.body.innerText = 'Downloading';
+  let wasmModule = await WebAssembly.compileStreaming(
+    fetch('./tuc.wasm')
+  );
+
+ // document.body.innerText = 'Instantiating';
+
+  document.getElementById('input').addEventListener('input', async (ev) => {
+    const [args, env, fds] = buildImportModuleData()
+    const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
+
+    try {
+     await inst.exports._start();
+    } catch (e) {
+      console.error('whops', e)
+    }
+  })
+
+  document.getElementById('command-line').addEventListener('input', async (ev) => {
+    let [args, env, fds] = buildImportModuleData()
+    args = parse_args(ev.target.value)
+    const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
+
+    try {
+     await inst.exports._start();
+    } catch (e) {
+      console.error('whops', e)
+    }
+  })
+})();
+
+</script>
+</body>
+</html>
