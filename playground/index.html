@@ -168,20 +168,20 @@ function buildImportModuleData() {
     }
   }})
 
-  let stdout = new Stdio({ write: (data) => {
+  const stdout = new Stdio({ write: (data) => {
     console.log('STDOUT', new TextDecoder('utf-8').decode(data))
     document.getElementById('output').value = new TextDecoder('utf-8').decode(data)
     return 0
   }})
 
-  let stderr = new Stdio({ write: (data) => {
+  const stderr = new Stdio({ write: (data) => {
     console.error('STDERR', new TextDecoder('utf-8').decode(data))
     return 0
   }})
 
-  let args = parse_args(document.getElementById('command-line').value || "tuc -h");
-  let env = ['RUSTC_LOG=trace','RUST_BACKTRACE=1'];
-  let fds = [
+  const args = parse_args(document.getElementById('command-line').value || "tuc -h");
+  const env = ['RUSTC_LOG=trace','RUST_BACKTRACE=1'];
+  const fds = [
     stdin,
     stdout,
     stderr,
@@ -189,6 +189,24 @@ function buildImportModuleData() {
   ];
 
   return [args, env, fds]
+}
+
+const debounce = (func, delay) => {
+    let previousCallTime = Date.now() - delay
+    let prevId = null
+
+    return (...args) => {
+      clearTimeout(prevId)
+      const now = Date.now()
+
+      if (previousCallTime + delay <= now) {
+        func(...args)
+      } else {
+        prevId = setTimeout(() => func(...args), delay - (now - previousCallTime))
+      }
+
+      previousCallTime = Date.now()
+    }
 }
 
 (async function () {
@@ -199,7 +217,7 @@ function buildImportModuleData() {
 
  // document.body.innerText = 'Instantiating';
 
-  document.getElementById('input').addEventListener('input', async (ev) => {
+  document.getElementById('input').addEventListener('input', debounce(async (ev) => {
     const [args, env, fds] = buildImportModuleData()
     const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
 
@@ -208,9 +226,9 @@ function buildImportModuleData() {
     } catch (e) {
       console.error('whops', e)
     }
-  })
+  }, 70))
 
-  document.getElementById('command-line').addEventListener('input', async (ev) => {
+  document.getElementById('command-line').addEventListener('input',  debounce(async (ev) => {
     let [args, env, fds] = buildImportModuleData()
     args = parse_args(ev.target.value)
     const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
@@ -220,7 +238,7 @@ function buildImportModuleData() {
     } catch (e) {
       console.error('whops', e)
     }
-  })
+  }, 70))
 })();
 
 </script>
