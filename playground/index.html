@@ -159,7 +159,6 @@ function buildImportModuleData() {
   let already_read = false;
 
   let stdin = new Stdio({ read: (len) => {
-    console.log('STDIN read',len,'bytes')
     if (!already_read) {
       already_read = true
       return [new TextEncoder().encode(document.getElementById('input').value), 0]
@@ -169,13 +168,11 @@ function buildImportModuleData() {
   }})
 
   const stdout = new Stdio({ write: (data) => {
-    console.log('STDOUT',[ new TextDecoder('utf-8').decode(data)])
     document.getElementById('output').value += new TextDecoder('utf-8').decode(data)
     return 0
   }})
 
   const stderr = new Stdio({ write: (data) => {
-    console.error('STDERR', new TextDecoder('utf-8').decode(data))
     document.getElementById('output').value += new TextDecoder('utf-8').decode(data)
     return 0
   }})
@@ -220,7 +217,13 @@ const debounce = (func, delay) => {
     const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
     document.getElementById('output').value = ''
 
-    inst.exports._start();
+    try {
+      inst.exports._start();
+    } catch (e) {
+      if (!e.message.includes('unreachable executed')) {
+        throw e;
+      }
+    }
   }, 70))
 
   document.getElementById('command-line').addEventListener('input',  debounce(async (ev) => {
@@ -229,7 +232,13 @@ const debounce = (func, delay) => {
     const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
     document.getElementById('output').value = ''
 
-    inst.exports._start();
+    try {
+      inst.exports._start();
+    } catch (e) {
+      if (!e.message.includes('unreachable executed')) {
+        throw e;
+      }
+    }
   }, 70))
 })();
 
