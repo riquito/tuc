@@ -169,13 +169,14 @@ function buildImportModuleData() {
   }})
 
   const stdout = new Stdio({ write: (data) => {
-    console.log('STDOUT', new TextDecoder('utf-8').decode(data))
-    document.getElementById('output').value = new TextDecoder('utf-8').decode(data)
+    console.log('STDOUT',[ new TextDecoder('utf-8').decode(data)])
+    document.getElementById('output').value += new TextDecoder('utf-8').decode(data)
     return 0
   }})
 
   const stderr = new Stdio({ write: (data) => {
     console.error('STDERR', new TextDecoder('utf-8').decode(data))
+    document.getElementById('output').value += new TextDecoder('utf-8').decode(data)
     return 0
   }})
 
@@ -210,34 +211,25 @@ const debounce = (func, delay) => {
 }
 
 (async function () {
-  //document.body.innerText = 'Downloading';
-  let wasmModule = await WebAssembly.compileStreaming(
-    fetch('./tuc.wasm')
+  const wasmModule = await WebAssembly.compileStreaming(
+    fetch('../target/wasm32-wasi/debug/tuc.wasm')
   );
-
- // document.body.innerText = 'Instantiating';
 
   document.getElementById('input').addEventListener('input', debounce(async (ev) => {
     const [args, env, fds] = buildImportModuleData()
     const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
+    document.getElementById('output').value = ''
 
-    try {
-     await inst.exports._start();
-    } catch (e) {
-      console.error('whops', e)
-    }
+    inst.exports._start();
   }, 70))
 
   document.getElementById('command-line').addEventListener('input',  debounce(async (ev) => {
     let [args, env, fds] = buildImportModuleData()
     args = parse_args(ev.target.value)
     const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
+    document.getElementById('output').value = ''
 
-    try {
-     await inst.exports._start();
-    } catch (e) {
-      console.error('whops', e)
-    }
+    inst.exports._start();
   }, 70))
 })();
 
