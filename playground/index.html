@@ -1,25 +1,37 @@
 <!DOCTYPE html>
-<html charset="utf-8">
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'nonce-378acdg21a' 'nonce-nvkjdnvf34' 'unsafe-eval' ; style-src 'nonce-nu3c532ewd'; img-src data:">
+  <title>TUC Playground</title>
   <link rel="icon" href="data:,">
-  <script src="./polyfill.js"></script>
-  <style>
-    h1 {
-      margin: 8px 0;
-    }
-    h4 {
+  <script defer src="./polyfill.js" nonce="nvkjdnvf34"></script>
+  <style nonce="nu3c532ewd">
+    label {
+      display: block;
       margin: 4px 0;
+      font-size: 1em;
+      font-weight: bold;
     }
     html {
       display: flex;
       min-height: 100%;
-      background-color: #6f758e;
+      background-color: #7d8295;
+      margin: 0;
+      padding: 0;
     }
     body {
       display: flex;
       flex: 1 0 auto;
+      margin: 0;
+      padding: 0;
+    }
+    main {
+      display: flex;
+      flex: 1 0 auto;
       flex-direction: column;
-      max-width: min(100%, 1200px);
+      max-width: min(100%, 700px);
       margin: 0 auto;
       padding: 10px;
       box-sizing: border-box;
@@ -62,6 +74,7 @@
     }
 
     h1 {
+      margin: 8px 0;
       justify-content: center;
       align-items: center;
     }
@@ -71,30 +84,51 @@
       outline-style: solid;
       outline-width: medium;
     }
+
+    @media screen and (max-width: 800px) {
+      #input-container, #output-container, h1, #cmd-container {
+        max-width: initial;
+      }
+      #input, #output {
+        min-height: 200px;
+      }
+
+      #title-cmd, #input-output-container {
+        flex-direction: column;
+        flex: 0 1 auto;
+      }
+
+      main {
+        padding: 5px;
+      }
+
+      #title-cmd {
+        max-width: fit-content;
+      }
+    }
   </style>
 </head>
-<body>
-  <div id="title-cmd">
-    <h1>TUC playground</h1>
-    <div id="cmd-container">
-      <h4>Editable Command Line (type "tuc -h" if you're lost)</h4>
-      <input id="command-line" type="text" placeholder="tuc -h" />
+  <main>
+    <div id="title-cmd">
+      <h1>TUC playground</h1>
+      <div id="cmd-container">
+        <label for="command-line">Command Line (type "tuc -h" if you're lost)</label>
+        <input id="command-line" type="text" placeholder="tuc -h" value="tuc -h" />
+      </div>
     </div>
-  </div>
-  <div id="input-output-container">
-    <div id="input-container">
-      <h4>PIPED INPUT</h4>
-      <textarea id="input"></textarea>
+    <div id="input-output-container">
+      <div id="input-container">
+        <label for="input">PIPED INPUT</label>
+        <textarea id="input"></textarea>
+      </div>
+      <div id="output-container">
+        <label for="output">OUTPUT</label>
+        <textarea id="output" disabled ></textarea>
+      </div>
     </div>
-    <div id="output-container">
-      <h4>OUTPUT</h4>
-      <textarea id="output" disabled ></textarea>
-    </div>
-  </div>
+  </main>
 
-<script>
-
-
+<script type="module" nonce="378acdg21a">
 /**
  * Split a command line string into its components
  *
@@ -243,5 +277,4 @@ const debounce = (func, delay) => {
 })();
 
 </script>
-</body>
 </html>
