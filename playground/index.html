@@ -258,38 +258,30 @@ const debounce = (func, delay) => {
     }
 }
 
+async function runTuc(wasmModule) {
+  const [args, env, fds] = buildImportModuleData()
+  const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
+  document.getElementById('output').value = ''
+
+  try {
+    inst.exports._start();
+  } catch (e) {
+    if (e.name !== 'WASIExit') {
+      throw e;
+    }
+  }
+}
+
 (async function () {
+
   const wasmModule = await WebAssembly.compileStreaming(
     fetch('../target/wasm32-wasi/debug/tuc.wasm')
   );
 
-  document.getElementById('input').addEventListener('input', debounce(async (ev) => {
-    const [args, env, fds] = buildImportModuleData()
-    const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
-    document.getElementById('output').value = ''
+  document.getElementById('input').addEventListener('input', debounce(() => runTuc(wasmModule), 70));
+  document.getElementById('command-line').addEventListener('input', debounce(() => runTuc(wasmModule), 70));
 
-    try {
-      inst.exports._start();
-    } catch (e) {
-      if (e.name !== 'WASIExit') {
-        throw e;
-      }
-    }
-  }, 70))
-
-  document.getElementById('command-line').addEventListener('input',  debounce(async (ev) => {
-    let [args, env, fds] = buildImportModuleData()
-    const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
-    document.getElementById('output').value = ''
-
-    try {
-      inst.exports._start();
-    } catch (e) {
-      if (e.name !== 'WASIExit') {
-        throw e;
-      }
-    }
-  }, 70))
+  await runTuc(wasmModule)
 })();
 
 </script>
