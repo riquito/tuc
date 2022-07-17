@@ -217,7 +217,12 @@ function buildImportModuleData() {
     return 0
   }})
 
-  const args = parse_args(document.getElementById('command-line').value || "tuc -h");
+  let cmd = document.getElementById('command-line').value.trim()
+  if (cmd === '' || !cmd.startsWith('tuc')) {
+    cmd = "tuc -h"
+  }
+
+  const args = parse_args(cmd);
   const env = ['RUSTC_LOG=trace','RUST_BACKTRACE=1'];
   const fds = [
     stdin,
@@ -268,7 +273,6 @@ const debounce = (func, delay) => {
 
   document.getElementById('command-line').addEventListener('input',  debounce(async (ev) => {
     let [args, env, fds] = buildImportModuleData()
-    args = parse_args(ev.target.value)
     const inst = await WASM_WASI_instantiate(wasmModule, args, env, fds);
     document.getElementById('output').value = ''
 
