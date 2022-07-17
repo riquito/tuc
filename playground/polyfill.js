@@ -2,6 +2,44 @@
 // Original source: https://github.com/bjorn3/rust/blob/051645c/rustc.html
 // LICENSE: Apache2
 
+// WASIExit from emscripten
+// Copyright 2010 The Emscripten Authors.  All rights reserved.
+// Emscripten is available under two separate licenses, the MIT license and the
+// University of Illinois/NCSA Open Source License.
+// To implement `proc_exit`, we define a custom exception object
+// that we can throw to unwind the stack and carry the exit value.
+function WASIExit(return_value, message, fileName, lineNumber) {
+  let instance = new Error(message, fileName, lineNumber);
+  instance.name = 'WASIExit';
+  instance.return_value = return_value;
+  Object.setPrototypeOf(instance, Object.getPrototypeOf(this));
+  if (Error.captureStackTrace) {
+    Error.captureStackTrace(instance, WASIExit);
+  }
+  return instance;
+}
+
+WASIExit.prototype = Object.create(Error.prototype, {
+  constructor: {
+    value: Error,
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  },
+});
+
+if (Object.setPrototypeOf) {
+  Object.setPrototypeOf(WASIExit, Error);
+} else {
+  WASIExit.__proto__ = Error;
+}
+
+function handleWASIExit(e) {
+  if (e.return_value != 0) {
+    console.log('program exited with non-zero exit status ' + e.return_value);
+  }
+}
+
 // @ts-check
 
 const FILETYPE_UNKNOWN = 0;
@@ -174,8 +212,14 @@ class Stdio {
 async function WASM_WASI_instantiate(wasm, args, env, fds) {
   const inst = await WebAssembly.instantiate(wasm, {
     wasi_snapshot_preview1: {
-      proc_exit(_n) {
-        return;
+      proc_exit(rval) {
+        let message;
+        if (rval == 0) {
+          message = 'success';
+        } else {
+          message = 'error code ' + rval;
+        }
+        throw new WASIExit(rval, message);
       },
       random_get() {
         throw new Error('NotImplemented: random_get');

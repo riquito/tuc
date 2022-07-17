@@ -254,7 +254,7 @@ const debounce = (func, delay) => {
     try {
       inst.exports._start();
     } catch (e) {
-      if (!e.message.includes('unreachable executed')) {
+      if (e.name !== 'WASIExit') {
         throw e;
       }
     }
@@ -269,7 +269,7 @@ const debounce = (func, delay) => {
     try {
       inst.exports._start();
     } catch (e) {
-      if (!e.message.includes('unreachable executed')) {
+      if (e.name !== 'WASIExit') {
         throw e;
       }
     }
