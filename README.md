@@ -21,6 +21,10 @@ cargo install tuc # append `--features regex` if you want regex support
 
 For other installation methods, check below the [community managed packages](#community-managed-packages)
 
+## Try it out online
+
+No time to install it? Play with a webassembly version online, the [tuc playground](https://riquito.github.io/tuc/playground/index.html)
+
 ## Help
 
 ```
