@@ -37,13 +37,14 @@
       box-sizing: border-box;
     }
     #command-line {
-      flex: 1 0 wrap;
-
       background-color: #0b0d22;
       color: #63df51;
       font-weight: bold;
       padding: 8px;
       border: 0;
+    }
+    #command-line::placeholder {
+      color: #ccc;
     }
     #input-output-container {
       display: flex;
@@ -77,6 +78,11 @@
       margin: 8px 0;
       justify-content: center;
       align-items: center;
+      flex-direction: row;
+    }
+
+    h1 > a {
+      margin-right: 10px;
     }
 
     #input:focus, #output:focus, #command-line:focus {
@@ -110,7 +116,7 @@
 </head>
   <main>
     <div id="title-cmd">
-      <h1>TUC playground</h1>
+      <h1><a href="https://github.com/riquito/tuc">TUC</a> playground</h1>
       <div id="cmd-container">
         <label for="command-line">Command Line (type "tuc -h" if you're lost)</label>
         <input id="command-line" type="text" placeholder="tuc -h" value="tuc -h" />
