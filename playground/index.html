@@ -275,7 +275,7 @@ async function runTuc(wasmModule) {
 (async function () {
 
   const wasmModule = await WebAssembly.compileStreaming(
-    fetch('./playground/tuc.wasm')
+    fetch('./tuc.wasm')
   );
 
   document.getElementById('input').addEventListener('input', debounce(() => runTuc(wasmModule), 70));
