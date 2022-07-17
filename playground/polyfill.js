@@ -221,8 +221,15 @@ async function WASM_WASI_instantiate(wasm, args, env, fds) {
         }
         throw new WASIExit(rval, message);
       },
-      random_get() {
-        throw new Error('NotImplemented: random_get');
+      random_get(bufferOffset, bufferLength) {
+        const buffer = new Uint8Array(
+          inst.exports.memory.buffer,
+          bufferOffset,
+          bufferLength
+        );
+        crypto.getRandomValues(buffer);
+
+        return 0;
       },
       args_sizes_get(argc, argv_buf_size) {
         let buffer = new DataView(inst.exports.memory.buffer);
