@@ -59,7 +59,7 @@ impl Default for Opt {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Trim {
     Left,
     Right,
