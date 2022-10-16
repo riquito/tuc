@@ -4,7 +4,7 @@ use std::fmt;
 use std::ops::Range;
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum BoundsType {
     Bytes,
     Characters,
@@ -12,7 +12,7 @@ pub enum BoundsType {
     Lines,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum BoundOrFiller {
     Bound(UserBounds),
     Filler(String),
