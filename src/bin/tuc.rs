@@ -86,7 +86,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let mut pargs = pico_args::Arguments::from_env();
 
     if pargs.contains(["-h", "--help"]) {
-        print!("{}", HELP);
+        print!("{HELP}");
         std::process::exit(0);
     }
 
@@ -132,15 +132,13 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             Some(RegexBag {
                 normal: Regex::new(&regex_text).unwrap_or_else(|e| {
                     eprintln!(
-                        "tuc: runtime error. The regular expression is malformed. {}",
-                        e
+                        "tuc: runtime error. The regular expression is malformed. {e}"
                     );
                     std::process::exit(1);
                 }),
                 greedy: Regex::new(&format!("({})+", &regex_text)).unwrap_or_else(|e| {
                     eprintln!(
-                        "tuc: runtime error. The regular expression is malformed. {}",
-                        e
+                        "tuc: runtime error. The regular expression is malformed. {e}"
                     );
                     std::process::exit(1);
                 }),
@@ -186,7 +184,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     }
 
     if !remaining.is_empty() {
-        eprintln!("tuc: unexpected arguments {:?}", remaining);
+        eprintln!("tuc: unexpected arguments {remaining:?}");
         eprintln!("Try 'tuc --help' for more information.");
         std::process::exit(1);
     }

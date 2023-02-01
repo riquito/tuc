@@ -32,7 +32,7 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
         return Ok(Vec::new());
     }
 
-    if s.contains(&['{', '}']) {
+    if s.contains(['{', '}']) {
         let mut bof: Vec<BoundOrFiller> = Vec::new();
         let mut inside_bound = false;
         let mut part_start = 0;
@@ -195,7 +195,7 @@ impl FromStr for Side {
 impl fmt::Display for Side {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Side::Some(v) => write!(f, "{}", v),
+            Side::Some(v) => write!(f, "{v}"),
             Side::Continue => write!(f, ""),
         }
     }
@@ -211,8 +211,8 @@ impl fmt::Display for UserBounds {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match (self.l, self.r) {
             (Side::Continue, Side::Continue) => write!(f, "1:-1"),
-            (l, r) if l == r => write!(f, "{}", l),
-            (l, r) => write!(f, "{}:{}", l, r),
+            (l, r) if l == r => write!(f, "{l}"),
+            (l, r) => write!(f, "{l}:{r}"),
         }
     }
 }
