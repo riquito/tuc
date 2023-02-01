@@ -14,7 +14,7 @@ fn it_skips_non_delimited_line_when_requested() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-s"])
+        .args(["-s"])
         .write_stdin("one\ntwo\tkeepme\nthree")
         .assert();
 
@@ -25,7 +25,7 @@ fn it_skips_non_delimited_line_when_requested() {
 fn it_cut_a_field() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd.args(&["-f", "2"]).write_stdin("foobar\tbaz").assert();
+    let assert = cmd.args(["-f", "2"]).write_stdin("foobar\tbaz").assert();
 
     assert.success().stdout("baz\n");
 }
@@ -35,7 +35,7 @@ fn it_cut_consecutive_delimiters() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-d", "-", "-f", "1,3"])
+        .args(["-d", "-", "-f", "1,3"])
         .write_stdin("foo--bar")
         .assert();
 
@@ -47,7 +47,7 @@ fn it_works_on_multiple_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-f", "2"])
+        .args(["-f", "2"])
         .write_stdin("hello\nfoobar\tbaz")
         .assert();
 
@@ -58,7 +58,7 @@ fn it_works_on_multiple_lines() {
 fn it_accepts_values_starting_with_hyphen() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd.args(&["-f", "-1"]).write_stdin("hello").assert();
+    let assert = cmd.args(["-f", "-1"]).write_stdin("hello").assert();
 
     assert.success().stdout("hello\n");
 }
@@ -68,7 +68,7 @@ fn it_compresses_delimiters_when_requested() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-d", "-", "-p", "-f", "2"])
+        .args(["-d", "-", "-p", "-f", "2"])
         .write_stdin("foo---bar")
         .assert();
 
@@ -80,7 +80,7 @@ fn it_compresses_delimiters_when_requested_and_handles_boundaries() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-d", "-", "-p"])
+        .args(["-d", "-", "-p"])
         .write_stdin("--foo---bar--")
         .assert();
 
@@ -92,7 +92,7 @@ fn it_cuts_on_characters() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["--characters", "2,-2"])
+        .args(["--characters", "2,-2"])
         .write_stdin("😁🤩😝😎")
         .assert();
 
@@ -103,7 +103,7 @@ fn it_cuts_on_characters() {
 fn it_cuts_on_bytes() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd.args(&["--bytes", "3:"]).write_stdin("über").assert();
+    let assert = cmd.args(["--bytes", "3:"]).write_stdin("über").assert();
 
     assert.success().stdout("ber");
 }
@@ -113,7 +113,7 @@ fn it_support_zero_terminated_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-z", "-d", "_", "-f", "2"])
+        .args(["-z", "-d", "_", "-f", "2"])
         .write_stdin("hello_world\0foo_bar")
         .assert();
 
@@ -125,7 +125,7 @@ fn it_can_complement_the_fields() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-m", "-d", " ", "-f", "2"])
+        .args(["-m", "-d", " ", "-f", "2"])
         .write_stdin("a b c")
         .assert();
 
@@ -133,7 +133,7 @@ fn it_can_complement_the_fields() {
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     let assert = cmd
-        .args(&["-m", "-d", " ", "-f", "1:"])
+        .args(["-m", "-d", " ", "-f", "1:"])
         .write_stdin("a b c")
         .assert();
 
@@ -145,7 +145,7 @@ fn it_cuts_on_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["--lines", "1,3"])
+        .args(["--lines", "1,3"])
         .write_stdin("a\nb\nc")
         .assert();
 
@@ -154,7 +154,7 @@ fn it_cuts_on_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["--lines", "3,1"])
+        .args(["--lines", "3,1"])
         .write_stdin("a\nb\nc")
         .assert();
 
@@ -163,7 +163,7 @@ fn it_cuts_on_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["--lines", "2:3"])
+        .args(["--lines", "2:3"])
         .write_stdin("a\nb\nc")
         .assert();
 
@@ -172,7 +172,7 @@ fn it_cuts_on_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["--complement", "--lines", "2"])
+        .args(["--complement", "--lines", "2"])
         .write_stdin("a\nb\nc")
         .assert();
 
@@ -184,7 +184,7 @@ fn it_join_fields() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-d", " ", "-f", "1,3", "-j"])
+        .args(["-d", " ", "-f", "1,3", "-j"])
         .write_stdin("a b c")
         .assert();
 
@@ -193,7 +193,7 @@ fn it_join_fields() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-d", " ", "-f", "1,3", "-j", "-r", "/"])
+        .args(["-d", " ", "-f", "1,3", "-j", "-r", "/"])
         .write_stdin("a b c")
         .assert();
 
@@ -202,7 +202,7 @@ fn it_join_fields() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-d", "-", "-f", "2", "-j", "-m"])
+        .args(["-d", "-", "-f", "2", "-j", "-m"])
         .write_stdin("a-b-c")
         .assert();
 
@@ -213,20 +213,20 @@ fn it_join_fields() {
 fn it_join_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd.args(&["-l", "1,3"]).write_stdin("a\nb\nc").assert();
+    let assert = cmd.args(["-l", "1,3"]).write_stdin("a\nb\nc").assert();
 
     assert.success().stdout("a\nc\n");
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd.args(&["-l", "3,1"]).write_stdin("a\nb\nc").assert();
+    let assert = cmd.args(["-l", "3,1"]).write_stdin("a\nb\nc").assert();
 
     assert.success().stdout("c\na\n");
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-l", "1,3", "--no-join"])
+        .args(["-l", "1,3", "--no-join"])
         .write_stdin("a\nb\nc")
         .assert();
 
@@ -235,7 +235,7 @@ fn it_join_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-l", "3,1", "--no-join"])
+        .args(["-l", "3,1", "--no-join"])
         .write_stdin("a\nb\nc")
         .assert();
 
@@ -247,7 +247,7 @@ fn it_format_fields() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-f", "Say {1} to our {2}.\nJust {{saying}}"])
+        .args(["-f", "Say {1} to our {2}.\nJust {{saying}}"])
         .write_stdin("hello\tworld")
         .assert();
 
@@ -261,7 +261,7 @@ fn it_cuts_using_a_greedy_delimiter() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-g", "-d", "-", "-f", "1,2"])
+        .args(["-g", "-d", "-", "-f", "1,2"])
         .write_stdin("a---b")
         .assert();
 
@@ -274,7 +274,7 @@ fn it_cuts_using_a_regex() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-e", "[.,]", "-f", "1,5"])
+        .args(["-e", "[.,]", "-f", "1,5"])
         .write_stdin("a..,,b")
         .assert();
 
@@ -287,7 +287,7 @@ fn it_cuts_using_a_greedy_delimiter_and_a_regex() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(&["-g", "-e", "[.,]", "-f", "1,2"])
+        .args(["-g", "-e", "[.,]", "-f", "1,2"])
         .write_stdin("a..,,b")
         .assert();
 
@@ -298,13 +298,13 @@ fn it_cuts_using_a_greedy_delimiter_and_a_regex() {
 fn it_accept_any_kind_of_range_as_long_as_its_safe() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd.args(&["-l", "2:-2"]).write_stdin("a\nb\nc\nd").assert();
+    let assert = cmd.args(["-l", "2:-2"]).write_stdin("a\nb\nc\nd").assert();
 
     assert.success().stdout("b\nc\n");
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd.args(&["-l", "2:-4"]).write_stdin("a\nb\nc\nd").assert();
+    let assert = cmd.args(["-l", "2:-4"]).write_stdin("a\nb\nc\nd").assert();
 
     assert
         .failure()
