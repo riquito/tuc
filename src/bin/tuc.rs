@@ -131,15 +131,11 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         if let Ok(Some(regex_text)) = pargs.opt_value_from_str::<_, String>(["-e", "--regex"]) {
             Some(RegexBag {
                 normal: Regex::new(&regex_text).unwrap_or_else(|e| {
-                    eprintln!(
-                        "tuc: runtime error. The regular expression is malformed. {e}"
-                    );
+                    eprintln!("tuc: runtime error. The regular expression is malformed. {e}");
                     std::process::exit(1);
                 }),
                 greedy: Regex::new(&format!("({})+", &regex_text)).unwrap_or_else(|e| {
-                    eprintln!(
-                        "tuc: runtime error. The regular expression is malformed. {e}"
-                    );
+                    eprintln!("tuc: runtime error. The regular expression is malformed. {e}");
                     std::process::exit(1);
                 }),
             })
