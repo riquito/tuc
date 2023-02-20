@@ -144,28 +144,19 @@ fn it_can_complement_the_fields() {
 fn it_cuts_on_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd
-        .args(["--lines", "1,3"])
-        .write_stdin("a\nb\nc")
-        .assert();
+    let assert = cmd.args(["--lines", "1,3"]).write_stdin("a\nb\nc").assert();
 
     assert.success().stdout("a\nc\n");
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd
-        .args(["--lines", "3,1"])
-        .write_stdin("a\nb\nc")
-        .assert();
+    let assert = cmd.args(["--lines", "3,1"]).write_stdin("a\nb\nc").assert();
 
     assert.success().stdout("c\na\n");
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd
-        .args(["--lines", "2:3"])
-        .write_stdin("a\nb\nc")
-        .assert();
+    let assert = cmd.args(["--lines", "2:3"]).write_stdin("a\nb\nc").assert();
 
     assert.success().stdout("b\nc\n");
 
