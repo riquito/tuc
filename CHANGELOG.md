@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 - feat: smaller binaries by removing unnecessary (to us) regex features
+- feat: regex cargo feature is enabled by default
 
 ## [0.11.0] - 2022-06-20
 
