@@ -13,7 +13,7 @@ jobs:
     name: Check if safe to release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -68,7 +68,7 @@ jobs:
             ext: ".exe"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Build project
         run: cargo build --release --locked --features ${{ matrix.features }}
@@ -101,7 +101,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install ARM target
         run: rustup update && rustup target add aarch64-apple-darwin
