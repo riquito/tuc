@@ -5,7 +5,7 @@
 
 You want to `cut` on more than just a character, perhaps using negative indexes 
 or format the selected fields as you want...
-Maybe you want to cut on lines (ever needed to drop first and last line?)...
+Maybe you want to cut on lines (ever needed to drop or keep first and last line?)...
 That's where `tuc` can help.
 
 ## Install
@@ -16,7 +16,7 @@ or run
 
 ```sh
 # requires rustc >= 1.61.0
-cargo install tuc # append `--features regex` if you want regex support
+cargo install tuc # append `--no-default-features` for a smaller binary with no regex support
 ```
 
 For other installation methods, check below the [community managed packages](#community-managed-packages)
@@ -28,7 +28,7 @@ No time to install it? Play with a webassembly version online, the [tuc playgrou
 ## Help
 
 ```
-tuc 0.12.0 [UNRELEASED]
+tuc 1.0.0
 Cut text (or bytes) where a delimiter matches, then keep the desired parts.
 
 The data is read from standard input.
@@ -169,7 +169,7 @@ cba
 ```
 
 ```sh
-# Cut using regular expressions (requires a release with regex features enabled)
+# Cut using regular expressions
 ❯ echo "a,b, c" | tuc -e '[, ]+' -f 1,3
 ac
 ```
@@ -193,12 +193,14 @@ ac
 ```
 
 ```sh
-# Keep non-matching fields
+# Discard selected fields, keep the rest
 ❯ echo "a b c" | tuc --complement -d ' ' -f 2
 ac
 ```
 
 ## Community-Managed Packages
+
+Heartfelt thanks to package maintainers: you make it easy to access open source software ❤️
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/tuc-cut.svg)](https://repology.org/project/tuc-cut/versions)
 
