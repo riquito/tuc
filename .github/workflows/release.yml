@@ -6,7 +6,7 @@ defaults:
 
 on:
   push:
-    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
 
 jobs:
   check_if_safe:
@@ -56,25 +56,30 @@ jobs:
     runs-on: ${{ matrix.partial_os }}-latest
     strategy:
       matrix:
-        features: [default, regex]
+        release_type: [full, lite]
         partial_os: [ubuntu, macos, windows]
-        ext: ["", ".exe"]
+        ext: ['', '.exe']
         exclude:
           - partial_os: windows
-            ext: ""
+            ext: ''
           - partial_os: ubuntu
-            ext: ".exe"
+            ext: '.exe'
           - partial_os: macos
-            ext: ".exe"
+            ext: '.exe'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Build project
-        run: cargo build --release --locked --features ${{ matrix.features }}
+      - name: Build tuc (full)
+        if: matrix.release_type == 'full'
+        run: cargo build --release --locked
 
-      - name: Upload "no features" binary to release
-        if: matrix.features == 'default'
+      - name: Build tuc (lite)
+        if: matrix.release_type == 'lite'
+        run: cargo build --release --locked --no-default-features
+
+      - name: Upload tuc (full) binary to release
+        if: matrix.release_type == 'full'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -83,13 +88,13 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
 
-      - name: Upload "regex" binary to release
-        if: matrix.features == 'regex'
+      - name: Upload tuc (lite) binary to release
+        if: matrix.release_type == 'lite'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/release/tuc${{ matrix.ext }}
-          asset_name: tuc-regex-${{ matrix.partial_os }}-amd64${{ matrix.ext }}
+          asset_name: tuc-lite-${{ matrix.partial_os }}-amd64${{ matrix.ext }}
           tag: ${{ github.ref }}
           overwrite: true
 
@@ -97,7 +102,7 @@ jobs:
     needs: check_if_safe
     strategy:
       matrix:
-        features: [default, regex]
+        release_type: [full, lite]
     runs-on: macos-latest
 
     steps:
@@ -106,14 +111,16 @@ jobs:
       - name: Install ARM target
         run: rustup update && rustup target add aarch64-apple-darwin
 
-      - name: Test
-        run: cargo test --release
+      - name: Build ARM tuc (full)
+        if: matrix.release_type == 'full'
+        run: cargo build --release --target=aarch64-apple-darwin --locked
 
-      - name: Build ARM
-        run: cargo build --release --target=aarch64-apple-darwin --locked --features ${{ matrix.features }}
+      - name: Build ARM tuc (lite)
+        if: matrix.release_type == 'lite'
+        run: cargo build --release --target=aarch64-apple-darwin --locked --no-default-features
 
-      - name: Upload "no features" binary to release
-        if: matrix.features == 'default'
+      - name: Upload tuc (full) binary to release
+        if: matrix.release_type == 'full'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -122,12 +129,12 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
 
-      - name: Upload "regex" binary to release
-        if: matrix.features == 'regex'
+      - name: Upload tuc (lite) binary to release
+        if: matrix.release_type == 'lite'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/release/tuc
-          asset_name: tuc-regex-macos-aarch64
+          asset_name: tuc-lite-macos-aarch64
           tag: ${{ github.ref }}
           overwrite: true
