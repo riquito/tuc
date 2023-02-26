@@ -124,7 +124,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/tuc
+          file: target/aarch64-apple-darwin/release/tuc
           asset_name: tuc-macos-aarch64
           tag: ${{ github.ref }}
           overwrite: true
@@ -134,7 +134,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/tuc
+          file: target/aarch64-apple-darwin/release/tuc
           asset_name: tuc-lite-macos-aarch64
           tag: ${{ github.ref }}
           overwrite: true
