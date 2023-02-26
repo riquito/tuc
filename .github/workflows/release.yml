@@ -87,6 +87,7 @@ jobs:
           asset_name: tuc-${{ matrix.partial_os }}-amd64${{ matrix.ext }}
           tag: ${{ github.ref }}
           overwrite: true
+          prerelease: true
 
       - name: Upload tuc (lite) binary to release
         if: matrix.release_type == 'lite'
@@ -97,6 +98,7 @@ jobs:
           asset_name: tuc-lite-${{ matrix.partial_os }}-amd64${{ matrix.ext }}
           tag: ${{ github.ref }}
           overwrite: true
+          prerelease: true
 
   macos_arm:
     needs: check_if_safe
@@ -128,6 +130,7 @@ jobs:
           asset_name: tuc-macos-aarch64
           tag: ${{ github.ref }}
           overwrite: true
+          prerelease: true
 
       - name: Upload tuc (lite) binary to release
         if: matrix.release_type == 'lite'
@@ -138,3 +141,4 @@ jobs:
           asset_name: tuc-lite-macos-aarch64
           tag: ${{ github.ref }}
           overwrite: true
+          prerelease: true
