@@ -75,7 +75,7 @@ OPTIONS:
                                   Implies --join. To merge lines, use --no-join
     -d, --delimiter <delimiter>   Delimiter used by --fields to cut the text
                                   [default: \t]
-    -e, --regex                   Use a regular expression as delimiter
+    -e, --regex <some regex>      Use a regular expression as delimiter
     -r, --replace-delimiter <new> Replace the delimiter with the provided text
     -t, --trim <type>             Trim the delimiter (greedy). Valid values are
                                   (l|L)eft, (r|R)ight, (b|B)oth
