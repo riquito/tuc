@@ -88,6 +88,9 @@ OPTIONS
 |        Delimiter used by --fields to cut the text
 |        [default: \\t]
 
+| **-e**, **--regex** [some regex]
+|        Use a regular expression as delimiter
+
 | **-r**, **--replace-delimiter** [new delimiter]
 |        Replace the delimiter with the provided text
 
