@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- doc: README, man, --help now mention that --regex requires an argument
+- fix: --regex display the correct error message when argument is missing
+
+## [1.0.0] - 2023-02-25
+
 - feat: smaller binaries by removing unnecessary (to us) regex features
 - feat: regex cargo feature is enabled by default
 
