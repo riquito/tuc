@@ -127,21 +127,18 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let regex_bag = None;
 
     #[cfg(feature = "regex")]
-    let regex_bag: Option<RegexBag> =
-        if let Ok(Some(regex_text)) = pargs.opt_value_from_str::<_, String>(["-e", "--regex"]) {
-            Some(RegexBag {
-                normal: Regex::new(&regex_text).unwrap_or_else(|e| {
-                    eprintln!("tuc: runtime error. The regular expression is malformed. {e}");
-                    std::process::exit(1);
-                }),
-                greedy: Regex::new(&format!("({})+", &regex_text)).unwrap_or_else(|e| {
-                    eprintln!("tuc: runtime error. The regular expression is malformed. {e}");
-                    std::process::exit(1);
-                }),
-            })
-        } else {
-            None
-        };
+    let regex_bag: Option<RegexBag> = pargs
+        .opt_value_from_str::<_, String>(["-e", "--regex"])?
+        .map(|regex_text| RegexBag {
+            normal: Regex::new(&regex_text).unwrap_or_else(|e| {
+                eprintln!("tuc: runtime error. The regular expression is malformed. {e}");
+                std::process::exit(1);
+            }),
+            greedy: Regex::new(&format!("({})+", &regex_text)).unwrap_or_else(|e| {
+                eprintln!("tuc: runtime error. The regular expression is malformed. {e}");
+                std::process::exit(1);
+            }),
+        });
 
     if regex_bag.is_some() && !cfg!(feature = "regex") {
         eprintln!("tuc: runtime error. This version of tuc was compiled without regex support");
