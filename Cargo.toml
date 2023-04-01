@@ -22,7 +22,7 @@ regex = { version = "1.7", default-features = false, features = ["std", "unicode
 default = ["regex"]
 
 [dev-dependencies]
-assert_cmd = "2.0.8"
+assert_cmd = "2.0.10"
 
 [profile.release]
 lto = true
