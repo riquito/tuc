@@ -13,7 +13,7 @@ jobs:
     name: Check if safe to release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -68,7 +68,7 @@ jobs:
             ext: '.exe'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Build tuc (full)
         if: matrix.release_type == 'full'
@@ -108,7 +108,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install ARM target
         run: rustup update && rustup target add aarch64-apple-darwin
