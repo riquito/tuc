@@ -14,8 +14,10 @@ fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usiz
         // full match => no match
         (0, end) if end == parts_length => Vec::new(),
         // match left side => match right side
+        #[allow(clippy::single_range_in_vec_init)]
         (0, right) => vec![right..parts_length],
         // match right side => match left side
+        #[allow(clippy::single_range_in_vec_init)]
         (left, end) if end == parts_length => vec![0..left],
         // match middle of string => match before and after
         (left, right) => vec![0..left, right..parts_length],
