@@ -102,64 +102,21 @@ bazbarfoo
 ```
 
 ```sh
-# ...and apply back the delimiter...
-❯ echo "foo bar baz" | tuc -j -d ' ' -f 3,2,1
+# ...and join them back with the same delimiter
+❯ echo "foo bar baz" | tuc -d ' ' -f 3,2,1 -j
 baz bar foo
 ```
 
 ```sh
-# ...or replace it
-❯ echo "foo bar baz" | tuc -j -r ' ➡ ' -d ' ' -f 3,2,1
-baz ➡ bar ➡ foo
+# Replace the delimiter with something else
+❯ echo "foo bar baz" | tuc -d ' ' -r ' ➡ '
+foo ➡ bar ➡ baz
 ```
 
 ```sh
-# Keep ranges
+# Keep a range of fields
 ❯ echo "foo bar    baz" | tuc -d ' ' -f 2:
 bar    baz
-```
-
-```sh
-# Cut using a greedy delimiter
-❯ echo "foo    bar" | tuc -g -d ' ' -f 1,2
-foobar
-```
-
-```sh
-# Format output
-❯ echo "foo bar baz" | tuc -d ' ' -f '{1}, {2} and lastly {3}'
-foo, bar and lastly baz
-# Support \n
-❯ echo "100Kb README.txt 2049-02-01" | tuc -d ' ' -f '{2}\n├── {1}\n└── {3}'
-README.txt
-├── 100Kb
-└── 2049-02-01
-```
-
-```sh
-# Cut lines (e.g. drop first and last line)
-❯ printf "a\nb\nc\nd\ne" | tuc -l 2:-2
-b
-c
-d
-```
-
-```sh
-# Concatenate lines
-❯ printf "a\nb\nc\nd\ne" | tuc -l 1,2 --no-join
-ab
-```
-
-```sh
-# Compress delimiters after cut
-❯ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p
-bar baz
-```
-
-```sh
-# Replace remaining delimiters with something else
-❯ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p -r ' -> '
-bar -> baz
 ```
 
 ```sh
@@ -178,6 +135,49 @@ ac
 # Delimiters can be any number of characters long
 ❯ echo "a<sep>b<sep>c" | tuc -d '<sep>' -f 1,3
 ac
+```
+
+```sh
+# Cut using a greedy delimiter
+❯ echo "foo    bar" | tuc -d ' ' -f 1,2 -g
+foobar
+```
+
+```sh
+# Format output
+❯ echo "foo bar baz" | tuc -d ' ' -f '{1}, {2} and lastly {3}'
+foo, bar and lastly baz
+# ...with support for \n
+❯ echo "100Kb README.txt 2049-02-01" | tuc -d ' ' -f '{2}\n├── {1}\n└── {3}'
+README.txt
+├── 100Kb
+└── 2049-02-01
+```
+
+```sh
+# Cut lines (e.g. keep everything between first and last line)
+❯ printf "a\nb\nc\nd\ne" | tuc -l 2:-2
+b
+c
+d
+```
+
+```sh
+# Concatenate lines (-l implies join with \n, so we need --no-join)
+❯ printf "a\nb\nc\nd\ne" | tuc -l 1,2 --no-join
+ab
+```
+
+```sh
+# Compress delimiters after cut
+❯ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p
+bar baz
+```
+
+```sh
+# Replace remaining delimiters with something else
+❯ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p -r ' -> '
+bar -> baz
 ```
 
 ```sh
