@@ -117,11 +117,25 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         _ => String::new(),
     };
 
+    let greedy_delimiter = pargs.contains(["-g", "--greedy-delimiter"]);
+    let replace_delimiter = pargs.opt_value_from_str(["-r", "--replace-delimiter"])?;
+
     let has_join = pargs.contains(["-j", "--join"]);
     let has_no_join = pargs.contains("--no-join");
-    let join = has_join || (bounds_type == BoundsType::Lines && !has_no_join);
 
-    let greedy_delimiter = pargs.contains(["-g", "--greedy-delimiter"]);
+    if has_join && has_no_join {
+        eprintln!("tuc: runtime error. You can't pass both --join and --no-join");
+        std::process::exit(1);
+    }
+
+    if replace_delimiter.is_some() && has_no_join {
+        eprintln!("tuc: runtime error. Since --replace implies --join, you can't pass --no-join");
+        std::process::exit(1);
+    }
+
+    let join = has_join
+        || replace_delimiter.is_some()
+        || (bounds_type == BoundsType::Lines && !has_no_join);
 
     #[cfg(not(feature = "regex"))]
     let regex_bag = None;
@@ -164,7 +178,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             .or(maybe_bytes)
             .or(maybe_lines)
             .unwrap(),
-        replace_delimiter: pargs.opt_value_from_str(["-r", "--replace-delimiter"])?,
+        replace_delimiter,
         trim: pargs.opt_value_from_str(["-t", "--trim"])?,
         regex_bag,
     };

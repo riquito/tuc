@@ -184,7 +184,7 @@ fn it_join_fields() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(["-d", " ", "-f", "1,3", "-j", "-r", "/"])
+        .args(["-d", " ", "-f", "1,3", "-r", "/"])
         .write_stdin("a b c")
         .assert();
 
@@ -300,4 +300,40 @@ fn it_accept_any_kind_of_range_as_long_as_its_safe() {
     assert
         .failure()
         .stderr("Error: Field left value cannot be greater than right value\n");
+}
+
+#[test]
+fn it_fails_if_there_are_unknown_arguments() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["--whatever"]).write_stdin("foobar").assert();
+
+    assert.failure().stderr(
+        "tuc: unexpected arguments [\"--whatever\"]\nTry 'tuc --help' for more information.\n",
+    );
+}
+
+#[test]
+fn it_fails_if_both_join_and_nojoin_are_used_at_once() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["-j", "--no-join"]).write_stdin("foobar").assert();
+
+    assert
+        .failure()
+        .stderr("tuc: runtime error. You can't pass both --join and --no-join\n");
+}
+
+#[test]
+fn it_fails_if_both_replace_and_nojoin_are_used_at_once() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["-r", "x", "--no-join"])
+        .write_stdin("foobar")
+        .assert();
+
+    assert
+        .failure()
+        .stderr("tuc: runtime error. Since --replace implies --join, you can't pass --no-join\n");
 }
