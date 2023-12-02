@@ -337,3 +337,33 @@ fn it_fails_if_both_replace_and_nojoin_are_used_at_once() {
         .failure()
         .stderr("tuc: runtime error. Since --replace implies --join, you can't pass --no-join\n");
 }
+
+#[cfg(feature = "regex")]
+#[test]
+fn it_fails_when_the_regex_is_malformed() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["-e", "["]).write_stdin("foobar").assert();
+
+    assert.failure().stderr(predicates::str::starts_with(
+        "tuc: runtime error. The regular expression is malformed.",
+    ));
+
+    let assert = cmd.args(["-e", "[", "-g"]).write_stdin("foobar").assert();
+
+    assert.failure().stderr(predicates::str::starts_with(
+        "tuc: runtime error. The regular expression is malformed.",
+    ));
+}
+
+#[cfg(not(feature = "regex"))]
+#[test]
+fn does_not_panic_if_attemtping_to_use_regex_arg_with_noregex_build() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["-e", "."]).write_stdin("foobar").assert();
+
+    assert.failure().stderr(
+        "tuc: unexpected arguments [\"-e\", \".\"]\nTry 'tuc --help' for more information.\n",
+    );
+}
