@@ -48,6 +48,16 @@ jobs:
           command: test
           args: --all-features
 
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-default-features
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-default-features --features regex
+
   dependabot:
     needs: check_if_safe_to_merge
     runs-on: ubuntu-latest
