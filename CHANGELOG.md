@@ -6,8 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-- doc: README, man, --help now mention that --regex requires an argument
-- fix: --regex display the correct error message when argument is missing
+## [1.1.0] - 2023-12-02
+
+- feat: no more need to pass --join when using --replace, it's implied
+- feat: new error messages when applying some incompatible options
+- doc: improved documentation, help, man page
+- doc: mention that --regex requires an argument
+- test: improved test coverage
+- fix: better error message when --regex argument is missing
 
 ## [1.0.0] - 2023-02-25
 
