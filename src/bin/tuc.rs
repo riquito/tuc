@@ -109,6 +109,13 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         BoundsType::Fields
     };
 
+    if bounds_type == BoundsType::Fields
+        && (maybe_fields.is_none() || maybe_fields.as_ref().unwrap().0.is_empty())
+    {
+        eprintln!("tuc: invariant error. At least 1 field bound is expected with --fields");
+        std::process::exit(1);
+    }
+
     let delimiter = match bounds_type {
         BoundsType::Fields => pargs
             .opt_value_from_str(["-d", "--delimiter"])?
