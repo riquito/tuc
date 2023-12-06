@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- fix: field formatting is now applied to field 1 even if it's the only
+       one present and with no delimiters around
+
 ## [1.1.0] - 2023-12-02
 
 - feat: no more need to pass --join when using --replace, it's implied
