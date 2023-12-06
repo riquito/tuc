@@ -1,4 +1,4 @@
-use crate::bounds::{BoundsType, UserBoundsList};
+use crate::bounds::{BoundOrFiller, BoundsType, UserBounds, UserBoundsList};
 use anyhow::Result;
 use std::str::FromStr;
 
@@ -44,7 +44,7 @@ impl Default for Opt {
         Opt {
             delimiter: String::from("-"),
             eol: EOL::Newline,
-            bounds: UserBoundsList(Vec::new()),
+            bounds: UserBoundsList(vec![BoundOrFiller::Bound(UserBounds::default())]),
             bounds_type: BoundsType::Fields,
             only_delimited: false,
             greedy_delimiter: false,

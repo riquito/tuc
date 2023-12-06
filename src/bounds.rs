@@ -334,7 +334,7 @@ impl PartialEq for UserBounds {
 
 impl Default for UserBounds {
     fn default() -> Self {
-        UserBounds::new(Side::Some(1), Side::Some(1))
+        UserBounds::new(Side::Some(1), Side::Continue)
     }
 }
 
@@ -502,6 +502,11 @@ mod tests {
                 Side::Some(1),
                 Side::Some(1)
             ))],
+        );
+
+        assert_eq!(
+            parse_bounds_list("1:").unwrap(),
+            vec![BoundOrFiller::Bound(UserBounds::default())],
         );
 
         assert_eq!(
