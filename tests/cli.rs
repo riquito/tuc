@@ -248,6 +248,15 @@ fn it_format_fields() {
 }
 
 #[test]
+fn it_format_field_1_even_with_no_matching_parameters() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["-f", "Say {1}"]).write_stdin("hello").assert();
+
+    assert.success().stdout("Say hello\n");
+}
+
+#[test]
 fn it_cuts_using_a_greedy_delimiter() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 

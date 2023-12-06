@@ -263,7 +263,7 @@ pub fn cut_str<W: Write>(
 
     match bounds_as_ranges.len() {
         1 if opt.only_delimited => (),
-        1 => {
+        1 if opt.bounds.0.len() == 1 => {
             stdout.write_all(line.as_bytes())?;
             stdout.write_all(eol)?;
         }
