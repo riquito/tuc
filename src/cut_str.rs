@@ -3,6 +3,7 @@ use std::io::{BufRead, Write};
 use std::ops::Range;
 
 use crate::bounds::{bounds_to_std_range, BoundOrFiller, BoundsType};
+use crate::json::escape_json;
 use crate::options::{Opt, Trim};
 use crate::read_utils::read_line_with_eol;
 
@@ -170,6 +171,18 @@ fn trim_regex<'a>(line: &'a str, trim_kind: &Trim, re: &Regex) -> &'a str {
     &line[idx_start..idx_end]
 }
 
+macro_rules! write_maybe_as_json {
+    ($writer:ident, $to_print:ident, $as_json:expr) => {{
+        if $as_json {
+            $writer.write_all(b"\"")?;
+            $writer.write_all(&escape_json(&$to_print).as_bytes())?;
+            $writer.write_all(b"\"")?;
+        } else {
+            $writer.write_all($to_print.as_bytes())?;
+        }
+    }};
+}
+
 pub fn cut_str<W: Write>(
     line: &str,
     opt: &Opt,
@@ -261,11 +274,19 @@ pub fn cut_str<W: Write>(
         bounds_as_ranges.drain(..1);
     }
 
+    if opt.only_delimited && bounds_as_ranges.len() == 1 {
+        // If there's only 1 field it means that there were no delimiters
+        // and when used alogside `only_delimited` we must skip the line
+        return Ok(());
+    }
+
+    if opt.json {
+        stdout.write_all(b"[")?;
+    }
+
     match bounds_as_ranges.len() {
-        1 if opt.only_delimited => (),
         1 if opt.bounds.0.len() == 1 => {
-            stdout.write_all(line.as_bytes())?;
-            stdout.write_all(eol)?;
+            write_maybe_as_json!(stdout, line, opt.json);
         }
         _ => {
             opt.bounds
@@ -281,23 +302,33 @@ pub fn cut_str<W: Write>(
                         BoundOrFiller::Bound(b) => b,
                     };
 
-                    let r_array = [bounds_to_std_range(bounds_as_ranges.len(), b)?];
-                    let mut r_iter = r_array.iter();
-                    let _complements;
-                    let mut n_ranges = 1;
+                    let mut r_array = vec![bounds_to_std_range(bounds_as_ranges.len(), b)?];
 
                     if opt.complement {
-                        _complements = complement_std_range(bounds_as_ranges.len(), &r_array[0]);
-                        r_iter = _complements.iter();
-                        n_ranges = _complements.len();
+                        r_array = complement_std_range(bounds_as_ranges.len(), &r_array[0]);
                     }
+
+                    if opt.json {
+                        r_array = r_array
+                            .iter()
+                            .flat_map(|r| r.start..r.end)
+                            .map(|i| Range {
+                                start: i,
+                                end: i + 1,
+                            })
+                            .collect();
+                    }
+
+                    let r_iter = r_array.iter();
+                    let n_ranges = r_array.len();
 
                     for (idx_r, r) in r_iter.enumerate() {
                         let idx_start = bounds_as_ranges[r.start].start;
                         let idx_end = bounds_as_ranges[r.end - 1].end;
                         let output = &line[idx_start..idx_end];
 
-                        stdout.write_all(maybe_replace_delimiter(output, opt).as_bytes())?;
+                        let field_to_print = maybe_replace_delimiter(output, opt);
+                        write_maybe_as_json!(stdout, field_to_print, opt.json);
 
                         if opt.join && !(i == opt.bounds.0.len() - 1 && idx_r == n_ranges - 1) {
                             stdout.write_all(
@@ -311,10 +342,14 @@ pub fn cut_str<W: Write>(
 
                     Ok(())
                 })?;
-
-            stdout.write_all(eol)?;
         }
     }
+
+    if opt.json {
+        stdout.write_all(b"]")?;
+    }
+
+    stdout.write_all(eol)?;
 
     Ok(())
 }
