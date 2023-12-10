@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- feat: new option --json to format output as JSON array
 - fix: field formatting is now applied to field 1 even if it's the only
        one present and with no delimiters around
 
