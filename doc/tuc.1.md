@@ -46,6 +46,8 @@ FLAGS
 -j, \--(no-)join
 :   Print selected parts with delimiter in between
 
+\--json
+:   Print fields as a JSON array of strings
 
 OPTIONS
 =======

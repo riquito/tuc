@@ -33,7 +33,7 @@ FLAGS:
     -h, --help                    Print this help and exit
     -m, --complement              Invert fields (e.g. '2' becomes '1,3:')
     -j, --(no-)join               Print selected parts with delimiter in between
-    --json                        Print fields in a JSON array
+    --json                        Print fields as a JSON array of strings
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
