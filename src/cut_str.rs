@@ -935,4 +935,68 @@ mod tests {
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"abc\n".as_slice());
     }
+
+    #[test]
+    fn cut_str_it_produce_json_output() {
+        let mut opt = make_fields_opt();
+        opt.json = true;
+        opt.replace_delimiter = Some(",".to_owned());
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a-b-c";
+        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
+        opt.join = true;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(
+            output,
+            br#"["a","c"]
+"#
+            .as_slice()
+        );
+    }
+
+    #[test]
+    fn cut_str_it_json_with_single_field_is_still_an_array() {
+        let mut opt = make_fields_opt();
+        opt.json = true;
+        opt.replace_delimiter = Some(",".to_owned());
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a-b-c";
+        opt.bounds = UserBoundsList::from_str("1").unwrap();
+        opt.join = true;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(
+            output,
+            br#"["a"]
+"#
+            .as_slice()
+        );
+    }
+
+    #[test]
+    fn cut_str_complement_works_with_json() {
+        let mut opt = make_fields_opt();
+        opt.json = true;
+        opt.replace_delimiter = Some(",".to_owned());
+        opt.complement = true;
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "a-b-c";
+        opt.bounds = UserBoundsList::from_str("2,2:3,-1").unwrap();
+        opt.join = true;
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(
+            output,
+            br#"["a","c","a","a","b"]
+"#
+            .as_slice()
+        );
+    }
 }
