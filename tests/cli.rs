@@ -376,3 +376,29 @@ fn does_not_panic_if_attemtping_to_use_regex_arg_with_noregex_build() {
         "tuc: unexpected arguments [\"-e\", \".\"]\nTry 'tuc --help' for more information.\n",
     );
 }
+
+#[test]
+fn it_emit_output_as_json() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["--json", "-d", "/", "-f", "1,2,1:3"])
+        .write_stdin("a/b/c/d")
+        .assert();
+
+    assert.success().stdout(
+        r#"["a","b","a","b","c"]
+"#,
+    );
+}
+
+#[test]
+fn it_does_not_allow_to_replace_delimiter_with_json() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["--json", "-r", "x"]).assert();
+
+    assert
+        .failure()
+        .stderr("tuc: runtime error. Cannot use --json and --join together\n");
+}
