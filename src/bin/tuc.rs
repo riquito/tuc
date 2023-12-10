@@ -33,6 +33,7 @@ FLAGS:
     -h, --help                    Print this help and exit
     -m, --complement              Invert fields (e.g. '2' becomes '1,3:')
     -j, --(no-)join               Print selected parts with delimiter in between
+    --json                        Print fields in a JSON array
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
@@ -166,7 +167,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         std::process::exit(1);
     }
 
-    let args = Opt {
+    let mut args = Opt {
         complement: pargs.contains(["-m", "--complement"]),
         only_delimited: pargs.contains(["-s", "--only-delimited"]),
         greedy_delimiter,
@@ -178,6 +179,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             EOL::Newline
         },
         join,
+        json: pargs.contains("--json"),
         delimiter,
         bounds_type,
         bounds: maybe_fields
@@ -192,6 +194,19 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
 
     let remaining = pargs.finish();
 
+    if args.json && args.join {
+        eprintln!("tuc: runtime error. Cannot use --json and --join together");
+        std::process::exit(1);
+    } else if args.json
+        && args.bounds_type != BoundsType::Characters
+        && args.bounds_type != BoundsType::Fields
+    {
+        eprintln!(
+            "tuc: runtime error. --json support is available only for --fields and --characters"
+        );
+        std::process::exit(1);
+    }
+
     if args.version {
         println!("tuc {}", env!("CARGO_PKG_VERSION"));
         std::process::exit(0);
@@ -201,6 +216,11 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         eprintln!("tuc: unexpected arguments {remaining:?}");
         eprintln!("Try 'tuc --help' for more information.");
         std::process::exit(1);
+    }
+
+    if args.json {
+        args.replace_delimiter = Some(",".to_owned());
+        args.join = true
     }
 
     Ok(args)
