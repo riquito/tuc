@@ -984,7 +984,7 @@ mod tests {
     }
 
     #[test]
-    fn cut_str_it_json_with_single_field_is_still_an_array() {
+    fn cut_str_json_with_single_field_is_still_an_array() {
         let mut opt = make_fields_opt();
         opt.json = true;
         opt.replace_delimiter = Some(",".to_owned());
@@ -1023,6 +1023,28 @@ mod tests {
             br#"["a","c","a","a","b"]
 "#
             .as_slice()
+        );
+    }
+
+    #[test]
+    fn cut_str_json_on_characters_works() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "😁🤩😝😎";
+        opt.bounds = UserBoundsList::from_str("1,2,3:4").unwrap();
+        opt.bounds_type = BoundsType::Characters;
+        opt.delimiter = String::new();
+        opt.join = true;
+        opt.json = true;
+        opt.replace_delimiter = Some(",".to_owned());
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(
+            &String::from_utf8_lossy(&output),
+            r#"["\uD83D\uDE01","\uD83E\uDD29","\uD83D\uDE1D","\uD83D\uDE0E"]
+"#
         );
     }
 }
