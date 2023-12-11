@@ -65,7 +65,8 @@ OPTIONS:
     -d, --delimiter <delimiter>   Delimiter used by --fields to cut the text
                                   [default: \t]
     -e, --regex <some regex>      Use a regular expression as delimiter
-    -r, --replace-delimiter <new> Replace the delimiter with the provided text
+    -r, --replace-delimiter <new> Replace the delimiter with the provided text.
+                                  Implies --join
     -t, --trim <type>             Trim the delimiter (greedy). Valid values are
                                   (l|L)eft, (r|R)ight, (b|B)oth
 
@@ -126,8 +127,9 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     };
 
     let greedy_delimiter = pargs.contains(["-g", "--greedy-delimiter"]);
-    let replace_delimiter = pargs.opt_value_from_str(["-r", "--replace-delimiter"])?;
+    let mut replace_delimiter = pargs.opt_value_from_str(["-r", "--replace-delimiter"])?;
 
+    let has_json = pargs.contains("--json");
     let has_join = pargs.contains(["-j", "--join"]);
     let has_no_join = pargs.contains("--no-join");
 
@@ -136,14 +138,38 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         std::process::exit(1);
     }
 
-    if replace_delimiter.is_some() && has_no_join {
-        eprintln!("tuc: runtime error. Since --replace implies --join, you can't pass --no-join");
+    if has_json && has_no_join {
+        eprintln!("tuc: runtime error. Cannot use --json and --no-join together");
         std::process::exit(1);
     }
 
+    if replace_delimiter.is_some() {
+        if has_no_join {
+            eprintln!(
+                "tuc: runtime error. Since --replace implies --join, you can't pass --no-join"
+            );
+            std::process::exit(1);
+        } else if has_json {
+            eprintln!("tuc: runtime error. Cannot use --replace with --json");
+            std::process::exit(1);
+        }
+    }
+
+    if has_json {
+        replace_delimiter = Some(",".to_owned());
+    }
+
     let join = has_join
+        || has_json
         || replace_delimiter.is_some()
         || (bounds_type == BoundsType::Lines && !has_no_join);
+
+    if has_json && bounds_type != BoundsType::Characters && bounds_type != BoundsType::Fields {
+        eprintln!(
+            "tuc: runtime error. --json support is available only for --fields and --characters"
+        );
+        std::process::exit(1);
+    }
 
     #[cfg(not(feature = "regex"))]
     let regex_bag = None;
@@ -167,7 +193,23 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         std::process::exit(1);
     }
 
-    let mut args = Opt {
+    let bounds = maybe_fields
+        .or(maybe_characters)
+        .or(maybe_bytes)
+        .or(maybe_lines)
+        .unwrap();
+
+    if has_json
+        && bounds
+            .0
+            .iter()
+            .any(|s| matches!(s, BoundOrFiller::Filler(_)))
+    {
+        eprintln!("tuc: runtime error. Cannot format fields when using --json");
+        std::process::exit(1);
+    }
+
+    let args = Opt {
         complement: pargs.contains(["-m", "--complement"]),
         only_delimited: pargs.contains(["-s", "--only-delimited"]),
         greedy_delimiter,
@@ -179,33 +221,16 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             EOL::Newline
         },
         join,
-        json: pargs.contains("--json"),
+        json: has_json,
         delimiter,
         bounds_type,
-        bounds: maybe_fields
-            .or(maybe_characters)
-            .or(maybe_bytes)
-            .or(maybe_lines)
-            .unwrap(),
+        bounds,
         replace_delimiter,
         trim: pargs.opt_value_from_str(["-t", "--trim"])?,
         regex_bag,
     };
 
     let remaining = pargs.finish();
-
-    if args.json && args.join {
-        eprintln!("tuc: runtime error. Cannot use --json and --join together");
-        std::process::exit(1);
-    } else if args.json
-        && args.bounds_type != BoundsType::Characters
-        && args.bounds_type != BoundsType::Fields
-    {
-        eprintln!(
-            "tuc: runtime error. --json support is available only for --fields and --characters"
-        );
-        std::process::exit(1);
-    }
 
     if args.version {
         println!("tuc {}", env!("CARGO_PKG_VERSION"));
@@ -216,11 +241,6 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         eprintln!("tuc: unexpected arguments {remaining:?}");
         eprintln!("Try 'tuc --help' for more information.");
         std::process::exit(1);
-    }
-
-    if args.json {
-        args.replace_delimiter = Some(",".to_owned());
-        args.join = true
     }
 
     Ok(args)

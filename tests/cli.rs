@@ -400,5 +400,5 @@ fn it_does_not_allow_to_replace_delimiter_with_json() {
 
     assert
         .failure()
-        .stderr("tuc: runtime error. Cannot use --json and --join together\n");
+        .stderr("tuc: runtime error. Cannot use --replace with --json\n");
 }
