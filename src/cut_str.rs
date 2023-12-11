@@ -116,7 +116,9 @@ fn compress_delimiter_with_regex<'a>(
 
 #[cfg(feature = "regex")]
 fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a, str> {
-    if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
+    if opt.bounds_type == BoundsType::Characters {
+        std::borrow::Cow::Borrowed(text)
+    } else if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
         if let Some(re_bag) = &opt.regex_bag {
             re_bag.normal.replace_all(text, new_delimiter)
         } else {
@@ -129,7 +131,9 @@ fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a,
 
 #[cfg(not(feature = "regex"))]
 fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a, str> {
-    if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
+    if opt.bounds_type == BoundsType::Characters {
+        std::borrow::Cow::Borrowed(text)
+    } else if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
         std::borrow::Cow::Owned(text.replace(&opt.delimiter, new_delimiter))
     } else {
         std::borrow::Cow::Borrowed(text)
@@ -713,6 +717,28 @@ mod tests {
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, "🤩\n".as_bytes());
+    }
+
+    #[test]
+    fn cut_str_it_cut_characters_and_replace_the_delimiter() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = "😁🤩😝😎";
+        opt.bounds = UserBoundsList::from_str("1,2,3:4").unwrap();
+        opt.bounds_type = BoundsType::Characters;
+        opt.delimiter = String::new();
+        opt.replace_delimiter = Some("-".to_owned());
+        opt.join = true; // implied when using BoundsType::Characters
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+
+        // In theory between 3:4 there is the (empty) delimiter, and we
+        // should replace it. I think that for Characters it makes more sense
+        // to replace only the delimiters between the selected bounds
+        // (for BoundsType::FIELDS instead we replace inside a ranged bound too).
+        assert_eq!(&String::from_utf8_lossy(&output), "😁-🤩-😝😎\n");
     }
 
     #[test]

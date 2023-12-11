@@ -393,6 +393,21 @@ fn it_emit_output_as_json() {
 }
 
 #[test]
+fn it_emit_output_as_json_even_when_cutting_on_chars() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["--json", "-c", "1,2,1:3"])
+        .write_stdin("abcd")
+        .assert();
+
+    assert.success().stdout(
+        r#"["a","b","a","b","c"]
+"#,
+    );
+}
+
+#[test]
 fn it_does_not_allow_to_replace_delimiter_with_json() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 

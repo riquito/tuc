@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::io::Write;
 use std::str::FromStr;
-use tuc::bounds::{BoundsType, UserBoundsList};
+use tuc::bounds::{BoundOrFiller, BoundsType, UserBoundsList};
 use tuc::cut_bytes::read_and_cut_bytes;
 use tuc::cut_lines::read_and_cut_lines;
 use tuc::cut_str::read_and_cut_str;
@@ -155,6 +155,12 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         }
     }
 
+    if bounds_type == BoundsType::Characters && has_no_join {
+        eprintln!(
+            "tuc: runtime error. Since --characters implies --join, you can't pass --no-join"
+        );
+    }
+
     if has_json {
         replace_delimiter = Some(",".to_owned());
     }
@@ -162,7 +168,8 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let join = has_join
         || has_json
         || replace_delimiter.is_some()
-        || (bounds_type == BoundsType::Lines && !has_no_join);
+        || (bounds_type == BoundsType::Lines && !has_no_join)
+        || (bounds_type == BoundsType::Characters);
 
     if has_json && bounds_type != BoundsType::Characters && bounds_type != BoundsType::Fields {
         eprintln!(
