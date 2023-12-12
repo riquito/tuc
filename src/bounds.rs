@@ -1,5 +1,6 @@
 use anyhow::{bail, Result};
 use std::cmp::Ordering;
+use std::convert::TryInto;
 use std::fmt;
 use std::ops::Range;
 use std::str::FromStr;
@@ -170,6 +171,24 @@ impl UserBoundsList {
     pub fn is_forward_only(&self) -> bool {
         self.is_sortable() && self.is_sorted() && !self.has_negative_indices()
     }
+
+    /**
+     * Create a new UserBoundsList with only the bounds (no fillers)
+     * and with every ranged bound converted into single slot bounds.
+     */
+    pub fn unpack(&self, num_fields: usize) -> UserBoundsList {
+        UserBoundsList(
+            self.0
+                .iter()
+                .filter_map(|x| match x {
+                    BoundOrFiller::Filler(_) => None,
+                    BoundOrFiller::Bound(b) => Some(b.unpack(num_fields)),
+                })
+                .flatten()
+                .map(BoundOrFiller::Bound)
+                .collect(),
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -296,6 +315,38 @@ impl UserBounds {
             (Side::Some(left), Side::Continue) if left <= idx => Ok(true),
             _ => Ok(false),
         }
+    }
+
+    /**
+     * Transform a ranged bound into a list of one or more
+     * 1 slot bound
+     */
+    pub fn unpack(&self, num_fields: usize) -> Vec<UserBounds> {
+        let mut bounds = Vec::new();
+        let n: i32 = num_fields
+            .try_into()
+            .expect("num_fields was bigger than expected");
+
+        let (start, end): (i32, i32) = match (self.l, self.r) {
+            (Side::Continue, Side::Continue) => (1, n),
+            (Side::Continue, Side::Some(right)) => {
+                (1, if right > 0 { right } else { n + 1 + right })
+            }
+            (Side::Some(left), Side::Some(right)) => (
+                if left > 0 { left } else { n + 1 + left },
+                if right > 0 { right } else { n + 1 + right },
+            ),
+            (Side::Some(left), Side::Continue) => (if left > 0 { left } else { n + 1 + left }, n),
+        };
+
+        for i in start..=end {
+            bounds.push(UserBounds {
+                l: Side::Some(i),
+                r: Side::Some(i),
+            })
+        }
+
+        bounds
     }
 }
 
@@ -570,6 +621,59 @@ mod tests {
     }
 
     #[test]
+    fn test_unpack_bound() {
+        assert_eq!(
+            UserBounds::new(Side::Some(1), Side::Some(1)).unpack(2),
+            vec![UserBounds::new(Side::Some(1), Side::Some(1))],
+        );
+
+        assert_eq!(
+            UserBounds::new(Side::Some(1), Side::Continue).unpack(2),
+            vec![
+                UserBounds::new(Side::Some(1), Side::Some(1)),
+                UserBounds::new(Side::Some(2), Side::Some(2))
+            ],
+        );
+
+        assert_eq!(
+            UserBounds::new(Side::Continue, Side::Some(2)).unpack(2),
+            vec![
+                UserBounds::new(Side::Some(1), Side::Some(1)),
+                UserBounds::new(Side::Some(2), Side::Some(2))
+            ],
+        );
+
+        assert_eq!(
+            UserBounds::new(Side::Continue, Side::Continue).unpack(2),
+            vec![
+                UserBounds::new(Side::Some(1), Side::Some(1)),
+                UserBounds::new(Side::Some(2), Side::Some(2))
+            ],
+        );
+
+        assert_eq!(
+            UserBounds::new(Side::Some(-1), Side::Continue).unpack(2),
+            vec![UserBounds::new(Side::Some(2), Side::Some(2)),],
+        );
+
+        assert_eq!(
+            UserBounds::new(Side::Continue, Side::Some(-1)).unpack(2),
+            vec![
+                UserBounds::new(Side::Some(1), Side::Some(1)),
+                UserBounds::new(Side::Some(2), Side::Some(2))
+            ],
+        );
+
+        assert_eq!(
+            UserBounds::new(Side::Some(-2), Side::Some(-1)).unpack(2),
+            vec![
+                UserBounds::new(Side::Some(1), Side::Some(1)),
+                UserBounds::new(Side::Some(2), Side::Some(2))
+            ],
+        );
+    }
+
+    #[test]
     fn test_user_bounds_is_sortable() {
         assert!(UserBoundsList(Vec::new()).is_sortable());
 
@@ -614,5 +718,27 @@ mod tests {
         assert!(!UserBoundsList::from_str("{2}foo{1}")
             .unwrap()
             .is_forward_only());
+    }
+
+    #[test]
+    fn test_vec_of_bounds_can_unpack() {
+        assert_eq!(
+            UserBoundsList::from_str("1,:1,2:3,4:").unwrap().unpack(4).0,
+            vec![
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(3), Side::Some(3))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(4), Side::Some(4))),
+            ]
+        );
+
+        assert_eq!(
+            UserBoundsList::from_str("a{1}b{2}c").unwrap().unpack(4).0,
+            vec![
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+            ]
+        );
     }
 }

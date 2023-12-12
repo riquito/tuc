@@ -2,7 +2,9 @@ use anyhow::{bail, Result};
 use std::io::{BufRead, Write};
 use std::ops::Range;
 
-use crate::bounds::{bounds_to_std_range, BoundOrFiller, BoundsType};
+use crate::bounds::{
+    bounds_to_std_range, BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList,
+};
 use crate::json::escape_json;
 use crate::options::{Opt, Trim};
 use crate::read_utils::read_line_with_eol;
@@ -288,12 +290,39 @@ pub fn cut_str<W: Write>(
         stdout.write_all(b"[")?;
     }
 
+    let _bounds: UserBoundsList;
+    let mut bounds = &opt.bounds;
+
+    if opt.bounds_type == BoundsType::Characters && opt.replace_delimiter.is_some() {
+        // Unpack bounds such as 1:3 or 2: into single character bounds
+        // such as 1:1,2:2,3:3 etc...
+        // We need it to be able to insert a replace character between every field.
+        // It can cost quite a bit and is risky because it may end up creating a
+        // char vector of the whole input (then again -c with -r is quite the
+        // rare usage).
+
+        // Start by checking if we actually need to rewrite the bounds
+        if bounds.0.iter().any(|b| {
+            matches!(
+                b,
+                BoundOrFiller::Bound(UserBounds {
+                    l: x,
+                    r: y
+                }) if x != y || x == &Side::Continue
+            )
+        }) {
+            // Yep, there at least a range bound. Let's do it
+            _bounds = bounds.unpack(bounds_as_ranges.len());
+            bounds = &_bounds;
+        }
+    }
+
     match bounds_as_ranges.len() {
-        1 if opt.bounds.0.len() == 1 => {
+        1 if bounds.0.len() == 1 => {
             write_maybe_as_json!(stdout, line, opt.json);
         }
         _ => {
-            opt.bounds
+            bounds
                 .0
                 .iter()
                 .enumerate()
@@ -334,7 +363,7 @@ pub fn cut_str<W: Write>(
                         let field_to_print = maybe_replace_delimiter(output, opt);
                         write_maybe_as_json!(stdout, field_to_print, opt.json);
 
-                        if opt.join && !(i == opt.bounds.0.len() - 1 && idx_r == n_ranges - 1) {
+                        if opt.join && !(i == bounds.0.len() - 1 && idx_r == n_ranges - 1) {
                             stdout.write_all(
                                 opt.replace_delimiter
                                     .as_ref()
@@ -733,12 +762,7 @@ mod tests {
         opt.join = true; // implied when using BoundsType::Characters
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
-
-        // In theory between 3:4 there is the (empty) delimiter, and we
-        // should replace it. I think that for Characters it makes more sense
-        // to replace only the delimiters between the selected bounds
-        // (for BoundsType::FIELDS instead we replace inside a ranged bound too).
-        assert_eq!(&String::from_utf8_lossy(&output), "😁-🤩-😝😎\n");
+        assert_eq!(&String::from_utf8_lossy(&output), "😁-🤩-😝-😎\n");
     }
 
     #[test]
