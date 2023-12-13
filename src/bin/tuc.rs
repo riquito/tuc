@@ -41,20 +41,20 @@ OPTIONS:
                                   Fields can be negative (-1 is the last field).
                                   [default 1:]
 
-                                  e.g. cutting on '-' the string 'a-b-c-d'
-                                  -f 1     => a
-                                  -f 1:    => a-b-c-d
-                                  -f 1:3   => a-b-c
-                                  -f 3,2   => cb
-                                  -f 3,1:2 => ca-b
-                                  -f -3:-2 => b-c
+                                  e.g. cutting the string 'a-b-c-d' on '-'
+                                    -f 1     => a
+                                    -f 1:    => a-b-c-d
+                                    -f 1:3   => a-b-c
+                                    -f 3,2   => cb
+                                    -f 3,1:2 => ca-b
+                                    -f -3:-2 => b-c
 
                                   To re-apply the delimiter add -j, to replace
                                   it add -r (followed by the new delimiter).
 
                                   You can also format the output using {} syntax
                                   e.g.
-                                  -f '["{1}", "{2}"]' => ["a", "b"]
+                                    -f '({1}, {2})' => (a, b)
 
                                   You can escape { and } using {{ and }}.
 
