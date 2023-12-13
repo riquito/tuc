@@ -328,9 +328,9 @@ fn it_fails_if_both_join_and_nojoin_are_used_at_once() {
 
     let assert = cmd.args(["-j", "--no-join"]).write_stdin("foobar").assert();
 
-    assert
-        .failure()
-        .stderr("tuc: runtime error. You can't pass both --join and --no-join\n");
+    assert.failure().stderr(
+        "tuc: runtime error. It's not possible to use --join and --no-join simultaneously\n",
+    );
 }
 
 #[test]
@@ -342,9 +342,9 @@ fn it_fails_if_both_replace_and_nojoin_are_used_at_once() {
         .write_stdin("foobar")
         .assert();
 
-    assert
-        .failure()
-        .stderr("tuc: runtime error. Since --replace implies --join, you can't pass --no-join\n");
+    assert.failure().stderr(
+        "tuc: runtime error. You can't pass --no-join when using --replace, which implies --join\n",
+    );
 }
 
 #[cfg(feature = "regex")]
@@ -415,5 +415,5 @@ fn it_does_not_allow_to_replace_delimiter_with_json() {
 
     assert
         .failure()
-        .stderr("tuc: runtime error. Cannot use --replace with --json\n");
+        .stderr("tuc: runtime error. The use of --replace with --json is not supported\n");
 }
