@@ -417,3 +417,47 @@ fn it_does_not_allow_to_replace_delimiter_with_json() {
         .failure()
         .stderr("tuc: runtime error. The use of --replace with --json is not supported\n");
 }
+
+#[test]
+fn it_is_not_allowed_to_use_character_with_nojoin() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["-c", "1", "--no-join"]).assert();
+
+    assert.failure().stderr(
+        "tuc: runtime error. Since --characters implies --join, you can\'t pass --no-join\n",
+    );
+}
+
+#[test]
+fn it_does_not_support_json_on_lines() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["-l", "1", "--json"]).assert();
+
+    assert.failure().stderr(
+        "tuc: runtime error. --json support is available only for --fields and --characters\n",
+    );
+}
+
+#[test]
+fn it_does_not_support_json_on_bytes() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["-b", "1", "--json"]).assert();
+
+    assert.failure().stderr(
+        "tuc: runtime error. --json support is available only for --fields and --characters\n",
+    );
+}
+
+#[test]
+fn it_cannot_format_fields_alongside_json() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["-f", "a{1}b", "--json"]).assert();
+
+    assert
+        .failure()
+        .stderr("tuc: runtime error. Cannot format fields when using --json\n");
+}

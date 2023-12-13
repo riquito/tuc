@@ -159,6 +159,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         eprintln!(
             "tuc: runtime error. Since --characters implies --join, you can't pass --no-join"
         );
+        std::process::exit(1);
     }
 
     if has_json {
@@ -195,8 +196,8 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             }),
         });
 
-    if regex_bag.is_some() && !cfg!(feature = "regex") {
-        eprintln!("tuc: runtime error. This version of tuc was compiled without regex support");
+    if regex_bag.is_some() && cfg!(not(feature = "regex")) {
+        eprintln!("tuc: invariant error. There should not be any regex when compiled without regex support");
         std::process::exit(1);
     }
 
