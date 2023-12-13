@@ -114,7 +114,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     if bounds_type == BoundsType::Fields
         && (maybe_fields.is_none() || maybe_fields.as_ref().unwrap().0.is_empty())
     {
-        eprintln!("tuc: invariant error. At least 1 field bound is expected with --fields");
+        eprintln!("tuc: invariant error. At this point we expected to find at least 1 field bound");
         std::process::exit(1);
     }
 
@@ -134,23 +134,23 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let has_no_join = pargs.contains("--no-join");
 
     if has_join && has_no_join {
-        eprintln!("tuc: runtime error. You can't pass both --join and --no-join");
+        eprintln!(
+            "tuc: runtime error. It's not possible to use --join and --no-join simultaneously"
+        );
         std::process::exit(1);
     }
 
     if has_json && has_no_join {
-        eprintln!("tuc: runtime error. Cannot use --json and --no-join together");
+        eprintln!("tuc: runtime error. Using both --json and --no-join is not permitted");
         std::process::exit(1);
     }
 
     if replace_delimiter.is_some() {
         if has_no_join {
-            eprintln!(
-                "tuc: runtime error. Since --replace implies --join, you can't pass --no-join"
-            );
+            eprintln!("tuc: runtime error. You can't pass --no-join when using --replace, which implies --join");
             std::process::exit(1);
         } else if has_json {
-            eprintln!("tuc: runtime error. Cannot use --replace with --json");
+            eprintln!("tuc: runtime error. The use of --replace with --json is not supported");
             std::process::exit(1);
         }
     }
