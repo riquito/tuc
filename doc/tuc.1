@@ -75,31 +75,31 @@ Print fields as a JSON array of strings
 .PP
 \ \ \ \ \ \ \ [default 1:]
 .PP
-\ \ \ \ \ \ \ e.g.\ cutting on \[aq]-\[aq] the string \[aq]a-b-c-d\[aq]
+\ \ \ \ \ \ \ e.g.\ cutting the string \[aq]a-b-c-d\[aq] on \[aq]-\[aq]
 .PD 0
 .P
 .PD
-\ \ \ \ \ \ \ \ \-f 1     => a
+\ \ \ \ \ \ \ \ \ \f[V]-f 1     => a\f[R]
 .PD 0
 .P
 .PD
-\ \ \ \ \ \ \ \ \-f 1:    => a-b-c-d
+\ \ \ \ \ \ \ \ \ \f[V]-f 1:    => a-b-c-d\f[R]
 .PD 0
 .P
 .PD
-\ \ \ \ \ \ \ \ \-f 1:3   => a-b-c
+\ \ \ \ \ \ \ \ \ \f[V]-f 1:3   => a-b-c\f[R]
 .PD 0
 .P
 .PD
-\ \ \ \ \ \ \ \ \-f 3,2   => cb
+\ \ \ \ \ \ \ \ \ \f[V]-f 3,2   => cb\f[R]
 .PD 0
 .P
 .PD
-\ \ \ \ \ \ \ \ \-f 3,1:2 => ca-b
+\ \ \ \ \ \ \ \ \ \f[V]-f 3,1:2 => ca-b\f[R]
 .PD 0
 .P
 .PD
-\ \ \ \ \ \ \ \ \-f -3:-2 => b-c
+\ \ \ \ \ \ \ \ \ \f[V]-f -3:-2 => b-c\f[R]
 .PP
 \ \ \ \ \ \ \ To re-apply the delimiter add -j, to replace
 .PD 0
@@ -115,8 +115,7 @@ Print fields as a JSON array of strings
 .PD 0
 .P
 .PD
-\ \ \ \ \ \ \ \ \ -f \[aq][\[dq]{1}\[dq], \[dq]{2}\[dq]]\[aq] =>
-[\[dq]a\[dq], \[dq]b\[dq]]
+\ \ \ \ \ \ \ \ \ \f[V]-f \[aq]({1}, {2})\[aq] => (a, b)\f[R]
 .PP
 \ \ \ \ \ \ \ You can escape { and } using {{ and }}.
 .PP

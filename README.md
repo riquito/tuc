@@ -53,7 +53,7 @@ OPTIONS:
                                   Fields can be negative (-1 is the last field).
                                   [default 1:]
 
-                                  e.g. cutting on '-' the string 'a-b-c-d'
+                                  e.g. cutting the string 'a-b-c-d' on '-'
                                     -f 1     => a
                                     -f 1:    => a-b-c-d
                                     -f 1:3   => a-b-c
@@ -66,7 +66,7 @@ OPTIONS:
 
                                   You can also format the output using {} syntax
                                   e.g.
-                                  -f '["{1}", "{2}"]' => ["a", "b"]
+                                    -f '({1}, {2})' => (a, b)
 
                                   You can escape { and } using {{ and }}.
 
@@ -130,6 +130,12 @@ cba
 # Cut using regular expressions
 ❯ echo "a,b, c" | tuc -e '[, ]+' -f 1,3
 ac
+```
+
+```sh
+# Emit JSON output
+❯ echo "foo bar baz" | tuc -d ' ' --json
+["foo","bar","baz"]
 ```
 
 ```sh
