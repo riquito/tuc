@@ -4,10 +4,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width">
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'nonce-378acdg21a' 'nonce-nvkjdnvf34' 'unsafe-eval' ; style-src 'nonce-nu3c532ewd'; img-src data:">
+  <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'nonce-378acdg21a' 'nonce-nvkjdnvf34' 'unsafe-eval' ; style-src 'nonce-nu3c532ewd'; img-src data:"> -->
   <title>TUC Playground</title>
   <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins|Roboto%20Mono|Zen%20Maru%20Gothic">
   <script defer src="./polyfill.js" nonce="nvkjdnvf34"></script>
   <style nonce="nu3c532ewd">
     label {
@@ -20,9 +20,17 @@
     html {
       display: flex;
       min-height: 100%;
-      background-color: #9a9a9a;
+      background-color: #040304;
+      color: #ffffffcf;
       margin: 0;
       padding: 0;
+      font-family: "Poppins", "Avenir", "Helvetica", "Arial", sans-serif;
+      font-size: 18px;
+    }
+
+    a,
+    a:visited {
+      color: #4db0d6;
     }
 
     body {
@@ -36,7 +44,7 @@
       display: flex;
       flex: 1 0 auto;
       flex-direction: column;
-      max-width: min(100%, 1280px);
+      max-width: min(100%, 1366px);
       margin: 0 auto;
       padding: 10px;
       box-sizing: border-box;
@@ -46,6 +54,7 @@
       background-color: #0b0d22;
       color: #63df51;
       font-weight: bold;
+      font-size: 16px;
       padding: 8px;
       border: 0;
     }
@@ -58,6 +67,7 @@
       display: flex;
       flex: 1 0 auto;
       justify-content: space-between;
+      gap: 1rem;
     }
 
     #title-cmd {
@@ -73,19 +83,23 @@
       display: flex;
       flex: 1 0 auto;
       flex-direction: column;
-      max-width: 49%;
+    }
+
+    #input-container {
+      max-width: min(600px, 49%);
+      flex: 0.5 0 auto;
     }
 
     #input,
     #output {
       flex: 1 0 auto;
 
-      background-color: #0b0d22;
-      color: #63df51;
+      background-color: #44465b;
+      color: #fff;
       border: 0;
       padding: 8px;
-      font-family: mono;
-      font-size: 12px;
+      font-family: "Roboto Mono", mono;
+      font-size: 16px;
       max-height: 600px;
     }
 
@@ -93,7 +107,31 @@
       white-space: pre;
       overflow-wrap: normal;
       overflow-x: auto;
+      border-radius: 15px;
     }
+
+    #command-line {
+      color: black;
+      background-color: #a09cb4;
+
+      border-radius: 3px;
+      border: 1px solid transparent;
+      border-top: none;
+      border-bottom: 1px solid #DDD;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, .39), 0 -1px 1px #FFF, 0 1px 0 #FFF;
+    }
+
+    #input {
+      color: black;
+      background-color: #a09cb4;
+
+      border-radius: 3px;
+      border: 1px solid transparent;
+      border-top: none;
+      border-bottom: 1px solid #DDD;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, .39), 0 -1px 1px #FFF, 0 1px 0 #FFF;
+    }
+
 
     h1 {
       margin: 8px 0;
@@ -104,14 +142,17 @@
 
     h1>a {
       margin-right: 10px;
+      font-family: "Zen Maru Gothic";
+      letter-spacing: 10px;
+      font-size: 48px;
     }
 
     #input:focus,
     #output:focus,
     #command-line:focus {
-      outline-color: #d0c03d;
+      outline-color: #3d5bd0;
       outline-style: solid;
-      outline-width: medium;
+      outline-width: 4px;
     }
 
     @media screen and (max-width: 800px) {
@@ -149,13 +190,17 @@
     <h1><a href="https://github.com/riquito/tuc">TUC</a> playground</h1>
     <div id="cmd-container">
       <label for="command-line">Command Line (type "tuc -h" if you're lost)</label>
-      <input id="command-line" type="text" placeholder="tuc -h" value="tuc -h" />
+      <input id="command-line" type="text" placeholder="tuc -h" value="tuc -d / -f '1,-1' --json" autofocus />
     </div>
   </div>
   <div id="input-output-container">
     <div id="input-container">
-      <label for="input">PIPED INPUT</label>
-      <textarea id="input"></textarea>
+      <label for="input">(PIPED) INPUT</label>
+      <textarea id="input">
+a/foo/bar/baz
+b/haba/ca/dabra
+c/hello/world
+d/so/long/and/thanks/for/all/the/fish</textarea>
     </div>
     <div id="output-container">
       <label for="output">OUTPUT</label>
