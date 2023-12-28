@@ -218,6 +218,10 @@
       }
     }
 
+    if (parts.length > 0 && parts[parts.length - 1] === '') {
+      parts.pop()
+    }
+
     if (parts.length === 1 && parts[0] === '') {
       return []
     }
