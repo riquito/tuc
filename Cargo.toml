@@ -30,3 +30,11 @@ lto = true
 codegen-units = 1
 panic = 'abort'
 strip = "debuginfo"
+
+[profile.web-release]
+# To be used with
+# cargo build --target wasm32-wasi --profile=web-release
+# then we get our wasm file at
+# target/wasm32-wasi/web-release/tuc.wasm
+inherits = "release"
+opt-level = "s"
