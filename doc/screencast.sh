@@ -1,7 +1,10 @@
 #!/bin/bash
-# Designed to be executed via svg-term from the fd root directory:
+# This script is a modified version of the one made by the good `fd` maintainers,
+# see https://github.com/sharkdp/fd/blob/f227bb2/doc/screencast.sh
+# Designed to be executed via svg-term from the root directory:
 # svg-term --command="bash doc/screencast.sh" --out doc/screencast.svg --padding=10
-# Then run this (workaround for #1003):
+# First copy doc/example in root (and delete it afterward).
+# Then run this (workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=1677988):
 # sed -i '' 's/<text/<text font-size="1.67"/g' doc/screencast.svg
 set -e
 set -u
@@ -12,18 +15,34 @@ enter() {
     INPUT="$1"
     DELAY=1
 
-    prompt
+    immediate_prompt
     sleep "$DELAY"
     type "$INPUT"
     sleep 0.5
     printf '%b' "\\n"
+    # this is to ensure that we can have examples with \n and still display it
     x=$(printf "$INPUT")
     eval "$x"
+}
+
+comment() {
+    INPUT="$1"
+    DELAY=1
+
+    prompt
+    sleep "$DELAY"
+    type "$INPUT"
+    sleep 0.5
     type "\\n"
+}
+
+immediate_prompt() {
+    printf '%b ' "$PROMPT"
 }
 
 prompt() {
     printf '%b ' "$PROMPT" | pv -q
+    sleep 2 # give some time to read previous output
 }
 
 type() {
@@ -33,60 +52,31 @@ type() {
 main() {
     IFS='%'
 
-    enter "# Cut and rearrange fields..."
-    enter "echo 'foo bar baz' | tuc -d ' ' -f 3,2,1"
+    comment "# Given this example file"
+    enter "cat example"
+    echo
+    immediate_prompt
+    sleep 5
+    echo
 
-    enter "# ...and join them back with the same delimiter"
-    enter "echo 'foo bar baz' | tuc -d ' ' -f 3,2,1 -j"
+    comment "# Say you want to keep only the 2nd element in each line"
+    enter "cat example | tuc -d , -f 2"
 
-    enter "# Replace the delimiter with something else"
-    enter "echo 'foo bar baz' | tuc -d ' ' -r ' ➡ '"
+    comment "# Let's keep just the last element of each  line"
+    enter "cat example | tuc -d , -f -1"
 
-    enter "# Keep a range of fields"
-    enter "echo 'foo bar    baz' | tuc -d ' ' -f 2:"
+    comment "# What if I wanted to skip first and last line?"
+    enter "cat example | tuc -l 2:-2"
 
-    enter "# Indexes can be negative and rearranged"
-    enter "echo 'a b c' | tuc -d ' ' -f -1,-2,-3"
+    comment "# Let's make it json"
+    enter "cat example | tuc -d , --json"
 
-    enter "# Cut using regular expressions"
-    enter "echo 'a,b, c' | tuc -e '[, ]+' -f 1,3"
+    comment "# We can also format the output to do nifty things"
+    comment "# Imagine you have .bak files and you want to rename them"
+    comment "# (the file names would come from 'find' or similar tools)"
+    enter "echo somefile.bak | tuc -d '.bak' -f 'mv {1}.bak {1}'"
 
-    enter "# Emit JSON output"
-    enter "echo 'foo bar baz' | tuc -d ' ' --json"
-
-    enter "# Delimiters can be any number of characters long"
-    enter "echo 'a<sep>b<sep>c' | tuc -d '<sep>' -f 1,3"
-
-    enter "# Cut using a greedy delimiter"
-    enter "echo 'foo    bar' | tuc -d ' ' -f 1,2 -g"
-
-    enter "# Format output"
-    enter "echo 'foo bar baz' | tuc -d ' ' -f '{1}, {2} and lastly {3}'"
-
-    enter "# ...with support for \\\\n"
-    enter "echo '100Kb README.txt 2049-02-01' | tuc -d ' ' -f '{2}\\\\n├── {1}\\\\n└── {3}'"
-
-    enter "# Cut lines (e.g. keep everything between first and last line)"
-    enter "printf 'a\\\\nb\\\\nc\\\\nd\\\\ne' | tuc -l 2:-2"
-
-    enter "# Concatenate lines (-l implies join with \\\\n, so we need --no-join)"
-    enter "printf 'a\\\\nb\\\\nc\\\\nd\\\\ne' | tuc -l 1,2 --no-join"
-
-    enter "# Compress delimiters after cut"
-    enter "echo 'foo    bar   baz' | tuc -d ' ' -f 2: -p"
-
-    enter "# Replace remaining delimiters with something else"
-    enter "echo 'foo    bar   baz' | tuc -d ' ' -f 2: -p -r ' -> '"
-
-    enter "# Cut characters (expects UTF-8 input)"
-    enter "echo '😁🤩😝😎' | tuc -c 4,3,2,1"
-
-    enter "# Cut bytes (the following emoji are 4 bytes each)"
-    enter "echo '😁🤩😝😎' | tuc -b 5:8"
-
-    enter "# Discard selected fields, keep the rest"
-    enter "echo 'a b c' | tuc --complement -d ' ' -f 2"
-
+    comment "# You can do much more than this. Check the documentation!"
     prompt
 
     sleep 3
