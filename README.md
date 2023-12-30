@@ -25,6 +25,10 @@ For other installation methods, check below the [community managed packages](#co
 
 No time to install it? Play with a webassembly version online, the [tuc playground](https://riquito.github.io/tuc/playground/index.html)
 
+## Demo
+
+![svg](./doc/screencast.svg)
+
 ## Help
 
 ```
