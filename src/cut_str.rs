@@ -447,14 +447,13 @@ mod tests {
     fn test_complement_std_range() {
         // remember, it assumes that ranges are "legit" (not out of bounds)
 
-        // test empty string
-        assert_eq!(complement_std_range(0, &(0..0)), vec![]);
+        let empty_vec: Vec<Range<usize>> = vec![];
 
         // test 1-long string
-        assert_eq!(complement_std_range(1, &(0..1)), vec![]);
+        assert_eq!(complement_std_range(1, &(0..1)), empty_vec);
 
         // test ranges that reach left or right bounds
-        assert_eq!(complement_std_range(5, &(0..5)), vec![]);
+        assert_eq!(complement_std_range(5, &(0..5)), empty_vec);
         assert_eq!(complement_std_range(5, &(0..3)), vec![3..5]);
         assert_eq!(complement_std_range(5, &(3..5)), vec![0..3]);
 
@@ -462,7 +461,7 @@ mod tests {
         assert_eq!(complement_std_range(5, &(1..3)), vec![0..1, 3..5]);
 
         // test 2-long string
-        assert_eq!(complement_std_range(2, &(0..2)), vec![]);
+        assert_eq!(complement_std_range(2, &(0..2)), empty_vec);
         assert_eq!(complement_std_range(2, &(0..1)), vec![1..2]);
         assert_eq!(complement_std_range(2, &(1..2)), vec![0..1]);
     }
@@ -470,12 +469,13 @@ mod tests {
     #[test]
     fn test_build_ranges_vec() {
         let mut v_range: Vec<Range<usize>> = Vec::new();
+        let empty_vec: Vec<Range<usize>> = vec![];
 
         // non greedy
 
         v_range.clear();
         build_ranges_vec(&mut v_range, "", "-", false);
-        assert_eq!(v_range, vec![]);
+        assert_eq!(v_range, vec![] as Vec<Range<usize>>);
 
         v_range.clear();
         build_ranges_vec(&mut v_range, "a", "-", false);
@@ -521,7 +521,7 @@ mod tests {
 
         v_range.clear();
         build_ranges_vec(&mut v_range, "", "-", true);
-        assert_eq!(v_range, vec![]);
+        assert_eq!(v_range, empty_vec);
 
         v_range.clear();
         build_ranges_vec(&mut v_range, "a", "-", true);
