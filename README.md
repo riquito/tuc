@@ -32,7 +32,7 @@ No time to install it? Play with a webassembly version online, the [tuc playgrou
 ## Help
 
 ```
-tuc 1.1.0
+tuc 1.2.0
 Cut text (or bytes) where a delimiter matches, then keep the desired parts.
 
 The data is read from standard input.

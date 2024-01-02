@@ -6,9 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.2.0] - 2024-01-01
+
 - feat: new option --json to format output as JSON array
-- fix: field formatting is now applied to field 1 even if it's the only
-       one present and with no delimiters around
+- feat: -r can be used when cutting --characters. It replaces
+  the (empty) delimiter between characters with whatever you provided
+- feat: exit early when some combinations of fields cannot be used together
+- feat: updated dependencies. In particular the regex crate which offers new
+  functionalities (word boundary assertions)
+- fix: field formatting is now applied to field 1 even if no delimiters
+  are found (similar to how we print the unformatted field 1)
+- doc: many error messages have been rewritten for better clarity
+- doc: new svg demo in the README
 
 ## [1.1.0] - 2023-12-02
 
