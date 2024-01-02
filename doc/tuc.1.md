@@ -1,6 +1,6 @@
-% tuc(1) Tuc 1.1.0 | Tuc Manual
+% tuc(1) Tuc 1.2.0 | Tuc Manual
 %
-% Dec 02, 2023
+% Jan 01, 2024
 
 NAME
 ====
