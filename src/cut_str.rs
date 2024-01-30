@@ -25,13 +25,19 @@ fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usiz
     }
 }
 
-// Split a string into parts and build a vector of ranges that match those parts.
-//
-// `buffer` - vector that will be filled with ranges
-// `line` - the string to split
-// `delimiter` - what to search to split the string
-// `greedy` - whether to consider consecutive delimiters as one or not
-fn build_ranges_vec(buffer: &mut Vec<Range<usize>>, line: &str, delimiter: &str, greedy: bool) {
+/// Split a string into parts and fill a buffer with ranges
+/// that match those parts.
+///
+/// - `buffer` - vector that will be filled with ranges
+/// - `line` - the string to split
+/// - `delimiter` - what to search to split the string
+/// - `greedy` - whether to consider consecutive delimiters as one or not
+fn fill_with_fields_locations(
+    buffer: &mut Vec<Range<usize>>,
+    line: &str,
+    delimiter: &str,
+    greedy: bool,
+) {
     buffer.clear();
 
     if line.is_empty() {
@@ -267,7 +273,7 @@ pub fn cut_str<W: Write>(
             },
         );
     } else {
-        build_ranges_vec(fields, line, delimiter, opt.greedy_delimiter);
+        fill_with_fields_locations(fields, line, delimiter, opt.greedy_delimiter);
     }
 
     if opt.bounds_type == BoundsType::Characters && fields.len() > 2 {
@@ -474,29 +480,29 @@ mod tests {
         // non greedy
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "", "-", false);
+        fill_with_fields_locations(&mut v_range, "", "-", false);
         assert_eq!(v_range, vec![] as Vec<Range<usize>>);
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "a", "-", false);
+        fill_with_fields_locations(&mut v_range, "a", "-", false);
         assert_eq!(v_range, vec![Range { start: 0, end: 1 }]);
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "-", "-", true);
+        fill_with_fields_locations(&mut v_range, "-", "-", true);
         assert_eq!(
             v_range,
             vec![Range { start: 0, end: 0 }, Range { start: 1, end: 1 }]
         );
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "a-b", "-", false);
+        fill_with_fields_locations(&mut v_range, "a-b", "-", false);
         assert_eq!(
             v_range,
             vec![Range { start: 0, end: 1 }, Range { start: 2, end: 3 }]
         );
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "-a-", "-", false);
+        fill_with_fields_locations(&mut v_range, "-a-", "-", false);
         assert_eq!(
             v_range,
             vec![
@@ -507,7 +513,7 @@ mod tests {
         );
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "a--", "-", false);
+        fill_with_fields_locations(&mut v_range, "a--", "-", false);
         assert_eq!(
             v_range,
             vec![
@@ -520,22 +526,22 @@ mod tests {
         // greedy
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "", "-", true);
+        fill_with_fields_locations(&mut v_range, "", "-", true);
         assert_eq!(v_range, empty_vec);
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "a", "-", true);
+        fill_with_fields_locations(&mut v_range, "a", "-", true);
         assert_eq!(v_range, vec![Range { start: 0, end: 1 }]);
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "-", "-", true);
+        fill_with_fields_locations(&mut v_range, "-", "-", true);
         assert_eq!(
             v_range,
             vec![Range { start: 0, end: 0 }, Range { start: 1, end: 1 }]
         );
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "-a--b", "-", true);
+        fill_with_fields_locations(&mut v_range, "-a--b", "-", true);
         assert_eq!(
             v_range,
             vec![
@@ -546,7 +552,7 @@ mod tests {
         );
 
         v_range.clear();
-        build_ranges_vec(&mut v_range, "-a--", "-", true);
+        fill_with_fields_locations(&mut v_range, "-a--", "-", true);
         assert_eq!(
             v_range,
             vec![
