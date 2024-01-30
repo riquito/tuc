@@ -278,7 +278,9 @@ pub fn cut_str<W: Write>(
         fields.drain(..1);
     }
 
-    if opt.only_delimited && fields.len() == 1 {
+    let num_fields = fields.len();
+
+    if opt.only_delimited && num_fields == 1 {
         // If there's only 1 field it means that there were no delimiters
         // and when used alogside `only_delimited` we must skip the line
         return Ok(());
@@ -310,12 +312,12 @@ pub fn cut_str<W: Write>(
             )
         }) {
             // Yep, there at least a range bound. Let's do it
-            _bounds = bounds.unpack(fields.len());
+            _bounds = bounds.unpack(num_fields);
             bounds = &_bounds;
         }
     }
 
-    match fields.len() {
+    match num_fields {
         1 if bounds.0.len() == 1 => {
             write_maybe_as_json!(stdout, line, opt.json);
         }
@@ -333,10 +335,10 @@ pub fn cut_str<W: Write>(
                         BoundOrFiller::Bound(b) => b,
                     };
 
-                    let mut r_array = vec![b.try_into_range(fields.len())?];
+                    let mut r_array = vec![b.try_into_range(num_fields)?];
 
                     if opt.complement {
-                        r_array = complement_std_range(fields.len(), &r_array[0]);
+                        r_array = complement_std_range(num_fields, &r_array[0]);
                     }
 
                     if opt.json {
