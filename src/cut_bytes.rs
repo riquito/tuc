@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::io::{Read, Write};
 
-use crate::bounds::{bounds_to_std_range, BoundOrFiller};
+use crate::bounds::BoundOrFiller;
 use crate::options::Opt;
 use crate::read_utils::read_bytes_to_end;
 
@@ -13,7 +13,7 @@ fn cut_bytes<W: Write>(data: &[u8], opt: &Opt, stdout: &mut W) -> Result<()> {
     opt.bounds.0.iter().try_for_each(|bof| -> Result<()> {
         let output = match bof {
             BoundOrFiller::Bound(b) => {
-                let r = bounds_to_std_range(data.len(), b)?;
+                let r = b.try_into_range(data.len())?;
                 &data[r.start..r.end]
             }
             BoundOrFiller::Filler(f) => f.as_bytes(),

@@ -2,9 +2,7 @@ use anyhow::{bail, Result};
 use std::io::{BufRead, Write};
 use std::ops::Range;
 
-use crate::bounds::{
-    bounds_to_std_range, BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList,
-};
+use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList};
 use crate::json::escape_json;
 use crate::options::{Opt, Trim};
 use crate::read_utils::read_line_with_eol;
@@ -193,7 +191,7 @@ pub fn cut_str<W: Write>(
     line: &str,
     opt: &Opt,
     stdout: &mut W,
-    bounds_as_ranges: &mut Vec<Range<usize>>,
+    fields: &mut Vec<Range<usize>>,
     compressed_line_buf: &mut String,
     eol: &[u8],
 ) -> Result<()> {
@@ -260,7 +258,7 @@ pub fn cut_str<W: Write>(
     if should_build_ranges_using_regex {
         #[cfg(feature = "regex")]
         build_ranges_vec_from_regex(
-            bounds_as_ranges,
+            fields,
             line,
             if opt.greedy_delimiter {
                 &opt.regex_bag.as_ref().unwrap().greedy
@@ -269,18 +267,18 @@ pub fn cut_str<W: Write>(
             },
         );
     } else {
-        build_ranges_vec(bounds_as_ranges, line, delimiter, opt.greedy_delimiter);
+        build_ranges_vec(fields, line, delimiter, opt.greedy_delimiter);
     }
 
-    if opt.bounds_type == BoundsType::Characters && bounds_as_ranges.len() > 2 {
+    if opt.bounds_type == BoundsType::Characters && fields.len() > 2 {
         // Unless the line is empty (which should have already been handled),
         // then the empty-string delimiter generated ranges alongside each
         // character, plus one at each boundary, e.g. _f_o_o_. We drop them.
-        bounds_as_ranges.pop();
-        bounds_as_ranges.drain(..1);
+        fields.pop();
+        fields.drain(..1);
     }
 
-    if opt.only_delimited && bounds_as_ranges.len() == 1 {
+    if opt.only_delimited && fields.len() == 1 {
         // If there's only 1 field it means that there were no delimiters
         // and when used alogside `only_delimited` we must skip the line
         return Ok(());
@@ -312,12 +310,12 @@ pub fn cut_str<W: Write>(
             )
         }) {
             // Yep, there at least a range bound. Let's do it
-            _bounds = bounds.unpack(bounds_as_ranges.len());
+            _bounds = bounds.unpack(fields.len());
             bounds = &_bounds;
         }
     }
 
-    match bounds_as_ranges.len() {
+    match fields.len() {
         1 if bounds.0.len() == 1 => {
             write_maybe_as_json!(stdout, line, opt.json);
         }
@@ -335,10 +333,10 @@ pub fn cut_str<W: Write>(
                         BoundOrFiller::Bound(b) => b,
                     };
 
-                    let mut r_array = vec![bounds_to_std_range(bounds_as_ranges.len(), b)?];
+                    let mut r_array = vec![b.try_into_range(fields.len())?];
 
                     if opt.complement {
-                        r_array = complement_std_range(bounds_as_ranges.len(), &r_array[0]);
+                        r_array = complement_std_range(fields.len(), &r_array[0]);
                     }
 
                     if opt.json {
@@ -356,8 +354,8 @@ pub fn cut_str<W: Write>(
                     let n_ranges = r_array.len();
 
                     for (idx_r, r) in r_iter.enumerate() {
-                        let idx_start = bounds_as_ranges[r.start].start;
-                        let idx_end = bounds_as_ranges[r.end - 1].end;
+                        let idx_start = fields[r.start].start;
+                        let idx_end = fields[r.end - 1].end;
                         let output = &line[idx_start..idx_end];
 
                         let field_to_print = maybe_replace_delimiter(output, opt);
