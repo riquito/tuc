@@ -317,6 +317,64 @@ impl UserBounds {
         }
     }
 
+    /// Transform UserBounds into std::opt::Range
+    ///
+    /// UserBounds is 1-indexed and inclusive on both sides, while
+    /// the resulting range is 0-indexed and exclusive on the  right side.
+    ///
+    /// `parts_length` is necessary to calculate Side::Continue on
+    /// the right side, or any negative indexes.
+    ///
+    /// e.g.
+    ///
+    /// ```rust
+    /// assert_eq!(
+    ///   (UserBounds { l: 1, r: 2 }).try_into_range(5),
+    ///   Ok(Range { start: 0, end: 2}) // 2, not 1, because it's exclusive
+    /// );
+    ///
+    /// assert_eq!(
+    ///   (UserBounds { l: 1, r: Side::Continue }).try_into_range(5),
+    ///   Ok(Range { start: 0, end: 5})
+    /// );
+    /// ```
+    pub fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>> {
+        let start: usize = match self.l {
+            Side::Continue => 0,
+            Side::Some(v) => {
+                if v.unsigned_abs() as usize > parts_length {
+                    bail!("Out of bounds: {}", v);
+                }
+                if v < 0 {
+                    parts_length - v.unsigned_abs() as usize
+                } else {
+                    v as usize - 1
+                }
+            }
+        };
+
+        let end: usize = match self.r {
+            Side::Continue => parts_length,
+            Side::Some(v) => {
+                if v.unsigned_abs() as usize > parts_length {
+                    bail!("Out of bounds: {}", v);
+                }
+                if v < 0 {
+                    parts_length - v.unsigned_abs() as usize + 1
+                } else {
+                    v as usize
+                }
+            }
+        };
+
+        if end <= start {
+            // `end` must always be 1 or more greater than start
+            bail!("Field left value cannot be greater than right value");
+        }
+
+        Ok(Range { start, end })
+    }
+
     /**
      * Transform a ranged bound into a list of one or more
      * 1 slot bound
@@ -387,43 +445,6 @@ impl Default for UserBounds {
     fn default() -> Self {
         UserBounds::new(Side::Some(1), Side::Continue)
     }
-}
-
-pub fn bounds_to_std_range(parts_length: usize, bounds: &UserBounds) -> Result<Range<usize>> {
-    let start: usize = match bounds.l {
-        Side::Continue => 0,
-        Side::Some(v) => {
-            if v.unsigned_abs() as usize > parts_length {
-                bail!("Out of bounds: {}", v);
-            }
-            if v < 0 {
-                parts_length - v.unsigned_abs() as usize
-            } else {
-                v as usize - 1
-            }
-        }
-    };
-
-    let end: usize = match bounds.r {
-        Side::Continue => parts_length,
-        Side::Some(v) => {
-            if v.unsigned_abs() as usize > parts_length {
-                bail!("Out of bounds: {}", v);
-            }
-            if v < 0 {
-                parts_length - v.unsigned_abs() as usize + 1
-            } else {
-                v as usize
-            }
-        }
-    };
-
-    if end <= start {
-        // `end` must always be 1 or more greater than start
-        bail!("Field left value cannot be greater than right value");
-    }
-
-    Ok(Range { start, end })
 }
 
 #[cfg(test)]
