@@ -23,7 +23,7 @@ default = ["regex"]
 
 [dev-dependencies]
 assert_cmd = "2.0.13"
-predicates = { version = "3.0.4",  default-features = false }
+predicates = { version = "3.1.0",  default-features = false }
 
 [profile.release]
 lto = true
