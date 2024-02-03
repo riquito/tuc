@@ -63,16 +63,6 @@ fn cut_str_fast_line<W: Write>(buffer: &[u8], opt: &FastOpt, stdout: &mut W) -> 
                 .iter()
                 .enumerate()
                 .try_for_each(|(bounds_idx, b)| -> Result<()> {
-                    // let b = match bof {
-                    //     BoundOrFiller::Filler(f) => {
-                    //         stdout.write_all(f.as_bytes())?;
-                    //         return Ok(());
-                    //     }
-                    //     BoundOrFiller::Bound(b) => b,
-                    // };
-
-                    //let mut r_array = vec![b.try_into_range(num_fields)?];
-
                     let is_last = bounds_idx == bounds.0.len() - 1;
 
                     output_parts(buffer, b, &fields, stdout, is_last, opt)
@@ -96,8 +86,6 @@ fn output_parts<W: Write>(
     is_last: bool,
     opt: &FastOpt,
 ) -> Result<()> {
-    // dbg!(&line.to_str_lossy(), &r, &fields, is_last);
-
     let idx_start = fields[r.start].start;
     let idx_end = fields[r.end - 1].end;
     let output = &line[idx_start..idx_end];
@@ -107,12 +95,6 @@ fn output_parts<W: Write>(
     stdout.write_all(field_to_print)?;
 
     if opt.join && !(is_last) {
-        // stdout.write_all(
-        //     opt.replace_delimiter
-        //         .as_ref()
-        //         .unwrap_or(&opt.delimiter)
-        //         .as_bytes(),
-        // )?;
         stdout.write_all(&[opt.delimiter])?;
     }
 
@@ -172,20 +154,12 @@ impl From<&UserBounds> for Range<usize> {
         // ... if we will still pass by it)
 
         let (l, r): (usize, usize) = match (value.l, value.r) {
-            // (Side::Some(l), Side::Some(r)) => (l as usize, (r - l) as usize),
-            // (Side::Some(l), Side::Continue) => (l as usize, usize::MAX - (l as usize)),
             (Side::Some(l), Side::Some(r)) => ((l - 1) as usize, r as usize),
             (Side::Some(l), Side::Continue) => ((l - 1) as usize, usize::MAX),
             (Side::Continue, Side::Some(r)) => (0, r as usize),
             (Side::Continue, Side::Continue) => (0, usize::MAX),
         };
 
-        // FastRange {
-        //     l,
-        //     r_sub_l: r - l,
-        //     buff_start: 0,
-        //     buff_end: 0,
-        // }
         Range { start: l, end: r }
     }
 }
@@ -220,7 +194,9 @@ pub fn read_and_cut_text_as_bytes<R: BufRead, W: Write>(
     opt: &FastOpt,
 ) -> Result<()> {
     stdin.for_byte_line(|line| {
-        cut_str_fast_line(line, opt, stdout)
+        let mut fields: Vec<Range<usize>> = Vec::with_capacity(16);
+        cut_str_fast_line(line, opt, stdout, &mut fields)
+            // XXX Should map properly the error
             .map_err(|x| io::Error::new(io::ErrorKind::Other, x.to_string()))
             .and(Ok(true))
     })?;
