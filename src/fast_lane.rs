@@ -87,7 +87,12 @@ fn output_parts<W: Write>(
     opt: &FastOpt,
 ) -> Result<()> {
     let idx_start = fields[r.start].start;
-    let idx_end = fields[r.end - 1].end;
+    let idx_end = fields[if r.end == usize::MAX {
+        fields.len()
+    } else {
+        r.end
+    } - 1]
+        .end;
     let output = &line[idx_start..idx_end];
 
     // let field_to_print = maybe_replace_delimiter(output, opt);
