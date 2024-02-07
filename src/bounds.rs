@@ -338,14 +338,18 @@ impl UserBounds {
     /// e.g.
     ///
     /// ```rust
+    /// # use tuc::bounds::UserBounds;
+    /// # use std::ops::Range;
+    /// # use tuc::bounds::Side;
+    ///
     /// assert_eq!(
-    ///   (UserBounds { l: 1, r: 2 }).try_into_range(5),
-    ///   Ok(Range { start: 0, end: 2}) // 2, not 1, because it's exclusive
+    ///   (UserBounds { l: Side::Some(1), r: Side::Some(2) }).try_into_range(5).unwrap(),
+    ///   Range { start: 0, end: 2} // 2, not 1, because it's exclusive
     /// );
     ///
     /// assert_eq!(
-    ///   (UserBounds { l: 1, r: Side::Continue }).try_into_range(5),
-    ///   Ok(Range { start: 0, end: 5})
+    ///   (UserBounds { l: Side::Some(1), r: Side::Continue }).try_into_range(5).unwrap(),
+    ///   Range { start: 0, end: 5}
     /// );
     /// ```
     pub fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>> {
