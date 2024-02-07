@@ -19,6 +19,15 @@ pub enum EOL {
     Newline = 10,
 }
 
+impl From<EOL> for u8 {
+    fn from(value: EOL) -> Self {
+        match value {
+            EOL::Zero => b'\0',
+            EOL::Newline => b'\n',
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Opt {
     pub delimiter: String,

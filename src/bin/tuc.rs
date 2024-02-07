@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::io::Write;
 use std::str::FromStr;
 use tuc::bounds::{BoundOrFiller, BoundsType, UserBoundsList};
