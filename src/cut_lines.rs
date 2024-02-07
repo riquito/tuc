@@ -26,15 +26,15 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
         // Print the matching fields. Fields are ordered but can still be
         // duplicated, e.g. 1-2,2,3 , so we may have to print the same
         // line multiple times
-        while bounds_idx < opt.bounds.0.len() {
-            let bof = opt.bounds.0.get(bounds_idx).unwrap();
+        while bounds_idx < opt.bounds.len() {
+            let bof = opt.bounds.get(bounds_idx).unwrap();
 
             let b = match bof {
                 BoundOrFiller::Filler(f) => {
                     stdout.write_all(f.as_bytes())?;
                     bounds_idx += 1;
 
-                    if opt.join && bounds_idx != opt.bounds.0.len() {
+                    if opt.join && bounds_idx != opt.bounds.len() {
                         stdout.write_all(&[opt.eol as u8])?;
                     }
 
@@ -57,7 +57,7 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
                     add_newline_next = false;
 
                     // if opt.join and it was not the last matching bound
-                    if opt.join && bounds_idx != opt.bounds.0.len() {
+                    if opt.join && bounds_idx != opt.bounds.len() {
                         stdout.write_all(&[opt.eol as u8])?;
                     }
 
@@ -68,14 +68,14 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
             break; // nothing matched, let's go to the next line
         }
 
-        if bounds_idx == opt.bounds.0.len() {
+        if bounds_idx == opt.bounds.len() {
             // no need to read the rest, we don't have other bounds to test
             break;
         }
     }
 
     // Output is finished. Did we output every bound?
-    if let Some(BoundOrFiller::Bound(b)) = opt.bounds.0.get(bounds_idx) {
+    if let Some(BoundOrFiller::Bound(b)) = opt.bounds.get(bounds_idx) {
         if b.r != Side::Continue {
             // not good, we still have bounds to print but the input is exhausted
             bail!("Out of bounds: {}", b);
