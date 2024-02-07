@@ -308,7 +308,7 @@ pub fn cut_str<W: Write>(
         // rare usage).
 
         // Start by checking if we actually need to rewrite the bounds
-        if bounds.0.iter().any(|b| {
+        if bounds.iter().any(|b| {
             matches!(
                 b,
                 BoundOrFiller::Bound(UserBounds {
@@ -324,12 +324,11 @@ pub fn cut_str<W: Write>(
     }
 
     match num_fields {
-        1 if bounds.0.len() == 1 => {
+        1 if bounds.len() == 1 => {
             write_maybe_as_json!(stdout, line, opt.json);
         }
         _ => {
             bounds
-                .0
                 .iter()
                 .enumerate()
                 .try_for_each(|(i, bof)| -> Result<()> {
@@ -369,7 +368,7 @@ pub fn cut_str<W: Write>(
                         let field_to_print = maybe_replace_delimiter(output, opt);
                         write_maybe_as_json!(stdout, field_to_print, opt.json);
 
-                        if opt.join && !(i == bounds.0.len() - 1 && idx_r == n_ranges - 1) {
+                        if opt.join && !(i == bounds.len() - 1 && idx_r == n_ranges - 1) {
                             stdout.write_all(
                                 opt.replace_delimiter
                                     .as_ref()

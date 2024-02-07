@@ -2,10 +2,10 @@ use anyhow::{bail, Result};
 use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::fmt;
-use std::ops::Range;
+use std::ops::{Deref, Range};
 use std::str::FromStr;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum BoundsType {
     Bytes,
     Characters,
@@ -13,7 +13,7 @@ pub enum BoundsType {
     Lines,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BoundOrFiller {
     Bound(UserBounds),
     Filler(String),
@@ -97,6 +97,14 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
 
 #[derive(Debug)]
 pub struct UserBoundsList(pub Vec<BoundOrFiller>);
+
+impl Deref for UserBoundsList {
+    type Target = Vec<BoundOrFiller>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl FromStr for UserBoundsList {
     type Err = anyhow::Error;
@@ -287,11 +295,13 @@ impl UserBounds {
         UserBounds { l, r }
     }
     /**
-     * Check if an index is between the bounds.
+     * Check if a field is between the bounds.
      *
      * It errors out if the index has different sign than the bounds
      * (we can't verify if e.g. -1 idx is between 3:5 without knowing the number
      * of matching bounds).
+     *
+     * Fields are 1-indexed.
      */
     pub fn matches(&self, idx: i32) -> Result<bool> {
         match (self.l, self.r) {
