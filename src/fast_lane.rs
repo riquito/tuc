@@ -3,23 +3,27 @@ use crate::options::{Opt, EOL};
 use anyhow::Result;
 use std::convert::TryFrom;
 use std::io::{self, BufRead};
+use std::ops::Deref;
 use std::{io::Write, ops::Range};
 
 use bstr::io::BufReadExt;
 
-fn cut_str_fast_line<W: Write>(buffer: &[u8], opt: &FastOpt, stdout: &mut W) -> Result<()> {
+fn cut_str_fast_line<W: Write>(
+    buffer: &[u8],
+    opt: &FastOpt,
+    stdout: &mut W,
+    fields: &mut Vec<Range<usize>>,
+) -> Result<()> {
     if buffer.is_empty() {
         return Ok(());
     }
 
     let bounds = &opt.bounds;
-    assert!(!bounds.0.is_empty());
-    // if we're here there must be at least one bound to check
-    let last_interesting_field = bounds.0.last().unwrap().end;
+
+    // ForwardBounds guarantees that there is at least one field to check
+    let last_interesting_field = bounds.get_last_bound().r;
 
     let mut prev_field_start = 0;
-
-    let mut fields: Vec<Range<usize>> = Vec::new();
 
     let mut curr_field = 0;
 
@@ -33,7 +37,7 @@ fn cut_str_fast_line<W: Write>(buffer: &[u8], opt: &FastOpt, stdout: &mut W) -> 
 
         fields.push(Range { start, end });
 
-        if curr_field == last_interesting_field {
+        if Side::Some(curr_field) == last_interesting_field {
             // we have no use for this field or any of the following ones
             break;
         }
@@ -44,7 +48,10 @@ fn cut_str_fast_line<W: Write>(buffer: &[u8], opt: &FastOpt, stdout: &mut W) -> 
         return Ok(());
     }
 
-    if curr_field != last_interesting_field {
+    // After the last loop ended, everything remaining is the field
+    // after the last delimiter (we want it), or "useless" fields after the
+    // last one that the user is interested in (and we can ignore them).
+    if Side::Some(curr_field) != last_interesting_field {
         fields.push(Range {
             start: prev_field_start,
             end: buffer.len(),
@@ -54,18 +61,25 @@ fn cut_str_fast_line<W: Write>(buffer: &[u8], opt: &FastOpt, stdout: &mut W) -> 
     let num_fields = fields.len();
 
     match num_fields {
-        1 if bounds.0.len() == 1 => {
+        1 if bounds.len() == 1 => {
             stdout.write_all(buffer)?;
         }
         _ => {
             bounds
-                .0
                 .iter()
                 .enumerate()
-                .try_for_each(|(bounds_idx, b)| -> Result<()> {
-                    let is_last = bounds_idx == bounds.0.len() - 1;
+                .try_for_each(|(bounds_idx, bof)| -> Result<()> {
+                    let b = match bof {
+                        BoundOrFiller::Filler(f) => {
+                            stdout.write_all(f.as_bytes())?;
+                            return Ok(());
+                        }
+                        BoundOrFiller::Bound(b) => b,
+                    };
 
-                    output_parts(buffer, b, &fields, stdout, is_last, opt)
+                    let is_last = bounds_idx == bounds.len() - 1;
+
+                    output_parts(buffer, b, fields, stdout, is_last, opt)
                 })?;
         }
     }
@@ -79,20 +93,17 @@ fn cut_str_fast_line<W: Write>(buffer: &[u8], opt: &FastOpt, stdout: &mut W) -> 
 fn output_parts<W: Write>(
     line: &[u8],
     // which parts to print
-    r: &Range<usize>,
+    b: &UserBounds,
     // where to find the parts inside `line`
     fields: &[Range<usize>],
     stdout: &mut W,
     is_last: bool,
     opt: &FastOpt,
 ) -> Result<()> {
+    let r = b.try_into_range(fields.len())?;
+
     let idx_start = fields[r.start].start;
-    let idx_end = fields[if r.end == usize::MAX {
-        fields.len()
-    } else {
-        r.end
-    } - 1]
-        .end;
+    let idx_end = fields[r.end - 1].end;
     let output = &line[idx_start..idx_end];
 
     // let field_to_print = maybe_replace_delimiter(output, opt);
@@ -106,6 +117,7 @@ fn output_parts<W: Write>(
     Ok(())
 }
 
+#[derive(Debug)]
 pub struct FastOpt {
     delimiter: u8,
     join: bool,
@@ -159,36 +171,76 @@ impl From<&UserBounds> for Range<usize> {
         // ... if we will still pass by it)
 
         let (l, r): (usize, usize) = match (value.l, value.r) {
+            // (Side::Some(l), Side::Some(r)) => (l as usize, (r - l) as usize),
+            // (Side::Some(l), Side::Continue) => (l as usize, usize::MAX - (l as usize)),
             (Side::Some(l), Side::Some(r)) => ((l - 1) as usize, r as usize),
             (Side::Some(l), Side::Continue) => ((l - 1) as usize, usize::MAX),
             (Side::Continue, Side::Some(r)) => (0, r as usize),
             (Side::Continue, Side::Continue) => (0, usize::MAX),
         };
 
+        // FastRange {
+        //     l,
+        //     r_sub_l: r - l,
+        //     buff_start: 0,
+        //     buff_end: 0,
+        // }
         Range { start: l, end: r }
     }
 }
 
 #[derive(Debug)]
-pub struct ForwardBounds(Vec<Range<usize>>);
+struct ForwardBounds {
+    pub list: UserBoundsList,
+    last_bound_idx: usize,
+}
 
 impl TryFrom<&UserBoundsList> for ForwardBounds {
     type Error = &'static str;
 
     fn try_from(value: &UserBoundsList) -> Result<Self, Self::Error> {
-        if value.is_forward_only() {
-            let mut v: Vec<Range<usize>> = Vec::with_capacity(value.0.len());
-            for maybe_bounds in value.0.iter() {
-                // XXX for now let's drop the fillers
-                // XXX TODO
-
-                if let BoundOrFiller::Bound(bounds) = maybe_bounds {
-                    v.push(bounds.into());
+        if value.0.is_empty() {
+            Err("Cannot create ForwardBounds from an empty UserBoundsList")
+        } else if value.is_forward_only() {
+            let value: UserBoundsList = UserBoundsList(value.iter().cloned().collect());
+            let mut maybe_last_bound: Option<usize> = None;
+            value.iter().enumerate().rev().any(|(idx, bof)| {
+                if matches!(bof, BoundOrFiller::Bound(_)) {
+                    maybe_last_bound = Some(idx);
+                    true
+                } else {
+                    false
                 }
+            });
+
+            if let Some(last_bound_idx) = maybe_last_bound {
+                Ok(ForwardBounds {
+                    list: value,
+                    last_bound_idx,
+                })
+            } else {
+                Err("Cannot create ForwardBounds from UserBoundsList without bounds")
             }
-            Ok(ForwardBounds(v))
         } else {
             Err("The provided UserBoundsList is not forward only")
+        }
+    }
+}
+
+impl Deref for ForwardBounds {
+    type Target = UserBoundsList;
+
+    fn deref(&self) -> &Self::Target {
+        &self.list
+    }
+}
+
+impl ForwardBounds {
+    fn get_last_bound(&self) -> &UserBounds {
+        if let Some(BoundOrFiller::Bound(b)) = self.list.get(self.last_bound_idx) {
+            b
+        } else {
+            panic!("Invariant error: last_bound_idx failed to match a bound")
         }
     }
 }
