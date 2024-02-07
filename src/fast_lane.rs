@@ -84,7 +84,7 @@ fn cut_str_fast_line<W: Write>(
         }
     }
 
-    stdout.write_all(&[b'\n'])?;
+    stdout.write_all(&[opt.eol.into()])?;
 
     Ok(())
 }
@@ -121,7 +121,7 @@ fn output_parts<W: Write>(
 pub struct FastOpt {
     delimiter: u8,
     join: bool,
-    eol: u8,
+    eol: EOL,
     bounds: ForwardBounds,
     only_delimited: bool,
 }
@@ -142,7 +142,6 @@ impl TryFrom<&Opt> for FastOpt {
             || value.replace_delimiter.is_some()
             || value.trim.is_some()
             || value.regex_bag.is_some()
-            || matches!(value.eol, EOL::Zero)
         {
             return Err(
                 "FastOpt supports solely forward fields, join and single-character delimiters",
@@ -153,7 +152,7 @@ impl TryFrom<&Opt> for FastOpt {
             Ok(FastOpt {
                 delimiter: value.delimiter.as_bytes().first().unwrap().to_owned(),
                 join: value.join,
-                eol: b'\n',
+                eol: value.eol,
                 bounds: forward_bounds,
                 only_delimited: value.only_delimited,
             })
@@ -199,7 +198,7 @@ impl TryFrom<&UserBoundsList> for ForwardBounds {
     type Error = &'static str;
 
     fn try_from(value: &UserBoundsList) -> Result<Self, Self::Error> {
-        if value.0.is_empty() {
+        if value.is_empty() {
             Err("Cannot create ForwardBounds from an empty UserBoundsList")
         } else if value.is_forward_only() {
             let value: UserBoundsList = UserBoundsList(value.iter().cloned().collect());
@@ -250,13 +249,21 @@ pub fn read_and_cut_text_as_bytes<R: BufRead, W: Write>(
     stdout: &mut W,
     opt: &FastOpt,
 ) -> Result<()> {
-    stdin.for_byte_line(|line| {
-        let mut fields: Vec<Range<usize>> = Vec::with_capacity(16);
-        cut_str_fast_line(line, opt, stdout, &mut fields)
-            // XXX Should map properly the error
-            .map_err(|x| io::Error::new(io::ErrorKind::Other, x.to_string()))
-            .and(Ok(true))
-    })?;
+    let mut fields: Vec<Range<usize>> = Vec::with_capacity(16);
+    match opt.eol {
+        EOL::Newline => stdin.for_byte_line(|line| {
+            cut_str_fast_line(line, opt, stdout, &mut fields)
+                // XXX Should map properly the error
+                .map_err(|x| io::Error::new(io::ErrorKind::Other, x.to_string()))
+                .and(Ok(true))
+        })?,
+        EOL::Zero => stdin.for_byte_record(opt.eol.into(), |line| {
+            cut_str_fast_line(line, opt, stdout, &mut fields)
+                // XXX Should map properly the error
+                .map_err(|x| io::Error::new(io::ErrorKind::Other, x.to_string()))
+                .and(Ok(true))
+        })?,
+    }
 
     Ok(())
 }
