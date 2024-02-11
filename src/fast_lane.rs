@@ -160,32 +160,6 @@ impl TryFrom<&Opt> for FastOpt {
     }
 }
 
-impl From<&UserBounds> for Range<usize> {
-    fn from(value: &UserBounds) -> Self {
-        // XXX this will explode in our face at the first negative value
-        // XXX we should have a try into and more checks in place
-        // (also, values must be sequential, but that should be covered by UserBounds
-        // ... if we will still pass by it)
-
-        let (l, r): (usize, usize) = match (value.l, value.r) {
-            // (Side::Some(l), Side::Some(r)) => (l as usize, (r - l) as usize),
-            // (Side::Some(l), Side::Continue) => (l as usize, usize::MAX - (l as usize)),
-            (Side::Some(l), Side::Some(r)) => ((l - 1) as usize, r as usize),
-            (Side::Some(l), Side::Continue) => ((l - 1) as usize, usize::MAX),
-            (Side::Continue, Side::Some(r)) => (0, r as usize),
-            (Side::Continue, Side::Continue) => (0, usize::MAX),
-        };
-
-        // FastRange {
-        //     l,
-        //     r_sub_l: r - l,
-        //     buff_start: 0,
-        //     buff_end: 0,
-        // }
-        Range { start: l, end: r }
-    }
-}
-
 #[derive(Debug)]
 struct ForwardBounds {
     pub list: UserBoundsList,
