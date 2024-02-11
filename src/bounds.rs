@@ -114,6 +114,9 @@ impl FromStr for UserBoundsList {
 }
 
 impl UserBoundsList {
+    /// Detect whether the list can be sorted.
+    /// It can be sorted only if every bound
+    /// has the same sign (all positive or all negative).
     fn is_sortable(&self) -> bool {
         let mut has_positive_idx = false;
         let mut has_negative_idx = false;
@@ -176,6 +179,10 @@ impl UserBoundsList {
         })
     }
 
+    /// Check if the bounds in the list match the following conditions:
+    /// - they are in ascending order
+    /// - they use solely positive indices
+    /// - they don't overlap (but they can be adjacent, e.g. 1:2,2,3)
     pub fn is_forward_only(&self) -> bool {
         self.is_sortable() && self.is_sorted() && !self.has_negative_indices()
     }
