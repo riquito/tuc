@@ -143,6 +143,19 @@ pub struct FastOpt {
     trim: Option<Trim>,
 }
 
+impl Default for FastOpt {
+    fn default() -> Self {
+        Self {
+            delimiter: b'\t',
+            join: false,
+            eol: EOL::Newline,
+            bounds: ForwardBounds::try_from(&UserBoundsList::from_str("1:").unwrap()).unwrap(),
+            only_delimited: false,
+            trim: None,
+        }
+    }
+}
+
 impl TryFrom<&Opt> for FastOpt {
     type Error = &'static str;
 
@@ -233,6 +246,14 @@ impl ForwardBounds {
     }
 }
 
+impl FromStr for ForwardBounds {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bounds_list = UserBoundsList::from_str(s)?;
+        ForwardBounds::try_from(&bounds_list)
+    }
+}
+
 pub fn read_and_cut_text_as_bytes<R: BufRead, W: Write>(
     stdin: &mut R,
     stdout: &mut W,
@@ -259,4 +280,163 @@ pub fn read_and_cut_text_as_bytes<R: BufRead, W: Write>(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use crate::options::Trim;
+
+    use super::*;
+
+    fn make_fields_opt() -> FastOpt {
+        FastOpt {
+            delimiter: b'-',
+            ..FastOpt::default()
+        }
+    }
+
+    #[test]
+    fn test_read_and_cut_str_echo_non_delimited_strings() {
+        // read_and_cut_str is difficult to test, let's verify at least
+        // that it reads the input and appears to call cut_str
+
+        let opt = make_fields_opt();
+        let mut input = b"foo".as_slice();
+        let mut output = Vec::new();
+        read_and_cut_text_as_bytes(&mut input, &mut output, &opt).unwrap();
+        assert_eq!(output, b"foo\n".as_slice());
+    }
+
+    fn make_cut_str_buffers() -> (Vec<u8>, Vec<Range<usize>>) {
+        let output = Vec::new();
+        let fields = Vec::new();
+        (output, fields)
+    }
+
+    #[test]
+    fn cut_str_echo_non_delimited_strings() {
+        let opt = make_fields_opt();
+        let (mut output, mut fields) = make_cut_str_buffers();
+        let last_interesting_field = Side::Continue;
+
+        let line = b"foo";
+
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"foo\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_skip_non_delimited_strings_when_requested() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut fields) = make_cut_str_buffers();
+        let last_interesting_field = Side::Continue;
+
+        opt.only_delimited = true;
+        let line = b"foo";
+
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_cut_a_field() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut fields) = make_cut_str_buffers();
+        let last_interesting_field = Side::Continue;
+
+        let line = b"a-b-c";
+        opt.bounds = ForwardBounds::from_str("1").unwrap();
+
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"a\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_cut_consecutive_delimiters() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut fields) = make_cut_str_buffers();
+        let last_interesting_field = Side::Continue;
+
+        let line = b"a-b-c";
+        opt.bounds = ForwardBounds::from_str("1,3").unwrap();
+
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"ac\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_supports_zero_terminated_lines() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut fields) = make_cut_str_buffers();
+        let last_interesting_field = Side::Continue;
+        opt.eol = EOL::Zero;
+
+        let line = b"a-b-c";
+        opt.bounds = ForwardBounds::from_str("2").unwrap();
+
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"b\0".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_join_fields() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut fields) = make_cut_str_buffers();
+        let last_interesting_field = Side::Continue;
+
+        let line = b"a-b-c";
+        opt.bounds = ForwardBounds::from_str("1,3").unwrap();
+        opt.join = true;
+
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"a-c\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_format_fields() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut fields) = make_cut_str_buffers();
+        let last_interesting_field = Side::Continue;
+
+        let line = b"a-b-c";
+        opt.bounds = ForwardBounds::from_str("{1} < {3} > {2}").unwrap();
+
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"a < c > b\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_trim_fields() {
+        let mut opt = make_fields_opt();
+        let line = b"--a--b--c--";
+
+        // check Trim::Both
+        opt.trim = Some(Trim::Both);
+        opt.bounds = ForwardBounds::from_str("1,3,-1").unwrap();
+
+        let (mut output, mut fields) = make_cut_str_buffers();
+        let last_interesting_field = Side::Continue;
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"abc\n".as_slice());
+
+        // check Trim::Left
+        opt.trim = Some(Trim::Left);
+        opt.bounds = ForwardBounds::from_str("1,3,-3").unwrap();
+
+        let (mut output, mut fields) = make_cut_str_buffers();
+        let last_interesting_field = Side::Continue;
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"abc\n".as_slice());
+
+        // check Trim::Right
+        opt.trim = Some(Trim::Right);
+        opt.bounds = ForwardBounds::from_str("3,5,-1").unwrap();
+
+        let (mut output, mut fields) = make_cut_str_buffers();
+        let last_interesting_field = Side::Continue;
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"abc\n".as_slice());
+    }
 }
