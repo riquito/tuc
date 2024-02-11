@@ -13,15 +13,13 @@ fn cut_str_fast_line<W: Write>(
     opt: &FastOpt,
     stdout: &mut W,
     fields: &mut Vec<Range<usize>>,
+    last_interesting_field: Side,
 ) -> Result<()> {
     if buffer.is_empty() {
         return Ok(());
     }
 
     let bounds = &opt.bounds;
-
-    // ForwardBounds guarantees that there is at least one field to check
-    let last_interesting_field = bounds.get_last_bound().r;
 
     let mut prev_field_start = 0;
 
@@ -38,7 +36,7 @@ fn cut_str_fast_line<W: Write>(
         fields.push(Range { start, end });
 
         if Side::Some(curr_field) == last_interesting_field {
-            // we have no use for this field or any of the following ones
+            // We have no use for any other fields in this line
             break;
         }
     }
@@ -89,7 +87,7 @@ fn cut_str_fast_line<W: Write>(
     Ok(())
 }
 
-#[inline]
+#[inline(always)]
 fn output_parts<W: Write>(
     line: &[u8],
     // which parts to print
@@ -250,15 +248,19 @@ pub fn read_and_cut_text_as_bytes<R: BufRead, W: Write>(
     opt: &FastOpt,
 ) -> Result<()> {
     let mut fields: Vec<Range<usize>> = Vec::with_capacity(16);
+
+    // ForwardBounds guarantees that there is at least one field to check
+    let last_interesting_field = opt.bounds.get_last_bound().r;
+
     match opt.eol {
         EOL::Newline => stdin.for_byte_line(|line| {
-            cut_str_fast_line(line, opt, stdout, &mut fields)
+            cut_str_fast_line(line, opt, stdout, &mut fields, last_interesting_field)
                 // XXX Should map properly the error
                 .map_err(|x| io::Error::new(io::ErrorKind::Other, x.to_string()))
                 .and(Ok(true))
         })?,
         EOL::Zero => stdin.for_byte_record(opt.eol.into(), |line| {
-            cut_str_fast_line(line, opt, stdout, &mut fields)
+            cut_str_fast_line(line, opt, stdout, &mut fields, last_interesting_field)
                 // XXX Should map properly the error
                 .map_err(|x| io::Error::new(io::ErrorKind::Other, x.to_string()))
                 .and(Ok(true))
