@@ -34,6 +34,9 @@ fn cut_str_fast_lane<W: Write>(
     }
 
     if buffer.is_empty() {
+        if !opt.only_delimited {
+            stdout.write_all(&[opt.eol.into()])?;
+        }
         return Ok(());
     }
 
@@ -122,7 +125,6 @@ fn output_parts<W: Write>(
     let idx_end = fields[r.end - 1].end;
     let output = &line[idx_start..idx_end];
 
-    // let field_to_print = maybe_replace_delimiter(output, opt);
     let field_to_print = output;
     stdout.write_all(field_to_print)?;
 
@@ -318,24 +320,37 @@ mod tests {
     #[test]
     fn cut_str_echo_non_delimited_strings() {
         let opt = make_fields_opt();
-        let (mut output, mut fields) = make_cut_str_buffers();
         let last_interesting_field = Side::Continue;
 
+        // non-empty line missing the delimiter
         let line = b"foo";
-
+        let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
         assert_eq!(output, b"foo\n".as_slice());
+
+        // empty line
+        let line = b"";
+        let (mut output, mut fields) = make_cut_str_buffers();
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"\n".as_slice());
     }
 
     #[test]
     fn cut_str_skip_non_delimited_strings_when_requested() {
         let mut opt = make_fields_opt();
-        let (mut output, mut fields) = make_cut_str_buffers();
         let last_interesting_field = Side::Continue;
 
         opt.only_delimited = true;
-        let line = b"foo";
 
+        // non-empty line missing the delimiter
+        let line = b"foo";
+        let (mut output, mut fields) = make_cut_str_buffers();
+        cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
+        assert_eq!(output, b"".as_slice());
+
+        // empty line
+        let line = b"";
+        let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(line, &opt, &mut output, &mut fields, last_interesting_field).unwrap();
         assert_eq!(output, b"".as_slice());
     }

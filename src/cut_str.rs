@@ -584,24 +584,38 @@ mod tests {
     #[test]
     fn cut_str_echo_non_delimited_strings() {
         let opt = make_fields_opt();
-        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
         let line = "foo";
 
+        // non-empty line missing the delimiter
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"foo\n".as_slice());
+
+        // empty line
+        let line = "";
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"\n".as_slice());
     }
 
     #[test]
     fn cut_str_skip_non_delimited_strings_when_requested() {
         let mut opt = make_fields_opt();
-        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
         opt.only_delimited = true;
-        let line = "foo";
 
+        // non-empty line missing the delimiter
+        let line = "foo";
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"".as_slice());
+
+        // empty line
+        let line = "";
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"".as_slice());
     }
