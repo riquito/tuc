@@ -1,20 +1,38 @@
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList};
-use crate::options::{Opt, EOL};
-use anyhow::Result;
+use crate::options::{Opt, Trim, EOL};
+use anyhow::{bail, Result};
+use bstr::ByteSlice;
 use std::convert::TryFrom;
 use std::io::{self, BufRead};
 use std::ops::Deref;
+use std::str::FromStr;
 use std::{io::Write, ops::Range};
 
 use bstr::io::BufReadExt;
 
-fn cut_str_fast_line<W: Write>(
-    buffer: &[u8],
+fn trim<'a>(buffer: &'a [u8], trim_kind: &Trim, delimiter: u8) -> &'a [u8] {
+    match trim_kind {
+        Trim::Both => buffer
+            .trim_start_with(|x| x == delimiter as char)
+            .trim_end_with(|x| x == delimiter as char),
+        Trim::Left => buffer.trim_start_with(|x| x == delimiter as char),
+        Trim::Right => buffer.trim_end_with(|x| x == delimiter as char),
+    }
+}
+
+fn cut_str_fast_lane<W: Write>(
+    initial_buffer: &[u8],
     opt: &FastOpt,
     stdout: &mut W,
     fields: &mut Vec<Range<usize>>,
     last_interesting_field: Side,
 ) -> Result<()> {
+    let mut buffer = initial_buffer;
+
+    if opt.trim.is_some() {
+        buffer = trim(buffer, opt.trim.as_ref().unwrap(), opt.delimiter)
+    }
+
     if buffer.is_empty() {
         return Ok(());
     }
@@ -122,6 +140,7 @@ pub struct FastOpt {
     eol: EOL,
     bounds: ForwardBounds,
     only_delimited: bool,
+    trim: Option<Trim>,
 }
 
 impl TryFrom<&Opt> for FastOpt {
@@ -138,7 +157,6 @@ impl TryFrom<&Opt> for FastOpt {
             || value.json
             || value.bounds_type != BoundsType::Fields
             || value.replace_delimiter.is_some()
-            || value.trim.is_some()
             || value.regex_bag.is_some()
         {
             return Err(
@@ -153,6 +171,7 @@ impl TryFrom<&Opt> for FastOpt {
                 eol: value.eol,
                 bounds: forward_bounds,
                 only_delimited: value.only_delimited,
+                trim: value.trim,
             })
         } else {
             Err("Bounds cannot be converted to ForwardBounds")
@@ -167,12 +186,12 @@ struct ForwardBounds {
 }
 
 impl TryFrom<&UserBoundsList> for ForwardBounds {
-    type Error = &'static str;
+    type Error = anyhow::Error;
 
     fn try_from(value: &UserBoundsList) -> Result<Self, Self::Error> {
         if value.is_empty() {
-            Err("Cannot create ForwardBounds from an empty UserBoundsList")
-        } else if value.is_forward_only() {
+            bail!("Cannot create ForwardBounds from an empty UserBoundsList");
+        } else {
             let value: UserBoundsList = UserBoundsList(value.iter().cloned().collect());
             let mut maybe_last_bound: Option<usize> = None;
             value.iter().enumerate().rev().any(|(idx, bof)| {
@@ -190,10 +209,8 @@ impl TryFrom<&UserBoundsList> for ForwardBounds {
                     last_bound_idx,
                 })
             } else {
-                Err("Cannot create ForwardBounds from UserBoundsList without bounds")
+                bail!("Cannot create ForwardBounds from UserBoundsList without bounds");
             }
-        } else {
-            Err("The provided UserBoundsList is not forward only")
         }
     }
 }
@@ -211,7 +228,7 @@ impl ForwardBounds {
         if let Some(BoundOrFiller::Bound(b)) = self.list.get(self.last_bound_idx) {
             b
         } else {
-            panic!("Invariant error: last_bound_idx failed to match a bound")
+            panic!("Invariant error: last_bound_idx failed to match a bound. The constructor should have verified that")
         }
     }
 }
@@ -228,13 +245,13 @@ pub fn read_and_cut_text_as_bytes<R: BufRead, W: Write>(
 
     match opt.eol {
         EOL::Newline => stdin.for_byte_line(|line| {
-            cut_str_fast_line(line, opt, stdout, &mut fields, last_interesting_field)
+            cut_str_fast_lane(line, opt, stdout, &mut fields, last_interesting_field)
                 // XXX Should map properly the error
                 .map_err(|x| io::Error::new(io::ErrorKind::Other, x.to_string()))
                 .and(Ok(true))
         })?,
         EOL::Zero => stdin.for_byte_record(opt.eol.into(), |line| {
-            cut_str_fast_line(line, opt, stdout, &mut fields, last_interesting_field)
+            cut_str_fast_lane(line, opt, stdout, &mut fields, last_interesting_field)
                 // XXX Should map properly the error
                 .map_err(|x| io::Error::new(io::ErrorKind::Other, x.to_string()))
                 .and(Ok(true))
