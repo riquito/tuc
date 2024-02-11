@@ -235,6 +235,23 @@ impl fmt::Display for Side {
     }
 }
 
+impl PartialOrd for Side {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Side::Some(s), Side::Some(o)) => {
+                if !(s * o).is_positive() {
+                    // We can't compare two sides with different sign
+                    return None;
+                }
+                Some(s.cmp(o))
+            }
+            (Side::Continue, Side::Some(_)) => Some(Ordering::Greater),
+            (Side::Some(_), Side::Continue) => Some(Ordering::Less),
+            (Side::Continue, Side::Continue) => Some(Ordering::Equal),
+        }
+    }
+}
+
 #[derive(Debug, Eq, Clone)]
 pub struct UserBounds {
     pub l: Side,
@@ -419,40 +436,20 @@ impl UserBounds {
         };
 
         for i in start..=end {
-            bounds.push(UserBounds {
-                l: Side::Some(i),
-                r: Side::Some(i),
-            })
+            bounds.push(UserBounds::new(Side::Some(i), Side::Some(i)))
         }
 
         bounds
     }
 }
 
-impl Ord for UserBounds {
-    /*
-     * Compare UserBounds. Note that comparison gives wrong results if
-     * bounds happen to have a mix of positive/negative indexes (you cannot
-     * reliably compare -1 with 3 without kwowing how many parts are there).
-     * Check with UserBounds.is_sortable before comparing.
-     */
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self == other {
-            return Ordering::Equal;
-        }
-
-        match (self.l, self.r, other.l, other.r) {
-            (_, Side::Some(s_r), Side::Some(o_l), _) if (s_r * o_l).is_positive() && s_r <= o_l => {
-                Ordering::Less
-            }
-            _ => Ordering::Greater,
-        }
-    }
-}
-
 impl PartialOrd for UserBounds {
+    /// Compare UserBounds. Note that you cannot reliably compare
+    /// bounds with a mix of positive/negative indices (you cannot
+    /// compare `-1` with `3` without kwowing how many parts are there).
+    /// Check with UserBounds.is_sortable before comparing.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+        self.r.partial_cmp(&other.l)
     }
 }
 
