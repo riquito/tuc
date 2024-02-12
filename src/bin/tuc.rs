@@ -9,6 +9,7 @@ use tuc::cut_lines::read_and_cut_lines;
 use tuc::cut_str::read_and_cut_str;
 use tuc::help::{get_help, get_short_help};
 use tuc::options::{Opt, EOL};
+use tuc::stream::{read_and_cut_bytes_stream, StreamOpt};
 
 #[cfg(feature = "fast-lane")]
 use tuc::fast_lane::{read_and_cut_text_as_bytes, FastOpt};
@@ -251,6 +252,8 @@ fn main() -> Result<()> {
         read_and_cut_bytes(&mut stdin, &mut stdout, &opt)?;
     } else if opt.bounds_type == BoundsType::Lines {
         read_and_cut_lines(&mut stdin, &mut stdout, &opt)?;
+    } else if let Ok(stream_opt) = StreamOpt::try_from(&opt) {
+        read_and_cut_bytes_stream(&mut stdin, &mut stdout, &stream_opt)?;
     } else if let Ok(fast_opt) = FastOpt::try_from(&opt) {
         read_and_cut_text_as_bytes(&mut stdin, &mut stdout, &fast_opt)?;
     } else {
