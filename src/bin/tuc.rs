@@ -114,7 +114,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     };
 
     if bounds_type == BoundsType::Fields
-        && (maybe_fields.is_none() || maybe_fields.as_ref().unwrap().0.is_empty())
+        && (maybe_fields.is_none() || maybe_fields.as_ref().unwrap().is_empty())
     {
         eprintln!("tuc: invariant error. At this point we expected to find at least 1 field bound");
         std::process::exit(1);
@@ -209,12 +209,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         .or(maybe_lines)
         .unwrap();
 
-    if has_json
-        && bounds
-            .0
-            .iter()
-            .any(|s| matches!(s, BoundOrFiller::Filler(_)))
-    {
+    if has_json && bounds.iter().any(|s| matches!(s, BoundOrFiller::Filler(_))) {
         eprintln!("tuc: runtime error. Cannot format fields when using --json");
         std::process::exit(1);
     }

@@ -95,25 +95,62 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
     }
 }
 
-#[derive(Debug)]
-pub struct UserBoundsList(pub Vec<BoundOrFiller>);
+#[derive(Debug, Clone)]
+pub struct UserBoundsList {
+    pub list: Vec<BoundOrFiller>,
+    /// Optimization that we can use to stop searching for fields.
+    /// It's available only when every bound uses positive indexes.
+    /// When conditions do not apply, its value is `Side::Continue`.
+    last_interesting_field: Side,
+}
 
 impl Deref for UserBoundsList {
     type Target = Vec<BoundOrFiller>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.list
+    }
+}
+
+impl From<Vec<BoundOrFiller>> for UserBoundsList {
+    fn from(list: Vec<BoundOrFiller>) -> Self {
+        let mut ubl = UserBoundsList {
+            list,
+            last_interesting_field: Side::Continue,
+        };
+
+        let mut rightmost_bound: Option<Side> = None;
+
+        // This is risky, we could end up using last_interesting_field
+        // internally. Couldn't figure out how to use is_sortable without
+        //  major refactoring.
+        if ubl.is_sortable() {
+            ubl.list.iter().for_each(|bof| {
+                if let BoundOrFiller::Bound(b) = bof {
+                    if rightmost_bound.is_none() || b.r > rightmost_bound.unwrap() {
+                        rightmost_bound = Some(b.r);
+                    }
+                }
+            });
+        }
+
+        ubl.last_interesting_field = rightmost_bound.unwrap_or(Side::Continue);
+        ubl
     }
 }
 
 impl FromStr for UserBoundsList {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(UserBoundsList(parse_bounds_list(s)?))
+        Ok(parse_bounds_list(s)?.into())
     }
 }
 
 impl UserBoundsList {
+    pub fn new(list: Vec<BoundOrFiller>) -> Self {
+        list.into()
+    }
+
     /// Detect whether the list can be sorted.
     /// It can be sorted only if every bound
     /// has the same sign (all positive or all negative).
@@ -142,7 +179,7 @@ impl UserBoundsList {
     }
 
     fn get_userbounds_only(&self) -> impl Iterator<Item = &UserBounds> + '_ {
-        self.0.iter().flat_map(|b| match b {
+        self.list.iter().flat_map(|b| match b {
             BoundOrFiller::Bound(x) => Some(x),
             _ => None,
         })
@@ -192,17 +229,22 @@ impl UserBoundsList {
      * and with every ranged bound converted into single slot bounds.
      */
     pub fn unpack(&self, num_fields: usize) -> UserBoundsList {
-        UserBoundsList(
-            self.0
-                .iter()
-                .filter_map(|x| match x {
-                    BoundOrFiller::Filler(_) => None,
-                    BoundOrFiller::Bound(b) => Some(b.unpack(num_fields)),
-                })
-                .flatten()
-                .map(BoundOrFiller::Bound)
-                .collect(),
-        )
+        let list: Vec<BoundOrFiller> = self
+            .list
+            .iter()
+            .filter_map(|x| match x {
+                BoundOrFiller::Filler(_) => None,
+                BoundOrFiller::Bound(b) => Some(b.unpack(num_fields)),
+            })
+            .flatten()
+            .map(BoundOrFiller::Bound)
+            .collect();
+
+        list.into()
+    }
+
+    pub fn get_last_bound(&self) -> Side {
+        self.last_interesting_field
     }
 }
 
@@ -715,7 +757,7 @@ mod tests {
 
     #[test]
     fn test_user_bounds_is_sortable() {
-        assert!(UserBoundsList(Vec::new()).is_sortable());
+        assert!(UserBoundsList::new(Vec::new()).is_sortable());
 
         assert!(UserBoundsList::from_str("1").unwrap().is_sortable());
 
@@ -763,7 +805,10 @@ mod tests {
     #[test]
     fn test_vec_of_bounds_can_unpack() {
         assert_eq!(
-            UserBoundsList::from_str("1,:1,2:3,4:").unwrap().unpack(4).0,
+            UserBoundsList::from_str("1,:1,2:3,4:")
+                .unwrap()
+                .unpack(4)
+                .list,
             vec![
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
@@ -774,7 +819,10 @@ mod tests {
         );
 
         assert_eq!(
-            UserBoundsList::from_str("a{1}b{2}c").unwrap().unpack(4).0,
+            UserBoundsList::from_str("a{1}b{2}c")
+                .unwrap()
+                .unpack(4)
+                .list,
             vec![
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
