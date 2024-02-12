@@ -1,10 +1,9 @@
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList};
 use crate::options::{Opt, Trim, EOL};
-use anyhow::{bail, Result};
+use anyhow::Result;
 use bstr::ByteSlice;
 use std::convert::TryFrom;
 use std::io::{self, BufRead};
-use std::ops::Deref;
 use std::str::FromStr;
 use std::{io::Write, ops::Range};
 
@@ -140,7 +139,7 @@ pub struct FastOpt {
     delimiter: u8,
     join: bool,
     eol: EOL,
-    bounds: ForwardBounds,
+    bounds: UserBoundsList,
     only_delimited: bool,
     trim: Option<Trim>,
 }
@@ -151,7 +150,7 @@ impl Default for FastOpt {
             delimiter: b'\t',
             join: false,
             eol: EOL::Newline,
-            bounds: ForwardBounds::try_from(&UserBoundsList::from_str("1:").unwrap()).unwrap(),
+            bounds: UserBoundsList::from_str("1:").unwrap(),
             only_delimited: false,
             trim: None,
         }
@@ -179,77 +178,15 @@ impl TryFrom<&Opt> for FastOpt {
             );
         }
 
-        if let Ok(forward_bounds) = ForwardBounds::try_from(&value.bounds) {
-            Ok(FastOpt {
-                delimiter: value.delimiter.as_bytes().first().unwrap().to_owned(),
-                join: value.join,
-                eol: value.eol,
-                bounds: forward_bounds,
-                only_delimited: value.only_delimited,
-                trim: value.trim,
-            })
-        } else {
-            Err("Bounds cannot be converted to ForwardBounds")
-        }
-    }
-}
-
-#[derive(Debug)]
-struct ForwardBounds {
-    pub list: UserBoundsList,
-    // Optimization that we can use to stop searching for fields
-    // It's available only when every bound use positive indexes.
-    // When conditions do not apply, Side::Continue is used.
-    last_interesting_field: Side,
-}
-
-impl TryFrom<&UserBoundsList> for ForwardBounds {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &UserBoundsList) -> Result<Self, Self::Error> {
-        if value.is_empty() {
-            bail!("Cannot create ForwardBounds from an empty UserBoundsList");
-        } else {
-            let value: UserBoundsList = UserBoundsList(value.iter().cloned().collect());
-
-            let mut rightmost_bound: Option<Side> = None;
-            if value.is_sortable() {
-                value.iter().for_each(|bof| {
-                    if let BoundOrFiller::Bound(b) = bof {
-                        if rightmost_bound.is_none() || b.r > rightmost_bound.unwrap() {
-                            rightmost_bound = Some(b.r);
-                        }
-                    }
-                });
-            }
-
-            Ok(ForwardBounds {
-                list: value,
-                last_interesting_field: rightmost_bound.unwrap_or(Side::Continue),
-            })
-        }
-    }
-}
-
-impl Deref for ForwardBounds {
-    type Target = UserBoundsList;
-
-    fn deref(&self) -> &Self::Target {
-        &self.list
-    }
-}
-
-impl ForwardBounds {
-    fn get_last_bound(&self) -> Side {
-        self.last_interesting_field
-    }
-}
-
-impl FromStr for ForwardBounds {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bounds_list = UserBoundsList::from_str(s)?;
-        ForwardBounds::try_from(&bounds_list)
+        let delimiter = value.delimiter.as_bytes().first().unwrap().to_owned();
+        Ok(FastOpt {
+            delimiter,
+            join: value.join,
+            eol: value.eol,
+            bounds: value.bounds.clone(),
+            only_delimited: value.only_delimited,
+            trim: value.trim,
+        })
     }
 }
 
@@ -397,7 +334,7 @@ mod tests {
         let (mut output, mut fields) = make_cut_str_buffers();
 
         let line = b"a-b-c";
-        opt.bounds = ForwardBounds::from_str("1").unwrap();
+        opt.bounds = UserBoundsList::from_str("1").unwrap();
 
         cut_str_fast_lane(
             line,
@@ -417,7 +354,7 @@ mod tests {
         let line = b"a-b-c";
 
         // just one negative index
-        opt.bounds = ForwardBounds::from_str("-1").unwrap();
+        opt.bounds = UserBoundsList::from_str("-1").unwrap();
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
             line,
@@ -430,7 +367,7 @@ mod tests {
         assert_eq!(output, b"c\n".as_slice());
 
         // multiple negative indices, in forward order
-        opt.bounds = ForwardBounds::from_str("-2,-1").unwrap();
+        opt.bounds = UserBoundsList::from_str("-2,-1").unwrap();
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
             line,
@@ -443,7 +380,7 @@ mod tests {
         assert_eq!(output, b"bc\n".as_slice());
 
         // multiple negative indices, in non-forward order
-        opt.bounds = ForwardBounds::from_str("-1,-2").unwrap();
+        opt.bounds = UserBoundsList::from_str("-1,-2").unwrap();
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
             line,
@@ -458,7 +395,7 @@ mod tests {
         // mix positive and negative indices
         // (this is particularly useful to verify that we don't screw
         // up optimizations on last field to check)
-        opt.bounds = ForwardBounds::from_str("-1,1").unwrap();
+        opt.bounds = UserBoundsList::from_str("-1,1").unwrap();
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
             line,
@@ -477,7 +414,7 @@ mod tests {
         let (mut output, mut fields) = make_cut_str_buffers();
 
         let line = b"a-b-c";
-        opt.bounds = ForwardBounds::from_str("1,3").unwrap();
+        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
 
         cut_str_fast_lane(
             line,
@@ -497,7 +434,7 @@ mod tests {
         opt.eol = EOL::Zero;
 
         let line = b"a-b-c";
-        opt.bounds = ForwardBounds::from_str("2").unwrap();
+        opt.bounds = UserBoundsList::from_str("2").unwrap();
 
         cut_str_fast_lane(
             line,
@@ -516,7 +453,7 @@ mod tests {
         let (mut output, mut fields) = make_cut_str_buffers();
 
         let line = b"a-b-c";
-        opt.bounds = ForwardBounds::from_str("1,3").unwrap();
+        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
         opt.join = true;
 
         cut_str_fast_lane(
@@ -536,7 +473,7 @@ mod tests {
         let (mut output, mut fields) = make_cut_str_buffers();
 
         let line = b"a-b-c";
-        opt.bounds = ForwardBounds::from_str("{1} < {3} > {2}").unwrap();
+        opt.bounds = UserBoundsList::from_str("{1} < {3} > {2}").unwrap();
 
         cut_str_fast_lane(
             line,
@@ -556,7 +493,7 @@ mod tests {
 
         // check Trim::Both
         opt.trim = Some(Trim::Both);
-        opt.bounds = ForwardBounds::from_str("1,3,-1").unwrap();
+        opt.bounds = UserBoundsList::from_str("1,3,-1").unwrap();
 
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
@@ -571,7 +508,7 @@ mod tests {
 
         // check Trim::Left
         opt.trim = Some(Trim::Left);
-        opt.bounds = ForwardBounds::from_str("1,3,-3").unwrap();
+        opt.bounds = UserBoundsList::from_str("1,3,-3").unwrap();
 
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
@@ -586,7 +523,7 @@ mod tests {
 
         // check Trim::Right
         opt.trim = Some(Trim::Right);
-        opt.bounds = ForwardBounds::from_str("3,5,-1").unwrap();
+        opt.bounds = UserBoundsList::from_str("3,5,-1").unwrap();
 
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(

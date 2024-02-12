@@ -10,7 +10,7 @@ fn cut_bytes<W: Write>(data: &[u8], opt: &Opt, stdout: &mut W) -> Result<()> {
         return Ok(());
     }
 
-    opt.bounds.0.iter().try_for_each(|bof| -> Result<()> {
+    opt.bounds.iter().try_for_each(|bof| -> Result<()> {
         let output = match bof {
             BoundOrFiller::Bound(b) => {
                 let r = b.try_into_range(data.len())?;

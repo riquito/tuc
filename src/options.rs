@@ -54,7 +54,7 @@ impl Default for Opt {
         Opt {
             delimiter: String::from("-"),
             eol: EOL::Newline,
-            bounds: UserBoundsList(vec![BoundOrFiller::Bound(UserBounds::default())]),
+            bounds: UserBoundsList::new(vec![BoundOrFiller::Bound(UserBounds::default())]),
             bounds_type: BoundsType::Fields,
             only_delimited: false,
             greedy_delimiter: false,
