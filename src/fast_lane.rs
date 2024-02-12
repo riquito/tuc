@@ -80,7 +80,7 @@ fn cut_str_fast_lane<W: Write>(
     let num_fields = fields.len();
 
     match num_fields {
-        1 if bounds.len() == 1 => {
+        1 if bounds.len() == 1 && fields[0].end == buffer.len() => {
             stdout.write_all(buffer)?;
         }
         _ => {
@@ -213,13 +213,15 @@ impl TryFrom<&UserBoundsList> for ForwardBounds {
             let value: UserBoundsList = UserBoundsList(value.iter().cloned().collect());
 
             let mut rightmost_bound: Option<Side> = None;
-            value.iter().for_each(|bof| {
-                if let BoundOrFiller::Bound(b) = bof {
-                    if rightmost_bound.is_none() || b.r > rightmost_bound.unwrap() {
-                        rightmost_bound = Some(b.r);
+            if value.is_sortable() {
+                value.iter().for_each(|bof| {
+                    if let BoundOrFiller::Bound(b) = bof {
+                        if rightmost_bound.is_none() || b.r > rightmost_bound.unwrap() {
+                            rightmost_bound = Some(b.r);
+                        }
                     }
-                }
-            });
+                });
+            }
 
             Ok(ForwardBounds {
                 list: value,
@@ -392,6 +394,67 @@ mod tests {
         )
         .unwrap();
         assert_eq!(output, b"a\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_cut_with_negative_indices() {
+        let mut opt = make_fields_opt();
+
+        let line = b"a-b-c";
+
+        // just one negative index
+        opt.bounds = ForwardBounds::from_str("-1").unwrap();
+        let (mut output, mut fields) = make_cut_str_buffers();
+        cut_str_fast_lane(
+            line,
+            &opt,
+            &mut output,
+            &mut fields,
+            opt.bounds.get_last_bound(),
+        )
+        .unwrap();
+        assert_eq!(output, b"c\n".as_slice());
+
+        // multiple negative indices, in forward order
+        opt.bounds = ForwardBounds::from_str("-2,-1").unwrap();
+        let (mut output, mut fields) = make_cut_str_buffers();
+        cut_str_fast_lane(
+            line,
+            &opt,
+            &mut output,
+            &mut fields,
+            opt.bounds.get_last_bound(),
+        )
+        .unwrap();
+        assert_eq!(output, b"bc\n".as_slice());
+
+        // multiple negative indices, in non-forward order
+        opt.bounds = ForwardBounds::from_str("-1,-2").unwrap();
+        let (mut output, mut fields) = make_cut_str_buffers();
+        cut_str_fast_lane(
+            line,
+            &opt,
+            &mut output,
+            &mut fields,
+            opt.bounds.get_last_bound(),
+        )
+        .unwrap();
+        assert_eq!(output, b"cb\n".as_slice());
+
+        // mix positive and negative indices
+        // (this is particularly useful to verify that we don't screw
+        // up optimizations on last field to check)
+        opt.bounds = ForwardBounds::from_str("-1,1").unwrap();
+        let (mut output, mut fields) = make_cut_str_buffers();
+        cut_str_fast_lane(
+            line,
+            &opt,
+            &mut output,
+            &mut fields,
+            opt.bounds.get_last_bound(),
+        )
+        .unwrap();
+        assert_eq!(output, b"ca\n".as_slice());
     }
 
     #[test]
