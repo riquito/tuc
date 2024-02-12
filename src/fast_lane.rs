@@ -197,7 +197,7 @@ pub fn read_and_cut_text_as_bytes<R: BufRead, W: Write>(
 ) -> Result<()> {
     let mut fields: Vec<Range<usize>> = Vec::with_capacity(16);
 
-    let last_interesting_field = opt.bounds.get_last_bound();
+    let last_interesting_field = opt.bounds.last_interesting_field;
 
     match opt.eol {
         EOL::Newline => stdin.for_byte_line(|line| {
@@ -276,7 +276,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"foo\n".as_slice());
@@ -289,7 +289,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"\n".as_slice());
@@ -309,7 +309,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"".as_slice());
@@ -322,7 +322,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"".as_slice());
@@ -341,7 +341,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"a\n".as_slice());
@@ -361,7 +361,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"c\n".as_slice());
@@ -374,7 +374,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"bc\n".as_slice());
@@ -387,7 +387,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"cb\n".as_slice());
@@ -402,7 +402,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"ca\n".as_slice());
@@ -421,7 +421,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"ac\n".as_slice());
@@ -441,7 +441,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"b\0".as_slice());
@@ -461,7 +461,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"a-c\n".as_slice());
@@ -480,7 +480,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"a < c > b\n".as_slice());
@@ -501,7 +501,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"abc\n".as_slice());
@@ -516,7 +516,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"abc\n".as_slice());
@@ -531,7 +531,7 @@ mod tests {
             &opt,
             &mut output,
             &mut fields,
-            opt.bounds.get_last_bound(),
+            opt.bounds.last_interesting_field,
         )
         .unwrap();
         assert_eq!(output, b"abc\n".as_slice());

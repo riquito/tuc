@@ -101,7 +101,7 @@ pub struct UserBoundsList {
     /// Optimization that we can use to stop searching for fields.
     /// It's available only when every bound uses positive indexes.
     /// When conditions do not apply, its value is `Side::Continue`.
-    last_interesting_field: Side,
+    pub last_interesting_field: Side,
 }
 
 impl Deref for UserBoundsList {
@@ -122,8 +122,8 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
         let mut rightmost_bound: Option<Side> = None;
 
         // This is risky, we could end up using last_interesting_field
-        // internally. Couldn't figure out how to use is_sortable without
-        //  major refactoring.
+        // internally. Didn't spend much time to figure out how to use
+        // is_sortable without major refactoring.
         if ubl.is_sortable() {
             ubl.list.iter().for_each(|bof| {
                 if let BoundOrFiller::Bound(b) = bof {
@@ -241,10 +241,6 @@ impl UserBoundsList {
             .collect();
 
         list.into()
-    }
-
-    pub fn get_last_bound(&self) -> Side {
-        self.last_interesting_field
     }
 }
 
