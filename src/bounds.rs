@@ -117,7 +117,7 @@ impl UserBoundsList {
     /// Detect whether the list can be sorted.
     /// It can be sorted only if every bound
     /// has the same sign (all positive or all negative).
-    fn is_sortable(&self) -> bool {
+    pub fn is_sortable(&self) -> bool {
         let mut has_positive_idx = false;
         let mut has_negative_idx = false;
         self.get_userbounds_only().for_each(|b| {
