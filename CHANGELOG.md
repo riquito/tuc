@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- feat: much faster (3x) implementation for common scenarios
+
 ## [1.2.0] - 2024-01-01
 
 - feat: new option --json to format output as JSON array
