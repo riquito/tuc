@@ -327,6 +327,7 @@ impl UserBounds {
      *
      * Fields are 1-indexed.
      */
+    #[inline(always)]
     pub fn matches(&self, idx: i32) -> Result<bool> {
         match (self.l, self.r) {
             (Side::Some(left), _) if (left * idx).is_negative() => {
