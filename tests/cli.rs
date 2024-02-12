@@ -10,12 +10,39 @@ fn it_display_short_help_when_run_without_arguments() {
 }
 
 #[test]
-fn it_echo_non_delimited_line() {
+fn it_echo_first_field_in_non_delimited_line() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd.args(["-d", "/"]).write_stdin("foobar").assert();
+    let assert = cmd
+        .args(["-d", "/", "-f", "1"])
+        .write_stdin("foobar")
+        .assert();
 
     assert.success().stdout("foobar\n");
+}
+
+#[test]
+fn it_fails_on_out_of_bound_fields_in_non_delimited_line() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["-d", "/", "-f", "2"])
+        .write_stdin("foobar")
+        .assert();
+
+    assert.failure().stderr("Error: Out of bounds: 2\n");
+}
+
+#[test]
+fn it_use_fallbacks_in_non_delimited_line() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["-d", "/", "-f", "2", "--fallback-oob", "ok"])
+        .write_stdin("foobar")
+        .assert();
+
+    assert.success().stdout("ok\n");
 }
 
 #[test]
@@ -69,10 +96,10 @@ fn it_works_on_multiple_lines() {
 
     let assert = cmd
         .args(["-f", "2"])
-        .write_stdin("hello\nfoobar\tbaz")
+        .write_stdin("hello\tworld\nfoobar\tbaz")
         .assert();
 
-    assert.success().stdout("hello\nbaz\n");
+    assert.success().stdout("world\nbaz\n");
 }
 
 #[test]
@@ -257,6 +284,15 @@ fn it_join_lines() {
 
 #[test]
 fn it_format_fields() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["-d", ",", "-f", "f1: {1}, f2: {2}"])
+        .write_stdin("hello,world")
+        .assert();
+
+    assert.success().stdout("f1: hello, f2: world\n");
+
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
