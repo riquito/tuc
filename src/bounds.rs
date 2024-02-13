@@ -352,8 +352,15 @@ impl FromStr for UserBounds {
     }
 }
 
-impl UserBounds {
-    pub fn new(l: Side, r: Side) -> Self {
+pub trait UserBoundsTrait<T> {
+    fn new(l: Side, r: Side) -> Self;
+    fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>>;
+    fn matches(&self, idx: T) -> Result<bool>;
+    fn unpack(&self, num_fields: usize) -> Vec<UserBounds>;
+}
+
+impl UserBoundsTrait<i32> for UserBounds {
+    fn new(l: Side, r: Side) -> Self {
         UserBounds { l, r }
     }
     /**
@@ -366,7 +373,7 @@ impl UserBounds {
      * Fields are 1-indexed.
      */
     #[inline(always)]
-    pub fn matches(&self, idx: i32) -> Result<bool> {
+    fn matches(&self, idx: i32) -> Result<bool> {
         match (self.l, self.r) {
             (Side::Some(left), _) if (left * idx).is_negative() => {
                 bail!(
@@ -401,7 +408,7 @@ impl UserBounds {
     /// e.g.
     ///
     /// ```rust
-    /// # use tuc::bounds::UserBounds;
+    /// # use tuc::bounds::{UserBounds, UserBoundsTrait};
     /// # use std::ops::Range;
     /// # use tuc::bounds::Side;
     ///
@@ -415,7 +422,7 @@ impl UserBounds {
     ///   Range { start: 0, end: 5}
     /// );
     /// ```
-    pub fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>> {
+    fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>> {
         let start: usize = match self.l {
             Side::Continue => 0,
             Side::Some(v) => {
@@ -452,11 +459,9 @@ impl UserBounds {
         Ok(Range { start, end })
     }
 
-    /**
-     * Transform a ranged bound into a list of one or more
-     * 1 slot bound
-     */
-    pub fn unpack(&self, num_fields: usize) -> Vec<UserBounds> {
+    /// Transform a ranged bound into a list of one or more
+    /// slot bound
+    fn unpack(&self, num_fields: usize) -> Vec<UserBounds> {
         let mut bounds = Vec::new();
         let n: i32 = num_fields
             .try_into()

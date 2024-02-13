@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use std::io::{BufRead, Write};
 use std::ops::Range;
 
-use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList};
+use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
 use crate::json::escape_json;
 use crate::options::{Opt, Trim};
 use crate::read_utils::read_line_with_eol;
