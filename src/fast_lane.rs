@@ -162,7 +162,7 @@ impl TryFrom<&Opt> for FastOpt {
     type Error = &'static str;
 
     fn try_from(value: &Opt) -> Result<Self, Self::Error> {
-        if !value.delimiter.as_bytes().len() == 1 {
+        if value.delimiter.as_bytes().len() != 1 {
             return Err("Delimiter must be 1 byte wide for FastOpt");
         }
 
@@ -305,6 +305,20 @@ mod tests {
         let mut output = Vec::new();
         read_and_cut_text_as_bytes(&mut input, &mut output, &opt).unwrap();
         assert_eq!(output, b"foo\n".as_slice());
+    }
+
+    #[test]
+    fn fail_to_convert_opt_with_long_delimiter_to_fastopt() {
+        let opt = Opt {
+            delimiter: "foo".to_owned(),
+            ..Default::default()
+        };
+
+        assert!(FastOpt::try_from(&opt).is_err());
+        assert_eq!(
+            FastOpt::try_from(&opt).unwrap_err(),
+            "Delimiter must be 1 byte wide for FastOpt"
+        );
     }
 
     fn make_cut_str_buffers() -> (Vec<u8>, Vec<Range<usize>>) {

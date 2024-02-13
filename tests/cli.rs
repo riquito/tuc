@@ -43,6 +43,18 @@ fn it_cut_consecutive_delimiters() {
 }
 
 #[test]
+fn it_cut_using_multibyte_delimiters() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["-d", "...", "-f", "2"])
+        .write_stdin("foo...bar")
+        .assert();
+
+    assert.success().stdout("bar\n");
+}
+
+#[test]
 fn it_works_on_multiple_lines() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
