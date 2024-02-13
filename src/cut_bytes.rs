@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::io::{Read, Write};
 
-use crate::bounds::BoundOrFiller;
+use crate::bounds::{BoundOrFiller, UserBoundsTrait};
 use crate::options::Opt;
 use crate::read_utils::read_bytes_to_end;
 

@@ -1,4 +1,4 @@
-use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList};
+use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
 use crate::options::{Opt, Trim, EOL};
 use anyhow::Result;
 use bstr::ByteSlice;
