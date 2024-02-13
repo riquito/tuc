@@ -87,17 +87,17 @@ fn cut_str_fast_lane<W: Write>(
                 .iter()
                 .enumerate()
                 .try_for_each(|(bounds_idx, bof)| -> Result<()> {
-                    let b = match bof {
+                    match bof {
                         BoundOrFiller::Filler(f) => {
                             stdout.write_all(f.as_bytes())?;
-                            return Ok(());
                         }
-                        BoundOrFiller::Bound(b) => b,
+                        BoundOrFiller::Bound(b) => {
+                            let is_last = bounds_idx == bounds.len() - 1;
+
+                            output_parts(buffer, b, fields, stdout, is_last, opt)?;
+                        }
                     };
-
-                    let is_last = bounds_idx == bounds.len() - 1;
-
-                    output_parts(buffer, b, fields, stdout, is_last, opt)
+                    Ok(())
                 })?;
         }
     }
