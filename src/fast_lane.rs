@@ -4,7 +4,6 @@ use anyhow::Result;
 use bstr::ByteSlice;
 use std::convert::TryFrom;
 use std::io::{self, BufRead};
-use std::str::FromStr;
 use std::{io::Write, ops::Range};
 
 use bstr::io::BufReadExt;
@@ -135,32 +134,19 @@ fn output_parts<W: Write>(
 }
 
 #[derive(Debug)]
-pub struct FastOpt {
+pub struct FastOpt<'a> {
     delimiter: u8,
     join: bool,
     eol: EOL,
-    bounds: UserBoundsList,
+    bounds: &'a UserBoundsList,
     only_delimited: bool,
     trim: Option<Trim>,
 }
 
-impl Default for FastOpt {
-    fn default() -> Self {
-        Self {
-            delimiter: b'\t',
-            join: false,
-            eol: EOL::Newline,
-            bounds: UserBoundsList::from_str("1:").unwrap(),
-            only_delimited: false,
-            trim: None,
-        }
-    }
-}
-
-impl TryFrom<&Opt> for FastOpt {
+impl<'a> TryFrom<&'a Opt> for FastOpt<'a> {
     type Error = &'static str;
 
-    fn try_from(value: &Opt) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a Opt) -> Result<Self, Self::Error> {
         if value.delimiter.as_bytes().len() != 1 {
             return Err("Delimiter must be 1 byte wide for FastOpt");
         }
@@ -183,7 +169,7 @@ impl TryFrom<&Opt> for FastOpt {
             delimiter,
             join: value.join,
             eol: value.eol,
-            bounds: value.bounds.clone(),
+            bounds: &value.bounds,
             only_delimited: value.only_delimited,
             trim: value.trim,
         })
@@ -225,10 +211,17 @@ mod tests {
 
     use super::*;
 
-    fn make_fields_opt() -> FastOpt {
+    fn make_fields_opt(bounds_as_text: &str) -> FastOpt<'static> {
+        let boxed_bounds = Box::new(UserBoundsList::from_str(bounds_as_text).unwrap());
+        let bounds: &'static mut UserBoundsList = Box::leak(boxed_bounds);
+
         FastOpt {
             delimiter: b'-',
-            ..FastOpt::default()
+            join: false,
+            eol: EOL::Newline,
+            bounds,
+            only_delimited: false,
+            trim: None,
         }
     }
 
@@ -237,7 +230,7 @@ mod tests {
         // read_and_cut_str is difficult to test, let's verify at least
         // that it reads the input and appears to call cut_str
 
-        let opt = make_fields_opt();
+        let opt = make_fields_opt("1:");
         let mut input = b"foo".as_slice();
         let mut output = Vec::new();
         read_and_cut_text_as_bytes(&mut input, &mut output, &opt).unwrap();
@@ -266,7 +259,7 @@ mod tests {
 
     #[test]
     fn cut_str_echo_non_delimited_strings() {
-        let opt = make_fields_opt();
+        let opt = make_fields_opt("1:");
 
         // non-empty line missing the delimiter
         let line = b"foo";
@@ -297,7 +290,7 @@ mod tests {
 
     #[test]
     fn cut_str_skip_non_delimited_strings_when_requested() {
-        let mut opt = make_fields_opt();
+        let mut opt = make_fields_opt("1:");
 
         opt.only_delimited = true;
 
@@ -330,11 +323,10 @@ mod tests {
 
     #[test]
     fn cut_str_it_cut_a_field() {
-        let mut opt = make_fields_opt();
+        let opt = make_fields_opt("1");
         let (mut output, mut fields) = make_cut_str_buffers();
 
         let line = b"a-b-c";
-        opt.bounds = UserBoundsList::from_str("1").unwrap();
 
         cut_str_fast_lane(
             line,
@@ -349,12 +341,11 @@ mod tests {
 
     #[test]
     fn cut_str_it_cut_with_negative_indices() {
-        let mut opt = make_fields_opt();
+        // just one negative index
+        let opt = make_fields_opt("-1");
 
         let line = b"a-b-c";
 
-        // just one negative index
-        opt.bounds = UserBoundsList::from_str("-1").unwrap();
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
             line,
@@ -367,7 +358,7 @@ mod tests {
         assert_eq!(output, b"c\n".as_slice());
 
         // multiple negative indices, in forward order
-        opt.bounds = UserBoundsList::from_str("-2,-1").unwrap();
+        let opt = make_fields_opt("-2,-1");
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
             line,
@@ -380,7 +371,7 @@ mod tests {
         assert_eq!(output, b"bc\n".as_slice());
 
         // multiple negative indices, in non-forward order
-        opt.bounds = UserBoundsList::from_str("-1,-2").unwrap();
+        let opt = make_fields_opt("-1,-2");
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
             line,
@@ -395,7 +386,7 @@ mod tests {
         // mix positive and negative indices
         // (this is particularly useful to verify that we don't screw
         // up optimizations on last field to check)
-        opt.bounds = UserBoundsList::from_str("-1,1").unwrap();
+        let opt = make_fields_opt("-1,1");
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
             line,
@@ -410,11 +401,10 @@ mod tests {
 
     #[test]
     fn cut_str_it_cut_consecutive_delimiters() {
-        let mut opt = make_fields_opt();
+        let opt = make_fields_opt("1,3");
         let (mut output, mut fields) = make_cut_str_buffers();
 
         let line = b"a-b-c";
-        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
 
         cut_str_fast_lane(
             line,
@@ -429,12 +419,11 @@ mod tests {
 
     #[test]
     fn cut_str_it_supports_zero_terminated_lines() {
-        let mut opt = make_fields_opt();
+        let mut opt = make_fields_opt("2");
         let (mut output, mut fields) = make_cut_str_buffers();
         opt.eol = EOL::Zero;
 
         let line = b"a-b-c";
-        opt.bounds = UserBoundsList::from_str("2").unwrap();
 
         cut_str_fast_lane(
             line,
@@ -449,11 +438,10 @@ mod tests {
 
     #[test]
     fn cut_str_it_join_fields() {
-        let mut opt = make_fields_opt();
+        let mut opt = make_fields_opt("1,3");
         let (mut output, mut fields) = make_cut_str_buffers();
 
         let line = b"a-b-c";
-        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
         opt.join = true;
 
         cut_str_fast_lane(
@@ -469,11 +457,10 @@ mod tests {
 
     #[test]
     fn cut_str_it_format_fields() {
-        let mut opt = make_fields_opt();
+        let opt = make_fields_opt("{1} < {3} > {2}");
         let (mut output, mut fields) = make_cut_str_buffers();
 
         let line = b"a-b-c";
-        opt.bounds = UserBoundsList::from_str("{1} < {3} > {2}").unwrap();
 
         cut_str_fast_lane(
             line,
@@ -488,12 +475,11 @@ mod tests {
 
     #[test]
     fn cut_str_it_trim_fields() {
-        let mut opt = make_fields_opt();
+        let mut opt = make_fields_opt("1,3,-1");
         let line = b"--a--b--c--";
 
         // check Trim::Both
         opt.trim = Some(Trim::Both);
-        opt.bounds = UserBoundsList::from_str("1,3,-1").unwrap();
 
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
@@ -507,8 +493,8 @@ mod tests {
         assert_eq!(output, b"abc\n".as_slice());
 
         // check Trim::Left
+        let mut opt = make_fields_opt("1,3,-3");
         opt.trim = Some(Trim::Left);
-        opt.bounds = UserBoundsList::from_str("1,3,-3").unwrap();
 
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
@@ -522,8 +508,8 @@ mod tests {
         assert_eq!(output, b"abc\n".as_slice());
 
         // check Trim::Right
+        let mut opt = make_fields_opt("3,5,-1");
         opt.trim = Some(Trim::Right);
-        opt.bounds = UserBoundsList::from_str("3,5,-1").unwrap();
 
         let (mut output, mut fields) = make_cut_str_buffers();
         cut_str_fast_lane(
