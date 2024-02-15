@@ -313,7 +313,8 @@ pub fn cut_str<W: Write>(
                 b,
                 BoundOrFiller::Bound(UserBounds {
                     l: x,
-                    r: y
+                    r: y,
+                    is_last: _,
                 }) if x != y || x == &Side::Continue
             )
         }) {

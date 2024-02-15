@@ -120,19 +120,26 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
         };
 
         let mut rightmost_bound: Option<Side> = None;
+        let mut last_bound: Option<&mut UserBounds> = None;
 
         // This is risky, we could end up using last_interesting_field
         // internally. Didn't spend much time to figure out how to use
         // is_sortable without major refactoring.
         if ubl.is_sortable() {
-            ubl.list.iter().for_each(|bof| {
+            ubl.list.iter_mut().for_each(|bof| {
                 if let BoundOrFiller::Bound(b) = bof {
                     if rightmost_bound.is_none() || b.r > rightmost_bound.unwrap() {
                         rightmost_bound = Some(b.r);
                     }
+
+                    last_bound = Some(b);
                 }
             });
         }
+
+        last_bound
+            .expect("UserBoundsList must contain at least one UserBounds")
+            .is_last = true;
 
         ubl.last_interesting_field = rightmost_bound.unwrap_or(Side::Continue);
         ubl
@@ -294,6 +301,7 @@ impl PartialOrd for Side {
 pub struct UserBounds {
     pub l: Side,
     pub r: Side,
+    pub is_last: bool,
 }
 
 impl fmt::Display for UserBounds {
@@ -361,7 +369,11 @@ pub trait UserBoundsTrait<T> {
 
 impl UserBoundsTrait<i32> for UserBounds {
     fn new(l: Side, r: Side) -> Self {
-        UserBounds { l, r }
+        UserBounds {
+            l,
+            r,
+            is_last: false,
+        }
     }
     /**
      * Check if a field is between the bounds.

@@ -82,22 +82,17 @@ fn cut_str_fast_lane<W: Write>(
             stdout.write_all(buffer)?;
         }
         _ => {
-            bounds
-                .iter()
-                .enumerate()
-                .try_for_each(|(bounds_idx, bof)| -> Result<()> {
-                    match bof {
-                        BoundOrFiller::Filler(f) => {
-                            stdout.write_all(f.as_bytes())?;
-                        }
-                        BoundOrFiller::Bound(b) => {
-                            let is_last = bounds_idx == bounds.len() - 1;
-
-                            output_parts(buffer, b, fields, stdout, is_last, opt)?;
-                        }
-                    };
-                    Ok(())
-                })?;
+            bounds.iter().try_for_each(|bof| -> Result<()> {
+                match bof {
+                    BoundOrFiller::Filler(f) => {
+                        stdout.write_all(f.as_bytes())?;
+                    }
+                    BoundOrFiller::Bound(b) => {
+                        output_parts(buffer, b, fields, stdout, opt)?;
+                    }
+                };
+                Ok(())
+            })?;
         }
     }
 
@@ -114,7 +109,6 @@ fn output_parts<W: Write>(
     // where to find the parts inside `line`
     fields: &[Range<usize>],
     stdout: &mut W,
-    is_last: bool,
     opt: &FastOpt,
 ) -> Result<()> {
     let r = b.try_into_range(fields.len())?;
@@ -126,7 +120,7 @@ fn output_parts<W: Write>(
     let field_to_print = output;
     stdout.write_all(field_to_print)?;
 
-    if opt.join && !(is_last) {
+    if opt.join && !b.is_last {
         stdout.write_all(&[opt.delimiter])?;
     }
 
