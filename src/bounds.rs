@@ -122,19 +122,20 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
         let mut rightmost_bound: Option<Side> = None;
         let mut last_bound: Option<&mut UserBounds> = None;
 
-        // This is risky, we could end up using last_interesting_field
-        // internally. Didn't spend much time to figure out how to use
-        // is_sortable without major refactoring.
-        if ubl.is_sortable() {
-            ubl.list.iter_mut().for_each(|bof| {
-                if let BoundOrFiller::Bound(b) = bof {
-                    if rightmost_bound.is_none() || b.r > rightmost_bound.unwrap() {
-                        rightmost_bound = Some(b.r);
-                    }
+        let is_sortable = ubl.is_sortable();
 
-                    last_bound = Some(b);
+        ubl.list.iter_mut().for_each(|bof| {
+            if let BoundOrFiller::Bound(b) = bof {
+                if rightmost_bound.is_none() || b.r > rightmost_bound.unwrap() {
+                    rightmost_bound = Some(b.r);
                 }
-            });
+
+                last_bound = Some(b);
+            }
+        });
+
+        if !is_sortable {
+            rightmost_bound = None;
         }
 
         last_bound
@@ -149,15 +150,14 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
 impl FromStr for UserBoundsList {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.trim().is_empty() {
+            bail!("UserBoundsList must contain at least one UserBounds");
+        }
         Ok(parse_bounds_list(s)?.into())
     }
 }
 
 impl UserBoundsList {
-    pub fn new(list: Vec<BoundOrFiller>) -> Self {
-        list.into()
-    }
-
     /// Detect whether the list can be sorted.
     /// It can be sorted only if every bound
     /// has the same sign (all positive or all negative).
@@ -423,14 +423,15 @@ impl UserBoundsTrait<i32> for UserBounds {
     /// # use tuc::bounds::{UserBounds, UserBoundsTrait};
     /// # use std::ops::Range;
     /// # use tuc::bounds::Side;
+    /// # use std::str::FromStr;
     ///
     /// assert_eq!(
-    ///   (UserBounds { l: Side::Some(1), r: Side::Some(2) }).try_into_range(5).unwrap(),
+    ///   UserBounds::from_str("1:2").unwrap().try_into_range(5).unwrap(),
     ///   Range { start: 0, end: 2} // 2, not 1, because it's exclusive
     /// );
     ///
     /// assert_eq!(
-    ///   (UserBounds { l: Side::Some(1), r: Side::Continue }).try_into_range(5).unwrap(),
+    ///   UserBounds::from_str("1:").unwrap().try_into_range(5).unwrap(),
     ///   Range { start: 0, end: 5}
     /// );
     /// ```
@@ -769,9 +770,12 @@ mod tests {
     }
 
     #[test]
-    fn test_user_bounds_is_sortable() {
-        assert!(UserBoundsList::new(Vec::new()).is_sortable());
+    fn test_user_bounds_cannot_be_empty() {
+        assert!(UserBoundsList::from_str("").is_err());
+    }
 
+    #[test]
+    fn test_user_bounds_is_sortable() {
         assert!(UserBoundsList::from_str("1").unwrap().is_sortable());
 
         assert!(UserBoundsList::from_str("1,2").unwrap().is_sortable());
@@ -787,8 +791,6 @@ mod tests {
 
     #[test]
     fn test_vec_of_bounds_is_sorted() {
-        assert!(UserBoundsList::from_str("").unwrap().is_sorted());
-
         assert!(UserBoundsList::from_str("1").unwrap().is_sorted());
 
         assert!(UserBoundsList::from_str("1,2").unwrap().is_sorted());

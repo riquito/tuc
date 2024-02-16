@@ -131,8 +131,10 @@ pub fn read_and_cut_lines<A: BufRead, B: Write>(
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use crate::{
-        bounds::{BoundsType, UserBounds, UserBoundsList},
+        bounds::{BoundsType, UserBoundsList},
         options::EOL,
     };
 
@@ -147,29 +149,10 @@ mod tests {
         }
     }
 
-    fn bof_f1() -> BoundOrFiller {
-        BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1)))
-    }
-
-    fn bof_f2() -> BoundOrFiller {
-        BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2)))
-    }
-    fn bof_f3() -> BoundOrFiller {
-        BoundOrFiller::Bound(UserBounds::new(Side::Some(3), Side::Some(3)))
-    }
-    fn bof_r2_3() -> BoundOrFiller {
-        BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(3)))
-    }
-    fn bof_neg1() -> BoundOrFiller {
-        BoundOrFiller::Bound(UserBounds::new(Side::Some(-1), Side::Some(-1)))
-    }
-    fn bof_f1_to_end() -> BoundOrFiller {
-        BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Continue))
-    }
     #[test]
     fn fwd_cut_one_field() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_f1()]);
+        opt.bounds = UserBoundsList::from_str("1").unwrap();
 
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
@@ -180,7 +163,7 @@ mod tests {
     #[test]
     fn fwd_cut_multiple_fields() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_f1(), bof_f2()]);
+        opt.bounds = UserBoundsList::from_str("1:2").unwrap();
 
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
@@ -191,7 +174,7 @@ mod tests {
     #[test]
     fn fwd_support_ranges() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_f1(), bof_r2_3()]);
+        opt.bounds = UserBoundsList::from_str("1,2:3").unwrap();
 
         let mut input = b"a\nb\nc".as_slice();
         let mut output = Vec::with_capacity(100);
@@ -202,7 +185,7 @@ mod tests {
     #[test]
     fn fwd_supports_no_join() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_f1(), bof_f3()]);
+        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
         opt.join = false;
 
         let mut input = b"a\nb\nc".as_slice();
@@ -214,7 +197,7 @@ mod tests {
     #[test]
     fn fwd_supports_no_right_bound() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_f1_to_end()]);
+        opt.bounds = UserBoundsList::from_str("1:").unwrap();
 
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
@@ -225,7 +208,7 @@ mod tests {
     #[test]
     fn fwd_handle_out_of_bounds() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_f3()]);
+        opt.bounds = UserBoundsList::from_str("3").unwrap();
         opt.join = true;
 
         let mut input = b"a\nb".as_slice();
@@ -237,7 +220,7 @@ mod tests {
     #[test]
     fn fwd_ignore_last_empty() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_f3()]);
+        opt.bounds = UserBoundsList::from_str("3").unwrap();
 
         let mut input1 = b"a\nb".as_slice();
         let mut input2 = b"a\nb\n".as_slice();
@@ -255,7 +238,7 @@ mod tests {
     #[test]
     fn cut_lines_handle_negative_idx() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_neg1()]);
+        opt.bounds = UserBoundsList::from_str("-1").unwrap();
 
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
@@ -266,7 +249,7 @@ mod tests {
     #[test]
     fn cut_lines_ignore_last_empty_when_using_positive_idx() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_f3()]);
+        opt.bounds = UserBoundsList::from_str("3").unwrap();
 
         let mut input1 = b"a\nb".as_slice();
         let mut input2 = b"a\nb\n".as_slice();
@@ -284,7 +267,7 @@ mod tests {
     #[test]
     fn cut_lines_ignore_last_empty_when_using_negative_idx() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_neg1()]);
+        opt.bounds = UserBoundsList::from_str("-1").unwrap();
 
         let mut input1 = b"a\nb".as_slice();
         let mut input2 = b"a\nb\n".as_slice();
@@ -302,7 +285,7 @@ mod tests {
     #[test]
     fn fwd_cut_zero_delimited() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_f1()]);
+        opt.bounds = UserBoundsList::from_str("1").unwrap();
         opt.eol = EOL::Zero;
         opt.delimiter = String::from("\0");
 
@@ -315,7 +298,7 @@ mod tests {
     #[test]
     fn cut_lines_zero_delimited() {
         let mut opt = make_lines_opt();
-        opt.bounds = UserBoundsList::new(vec![bof_f1()]);
+        opt.bounds = UserBoundsList::from_str("1").unwrap();
         opt.eol = EOL::Zero;
         opt.delimiter = String::from("\0");
 
