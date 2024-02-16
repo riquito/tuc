@@ -3,8 +3,8 @@ use crate::options::{Opt, Trim, EOL};
 use anyhow::Result;
 use bstr::ByteSlice;
 use std::convert::TryFrom;
+use std::io::Write;
 use std::io::{self, BufRead};
-use std::{io::Write, ops::Range};
 
 use bstr::io::BufReadExt;
 
@@ -18,11 +18,12 @@ fn trim<'a>(buffer: &'a [u8], trim_kind: &Trim, delimiter: u8) -> &'a [u8] {
     }
 }
 
+#[inline(always)]
 fn cut_str_fast_lane<W: Write>(
     initial_buffer: &[u8],
     opt: &FastOpt,
     stdout: &mut W,
-    fields: &mut Vec<Range<usize>>,
+    fields: &mut Vec<usize>,
     last_interesting_field: Side,
 ) -> Result<()> {
     let mut buffer = initial_buffer;
@@ -40,8 +41,6 @@ fn cut_str_fast_lane<W: Write>(
 
     let bounds = &opt.bounds;
 
-    let mut prev_field_start = 0;
-
     let mut curr_field = 0;
 
     fields.clear();
@@ -49,10 +48,7 @@ fn cut_str_fast_lane<W: Write>(
     for i in memchr::memchr_iter(opt.delimiter, buffer) {
         curr_field += 1;
 
-        let (start, end) = (prev_field_start, i); // end exclusive
-        prev_field_start = i + 1;
-
-        fields.push(Range { start, end });
+        fields.push(i);
 
         if Side::Some(curr_field) == last_interesting_field {
             // We have no use for any other fields in this line
@@ -65,20 +61,16 @@ fn cut_str_fast_lane<W: Write>(
         return Ok(());
     }
 
-    // After the last loop ended, everything remaining is the field
-    // after the last delimiter (we want it), or "useless" fields after the
-    // last one that the user is interested in (and we can ignore them).
     if Side::Some(curr_field) != last_interesting_field {
-        fields.push(Range {
-            start: prev_field_start,
-            end: buffer.len(),
-        });
+        // We reached the end of the line. Who knows, maybe
+        // the user is interested in this field too.
+        fields.push(buffer.len());
     }
 
     let num_fields = fields.len();
 
     match num_fields {
-        1 if bounds.len() == 1 && fields[0].end == buffer.len() => {
+        1 if bounds.len() == 1 && fields[0] == buffer.len() => {
             stdout.write_all(buffer)?;
         }
         _ => {
@@ -107,14 +99,19 @@ fn output_parts<W: Write>(
     // which parts to print
     b: &UserBounds,
     // where to find the parts inside `line`
-    fields: &[Range<usize>],
+    fields: &[usize],
     stdout: &mut W,
     opt: &FastOpt,
 ) -> Result<()> {
     let r = b.try_into_range(fields.len())?;
 
-    let idx_start = fields[r.start].start;
-    let idx_end = fields[r.end - 1].end;
+    let idx_start = if r.start == 0 {
+        0
+    } else {
+        fields[r.start - 1] + 1
+    };
+    let idx_end = fields[r.end - 1];
+
     let output = &line[idx_start..idx_end];
 
     let field_to_print = output;
@@ -175,7 +172,7 @@ pub fn read_and_cut_text_as_bytes<R: BufRead, W: Write>(
     stdout: &mut W,
     opt: &FastOpt,
 ) -> Result<()> {
-    let mut fields: Vec<Range<usize>> = Vec::with_capacity(16);
+    let mut fields: Vec<usize> = Vec::with_capacity(16);
 
     let last_interesting_field = opt.bounds.last_interesting_field;
 
@@ -245,7 +242,7 @@ mod tests {
         );
     }
 
-    fn make_cut_str_buffers() -> (Vec<u8>, Vec<Range<usize>>) {
+    fn make_cut_str_buffers() -> (Vec<u8>, Vec<usize>) {
         let output = Vec::new();
         let fields = Vec::new();
         (output, fields)
@@ -451,6 +448,21 @@ mod tests {
 
     #[test]
     fn cut_str_it_format_fields() {
+        let opt = make_fields_opt("{2}");
+        let (mut output, mut fields) = make_cut_str_buffers();
+
+        let line = b"a-b-c";
+
+        cut_str_fast_lane(
+            line,
+            &opt,
+            &mut output,
+            &mut fields,
+            opt.bounds.last_interesting_field,
+        )
+        .unwrap();
+        assert_eq!(output.to_str_lossy(), b"b\n".as_slice().to_str_lossy());
+
         let opt = make_fields_opt("{1} < {3} > {2}");
         let (mut output, mut fields) = make_cut_str_buffers();
 
@@ -464,7 +476,10 @@ mod tests {
             opt.bounds.last_interesting_field,
         )
         .unwrap();
-        assert_eq!(output, b"a < c > b\n".as_slice());
+        assert_eq!(
+            output.to_str_lossy(),
+            b"a < c > b\n".as_slice().to_str_lossy()
+        );
     }
 
     #[test]
