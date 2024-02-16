@@ -3,7 +3,7 @@ use anyhow::Result;
 use std::str::FromStr;
 
 #[cfg(feature = "regex")]
-use regex::Regex;
+use regex::bytes::Regex;
 
 #[cfg(feature = "regex")]
 #[derive(Debug)]
@@ -30,14 +30,14 @@ impl From<EOL> for u8 {
 
 #[derive(Debug)]
 pub struct Opt {
-    pub delimiter: String,
+    pub delimiter: Vec<u8>,
     pub eol: EOL,
     pub bounds: UserBoundsList,
     pub bounds_type: BoundsType,
     pub only_delimited: bool,
     pub greedy_delimiter: bool,
     pub compress_delimiter: bool,
-    pub replace_delimiter: Option<String>,
+    pub replace_delimiter: Option<Vec<u8>>,
     pub trim: Option<Trim>,
     pub version: bool,
     pub complement: bool,
@@ -52,7 +52,7 @@ pub struct Opt {
 impl Default for Opt {
     fn default() -> Self {
         Opt {
-            delimiter: String::from("-"),
+            delimiter: "-".into(),
             eol: EOL::Newline,
             bounds: UserBoundsList::from_str("1:").unwrap(),
             bounds_type: BoundsType::Fields,

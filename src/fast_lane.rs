@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn fail_to_convert_opt_with_long_delimiter_to_fastopt() {
         let opt = Opt {
-            delimiter: "foo".to_owned(),
+            delimiter: "foo".into(),
             ..Default::default()
         };
 

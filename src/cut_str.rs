@@ -1,14 +1,15 @@
 use anyhow::{bail, Result};
+use bstr::io::BufReadExt;
+use bstr::ByteSlice;
 use std::io::{BufRead, Write};
 use std::ops::Range;
 
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
 use crate::json::escape_json;
-use crate::options::{Opt, Trim};
-use crate::read_utils::read_line_with_eol;
+use crate::options::{Opt, Trim, EOL};
 
 #[cfg(feature = "regex")]
-use regex::Regex;
+use regex::bytes::Regex;
 
 fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usize>> {
     match (r.start, r.end) {
@@ -34,8 +35,8 @@ fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usiz
 /// - `greedy` - whether to consider consecutive delimiters as one or not
 fn fill_with_fields_locations(
     buffer: &mut Vec<Range<usize>>,
-    line: &str,
-    delimiter: &str,
+    line: &[u8],
+    delimiter: &[u8],
     greedy: bool,
 ) {
     buffer.clear();
@@ -47,7 +48,7 @@ fn fill_with_fields_locations(
     let delimiter_length = delimiter.len();
     let mut next_part_start = 0;
 
-    for (idx, _) in line.match_indices(&delimiter) {
+    for idx in line.find_iter(&delimiter) {
         if !(greedy && idx == next_part_start && idx != 0) {
             buffer.push(Range {
                 start: next_part_start,
@@ -65,7 +66,7 @@ fn fill_with_fields_locations(
 }
 
 #[cfg(feature = "regex")]
-fn build_ranges_vec_from_regex(buffer: &mut Vec<Range<usize>>, line: &str, re: &Regex) {
+fn fill_with_fields_locations_using_regex(buffer: &mut Vec<Range<usize>>, line: &[u8], re: &Regex) {
     buffer.clear();
 
     if line.is_empty() {
@@ -89,39 +90,39 @@ fn build_ranges_vec_from_regex(buffer: &mut Vec<Range<usize>>, line: &str, re: &
     });
 }
 
-fn compress_delimiter(line: &str, delimiter: &str, output: &mut String) {
+fn compress_delimiter(line: &[u8], delimiter: &[u8], output: &mut Vec<u8>) {
     output.clear();
     let mut prev_idx = 0;
 
-    for (idx, _) in line.match_indices(delimiter) {
+    for idx in line.find_iter(delimiter) {
         let prev_part = &line[prev_idx..idx];
 
         if idx == 0 {
-            output.push_str(delimiter);
+            output.extend(delimiter);
         } else if !prev_part.is_empty() {
-            output.push_str(prev_part);
-            output.push_str(delimiter);
+            output.extend(prev_part);
+            output.extend(delimiter);
         }
 
         prev_idx = idx + delimiter.len();
     }
 
     if prev_idx < line.len() {
-        output.push_str(&line[prev_idx..]);
+        output.extend(&line[prev_idx..]);
     }
 }
 
 #[cfg(feature = "regex")]
 fn compress_delimiter_with_regex<'a>(
-    line: &'a str,
+    line: &'a [u8],
     re: &Regex,
-    new_delimiter: &str,
-) -> std::borrow::Cow<'a, str> {
+    new_delimiter: &[u8],
+) -> std::borrow::Cow<'a, [u8]> {
     re.replace_all(line, new_delimiter)
 }
 
 #[cfg(feature = "regex")]
-fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a, str> {
+fn maybe_replace_delimiter<'a>(text: &'a [u8], opt: &Opt) -> std::borrow::Cow<'a, [u8]> {
     if opt.bounds_type == BoundsType::Characters {
         std::borrow::Cow::Borrowed(text)
     } else if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
@@ -136,7 +137,7 @@ fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a,
 }
 
 #[cfg(not(feature = "regex"))]
-fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a, str> {
+fn maybe_replace_delimiter<'a>(text: &'a [u8], opt: &Opt) -> std::borrow::Cow<'a, [u8]> {
     if opt.bounds_type == BoundsType::Characters {
         std::borrow::Cow::Borrowed(text)
     } else if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
@@ -146,18 +147,45 @@ fn maybe_replace_delimiter<'a>(text: &'a str, opt: &Opt) -> std::borrow::Cow<'a,
     }
 }
 
-fn trim<'a>(line: &'a str, trim_kind: &Trim, delimiter: &str) -> &'a str {
+fn trim<'a>(buffer: &'a [u8], trim_kind: &Trim, delimiter: &[u8]) -> &'a [u8] {
     match trim_kind {
-        Trim::Both => line
-            .trim_start_matches(delimiter)
-            .trim_end_matches(delimiter),
-        Trim::Left => line.trim_start_matches(delimiter),
-        Trim::Right => line.trim_end_matches(delimiter),
+        Trim::Both => {
+            let mut idx = 0;
+            let mut r_idx = buffer.len();
+
+            while buffer[idx..].starts_with(delimiter) {
+                idx += delimiter.len();
+            }
+
+            while buffer[idx..r_idx].ends_with(delimiter) {
+                r_idx -= delimiter.len();
+            }
+
+            &buffer[idx..r_idx]
+        }
+        Trim::Left => {
+            let mut idx = 0;
+
+            while buffer[idx..].starts_with(delimiter) {
+                idx += delimiter.len();
+            }
+
+            &buffer[idx..]
+        }
+        Trim::Right => {
+            let mut r_idx = buffer.len();
+
+            while buffer[..r_idx].ends_with(delimiter) {
+                r_idx -= delimiter.len();
+            }
+
+            &buffer[..r_idx]
+        }
     }
 }
 
 #[cfg(feature = "regex")]
-fn trim_regex<'a>(line: &'a str, trim_kind: &Trim, re: &Regex) -> &'a str {
+fn trim_regex<'a>(line: &'a [u8], trim_kind: &Trim, re: &Regex) -> &'a [u8] {
     let mut iter = re.find_iter(line);
     let mut idx_start = 0;
     let mut idx_end = line.len();
@@ -185,20 +213,20 @@ macro_rules! write_maybe_as_json {
     ($writer:ident, $to_print:ident, $as_json:expr) => {{
         if $as_json {
             $writer.write_all(b"\"")?;
-            $writer.write_all(&escape_json(&$to_print).as_bytes())?;
+            $writer.write_all(&escape_json(&$to_print.to_str_lossy()).as_bytes())?;
             $writer.write_all(b"\"")?;
         } else {
-            $writer.write_all($to_print.as_bytes())?;
+            $writer.write_all(&$to_print)?;
         }
     }};
 }
 
 pub fn cut_str<W: Write>(
-    line: &str,
+    line: &[u8],
     opt: &Opt,
     stdout: &mut W,
     fields: &mut Vec<Range<usize>>,
-    compressed_line_buf: &mut String,
+    compressed_line_buf: &mut Vec<u8>,
     eol: &[u8],
 ) -> Result<()> {
     if opt.regex_bag.is_some() {
@@ -234,7 +262,7 @@ pub fn cut_str<W: Write>(
     }
 
     #[allow(unused_variables)]
-    let line_holder: std::borrow::Cow<str>;
+    let line_holder: std::borrow::Cow<[u8]>;
     #[allow(unused_mut)]
     let mut should_build_ranges_using_regex = opt.regex_bag.is_some() && cfg!(feature = "regex");
     #[allow(unused_mut)]
@@ -263,7 +291,7 @@ pub fn cut_str<W: Write>(
 
     if should_build_ranges_using_regex {
         #[cfg(feature = "regex")]
-        build_ranges_vec_from_regex(
+        fill_with_fields_locations_using_regex(
             fields,
             line,
             if opt.greedy_delimiter {
@@ -398,27 +426,45 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
     stdout: &mut W,
     opt: Opt,
 ) -> Result<()> {
-    let mut line_buf = String::with_capacity(256);
+    let line_buf: Vec<u8> = Vec::with_capacity(1024);
     let mut bounds_as_ranges: Vec<Range<usize>> = Vec::with_capacity(16);
     let mut compressed_line_buf = if opt.compress_delimiter {
-        String::with_capacity(line_buf.capacity())
+        Vec::with_capacity(line_buf.capacity())
     } else {
-        String::new()
+        Vec::new()
     };
 
-    while let Some(line) = read_line_with_eol(stdin, &mut line_buf, opt.eol) {
-        let line = line?;
-        let line: &str = line.as_ref();
-        let line = line.strip_suffix(opt.eol as u8 as char).unwrap_or(line);
-        cut_str(
-            line,
-            &opt,
-            stdout,
-            &mut bounds_as_ranges,
-            &mut compressed_line_buf,
-            &[opt.eol as u8],
-        )?;
+    match opt.eol {
+        EOL::Newline => stdin.for_byte_line(|line| {
+            let line = line.strip_suffix(&[opt.eol as u8]).unwrap_or(line);
+            cut_str(
+                line,
+                &opt,
+                stdout,
+                &mut bounds_as_ranges,
+                &mut compressed_line_buf,
+                &[opt.eol as u8],
+            )
+            // XXX Should map properly the error
+            .map_err(|x| std::io::Error::new(std::io::ErrorKind::Other, x.to_string()))
+            .and(Ok(true))
+        })?,
+        EOL::Zero => stdin.for_byte_record(opt.eol.into(), |line| {
+            let line = line.strip_suffix(&[opt.eol as u8]).unwrap_or(line);
+            cut_str(
+                line,
+                &opt,
+                stdout,
+                &mut bounds_as_ranges,
+                &mut compressed_line_buf,
+                &[opt.eol as u8],
+            )
+            // XXX Should map properly the error
+            .map_err(|x| std::io::Error::new(std::io::ErrorKind::Other, x.to_string()))
+            .and(Ok(true))
+        })?,
     }
+
     Ok(())
 }
 
@@ -436,7 +482,7 @@ mod tests {
     fn make_fields_opt() -> Opt {
         Opt {
             bounds_type: BoundsType::Fields,
-            delimiter: String::from("-"),
+            delimiter: "-".into(),
             ..Opt::default()
         }
     }
@@ -446,6 +492,14 @@ mod tests {
         RegexBag {
             normal: Regex::from_str("[.,]").unwrap(),
             greedy: Regex::from_str("([.,])+").unwrap(),
+        }
+    }
+
+    #[cfg(feature = "regex")]
+    fn make_cut_characters_regex_bag() -> RegexBag {
+        RegexBag {
+            normal: Regex::from_str("\\b|\\B").unwrap(),
+            greedy: Regex::from_str("(\\b|\\B)+").unwrap(),
         }
     }
 
@@ -480,29 +534,29 @@ mod tests {
         // non greedy
 
         v_range.clear();
-        fill_with_fields_locations(&mut v_range, "", "-", false);
+        fill_with_fields_locations(&mut v_range, b"", b"-", false);
         assert_eq!(v_range, vec![] as Vec<Range<usize>>);
 
         v_range.clear();
-        fill_with_fields_locations(&mut v_range, "a", "-", false);
+        fill_with_fields_locations(&mut v_range, b"a", b"-", false);
         assert_eq!(v_range, vec![Range { start: 0, end: 1 }]);
 
         v_range.clear();
-        fill_with_fields_locations(&mut v_range, "-", "-", true);
+        fill_with_fields_locations(&mut v_range, b"-", b"-", true);
         assert_eq!(
             v_range,
             vec![Range { start: 0, end: 0 }, Range { start: 1, end: 1 }]
         );
 
         v_range.clear();
-        fill_with_fields_locations(&mut v_range, "a-b", "-", false);
+        fill_with_fields_locations(&mut v_range, b"a-b", b"-", false);
         assert_eq!(
             v_range,
             vec![Range { start: 0, end: 1 }, Range { start: 2, end: 3 }]
         );
 
         v_range.clear();
-        fill_with_fields_locations(&mut v_range, "-a-", "-", false);
+        fill_with_fields_locations(&mut v_range, b"-a-", b"-", false);
         assert_eq!(
             v_range,
             vec![
@@ -513,7 +567,7 @@ mod tests {
         );
 
         v_range.clear();
-        fill_with_fields_locations(&mut v_range, "a--", "-", false);
+        fill_with_fields_locations(&mut v_range, b"a--", b"-", false);
         assert_eq!(
             v_range,
             vec![
@@ -526,22 +580,22 @@ mod tests {
         // greedy
 
         v_range.clear();
-        fill_with_fields_locations(&mut v_range, "", "-", true);
+        fill_with_fields_locations(&mut v_range, b"", b"-", true);
         assert_eq!(v_range, empty_vec);
 
         v_range.clear();
-        fill_with_fields_locations(&mut v_range, "a", "-", true);
+        fill_with_fields_locations(&mut v_range, b"a", b"-", true);
         assert_eq!(v_range, vec![Range { start: 0, end: 1 }]);
 
         v_range.clear();
-        fill_with_fields_locations(&mut v_range, "-", "-", true);
+        fill_with_fields_locations(&mut v_range, b"-", b"-", true);
         assert_eq!(
             v_range,
             vec![Range { start: 0, end: 0 }, Range { start: 1, end: 1 }]
         );
 
         v_range.clear();
-        fill_with_fields_locations(&mut v_range, "-a--b", "-", true);
+        fill_with_fields_locations(&mut v_range, b"-a--b", b"-", true);
         assert_eq!(
             v_range,
             vec![
@@ -552,7 +606,7 @@ mod tests {
         );
 
         v_range.clear();
-        fill_with_fields_locations(&mut v_range, "-a--", "-", true);
+        fill_with_fields_locations(&mut v_range, b"-a--", b"-", true);
         assert_eq!(
             v_range,
             vec![
@@ -575,10 +629,10 @@ mod tests {
         assert_eq!(output, b"foo\n".as_slice());
     }
 
-    fn make_cut_str_buffers() -> (Vec<u8>, Vec<Range<usize>>, String) {
+    fn make_cut_str_buffers() -> (Vec<u8>, Vec<Range<usize>>, Vec<u8>) {
         let output = Vec::new();
         let bounds_as_ranges = Vec::new();
-        let compressed_line_buffer = String::new();
+        let compressed_line_buffer = Vec::new();
         (output, bounds_as_ranges, compressed_line_buffer)
     }
 
@@ -587,7 +641,7 @@ mod tests {
         let opt = make_fields_opt();
         let eol = &[EOL::Newline as u8];
 
-        let line = "foo";
+        let line = b"foo";
 
         // non-empty line missing the delimiter
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
@@ -595,7 +649,7 @@ mod tests {
         assert_eq!(output, b"foo\n".as_slice());
 
         // empty line
-        let line = "";
+        let line = b"";
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"\n".as_slice());
@@ -609,13 +663,13 @@ mod tests {
         opt.only_delimited = true;
 
         // non-empty line missing the delimiter
-        let line = "foo";
+        let line = b"foo";
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"".as_slice());
 
         // empty line
-        let line = "";
+        let line = b"";
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"".as_slice());
@@ -627,7 +681,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a-b-c";
+        let line = b"a-b-c";
         opt.bounds = UserBoundsList::from_str("1").unwrap();
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
@@ -641,7 +695,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a.b,c";
+        let line = b"a.b,c";
         opt.bounds = UserBoundsList::from_str("1,2,3").unwrap();
         opt.regex_bag = Some(make_regex_bag());
 
@@ -655,7 +709,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a-b-c";
+        let line = b"a-b-c";
         opt.bounds = UserBoundsList::from_str("1,3").unwrap();
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
@@ -667,7 +721,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.bounds = UserBoundsList::from_str("2").unwrap();
 
-        let line = "--a---b--";
+        let line = b"--a---b--";
         let eol = &[EOL::Newline as u8];
 
         // first we verify we get an empty string without compressing delimiters
@@ -693,7 +747,7 @@ mod tests {
         assert_eq!(output, b"-a-b-\n".as_slice());
 
         // let's check with a line that doesn't start/end with delimiters
-        let line = "a---b";
+        let line = b"a---b";
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         opt.bounds = UserBoundsList::from_str("1:").unwrap();
         opt.compress_delimiter = true;
@@ -708,7 +762,7 @@ mod tests {
         let mut opt = make_fields_opt();
         let eol = &[EOL::Newline as u8];
 
-        let line = ".,a,,,b..c";
+        let line = b".,a,,,b..c";
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         opt.bounds = UserBoundsList::from_str("2,3,4").unwrap();
         opt.compress_delimiter = true;
@@ -732,53 +786,55 @@ mod tests {
         let mut opt = make_fields_opt();
         let eol = &[EOL::Newline as u8];
 
-        let line = ".,a,,,b..c";
+        let line = b".,a,,,b..c";
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         opt.bounds = UserBoundsList::from_str("2,3,4").unwrap();
         opt.compress_delimiter = true;
         opt.regex_bag = Some(make_regex_bag());
-        opt.replace_delimiter = Some(String::from("-"));
+        opt.replace_delimiter = Some("-".into());
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"abc\n".as_slice());
 
-        let line = ".,a,,,b..c";
+        let line = b".,a,,,b..c";
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         opt.bounds = UserBoundsList::from_str("1:").unwrap();
         opt.compress_delimiter = true;
         opt.regex_bag = Some(make_regex_bag());
-        opt.replace_delimiter = Some(String::from("-"));
+        opt.replace_delimiter = Some("-".into());
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"-a-b-c\n".as_slice());
     }
 
+    #[cfg(feature = "regex")]
     #[test]
     fn cut_str_it_cut_characters() {
         let mut opt = make_fields_opt();
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "😁🤩😝😎";
+        let line = "😁🤩😝😎".as_bytes();
         opt.bounds = UserBoundsList::from_str("2").unwrap();
         opt.bounds_type = BoundsType::Characters;
-        opt.delimiter = String::new();
+        opt.regex_bag = Some(make_cut_characters_regex_bag());
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, "🤩\n".as_bytes());
     }
 
+    #[cfg(feature = "regex")]
     #[test]
     fn cut_str_it_cut_characters_and_replace_the_delimiter() {
         let mut opt = make_fields_opt();
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "😁🤩😝😎";
+        let line = "😁🤩😝😎".as_bytes();
         opt.bounds = UserBoundsList::from_str("1,2,3:4").unwrap();
         opt.bounds_type = BoundsType::Characters;
-        opt.delimiter = String::new();
-        opt.replace_delimiter = Some("-".to_owned());
+        opt.regex_bag = Some(make_cut_characters_regex_bag());
+        opt.replace_delimiter = Some("-".into());
         opt.join = true; // implied when using BoundsType::Characters
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
@@ -791,7 +847,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Zero as u8];
 
-        let line = "a-b-c";
+        let line = b"a-b-c";
         opt.bounds = UserBoundsList::from_str("2").unwrap();
         opt.eol = EOL::Zero;
 
@@ -805,7 +861,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a-b-c";
+        let line = b"a-b-c";
         opt.bounds = UserBoundsList::from_str("2").unwrap();
         opt.complement = true;
 
@@ -819,7 +875,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a-b-c";
+        let line = b"a-b-c";
         opt.bounds = UserBoundsList::from_str("1,3").unwrap();
         opt.join = true;
 
@@ -833,10 +889,10 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a-b-c";
+        let line = b"a-b-c";
         opt.bounds = UserBoundsList::from_str("1,3").unwrap();
         opt.join = true;
-        opt.replace_delimiter = Some(String::from("*"));
+        opt.replace_delimiter = Some("*".into());
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"a*c\n".as_slice());
@@ -849,9 +905,9 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a,,b..c";
+        let line = b"a,,b..c";
         opt.bounds = UserBoundsList::from_str("1,3").unwrap();
-        opt.delimiter = String::from("[.,]");
+        opt.delimiter = "[.,]".into();
         opt.regex_bag = Some(make_regex_bag());
         opt.join = true;
 
@@ -870,12 +926,12 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a.b,c";
+        let line = b"a.b,c";
         opt.bounds = UserBoundsList::from_str("1,3").unwrap();
-        opt.delimiter = String::from("[.,]");
+        opt.delimiter = "[.,]".into();
         opt.regex_bag = Some(make_regex_bag());
         opt.join = true;
-        opt.replace_delimiter = Some(String::from("<->"));
+        opt.replace_delimiter = Some("<->".into());
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"a<->c\n".as_slice());
@@ -887,7 +943,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a-b-c";
+        let line = b"a-b-c";
         opt.bounds = UserBoundsList::from_str("{1} < {3} > {2}").unwrap();
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
@@ -900,7 +956,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a---b---c";
+        let line = b"a---b---c";
         opt.bounds = UserBoundsList::from_str("2").unwrap();
         opt.greedy_delimiter = true;
 
@@ -912,7 +968,7 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a---b---c";
+        let line = b"a---b---c";
         opt.bounds = UserBoundsList::from_str("2:3").unwrap();
         opt.greedy_delimiter = true;
 
@@ -928,11 +984,11 @@ mod tests {
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a,,.,b..,,c";
+        let line = b"a,,.,b..,,c";
         opt.bounds = UserBoundsList::from_str("2:3").unwrap();
 
         opt.greedy_delimiter = true;
-        opt.delimiter = String::from("[.,]");
+        opt.delimiter = "[.,]".into();
         opt.regex_bag = Some(make_regex_bag());
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
@@ -944,7 +1000,7 @@ mod tests {
     fn cut_str_it_trim_fields() {
         let mut opt = make_fields_opt();
         let eol = &[EOL::Newline as u8];
-        let line = "--a--b--c--";
+        let line = b"--a--b--c--";
 
         // check Trim::Both
         opt.trim = Some(Trim::Both);
@@ -976,9 +1032,9 @@ mod tests {
     fn cut_str_regex_it_trim_fields() {
         let mut opt = make_fields_opt();
         let eol = &[EOL::Newline as u8];
-        let line = "..a,.b..c,,";
+        let line = b"..a,.b..c,,";
 
-        opt.delimiter = String::from("[.,]");
+        opt.delimiter = "[.,]".into();
         opt.regex_bag = Some(make_regex_bag());
 
         // check Trim::Both
@@ -1010,11 +1066,11 @@ mod tests {
     fn cut_str_it_produce_json_output() {
         let mut opt = make_fields_opt();
         opt.json = true;
-        opt.replace_delimiter = Some(",".to_owned());
+        opt.replace_delimiter = Some(",".into());
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a-b-c";
+        let line = b"a-b-c";
         opt.bounds = UserBoundsList::from_str("1,3").unwrap();
         opt.join = true;
 
@@ -1031,11 +1087,11 @@ mod tests {
     fn cut_str_json_with_single_field_is_still_an_array() {
         let mut opt = make_fields_opt();
         opt.json = true;
-        opt.replace_delimiter = Some(",".to_owned());
+        opt.replace_delimiter = Some(",".into());
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a-b-c";
+        let line = b"a-b-c";
         opt.bounds = UserBoundsList::from_str("1").unwrap();
         opt.join = true;
 
@@ -1052,12 +1108,12 @@ mod tests {
     fn cut_str_complement_works_with_json() {
         let mut opt = make_fields_opt();
         opt.json = true;
-        opt.replace_delimiter = Some(",".to_owned());
+        opt.replace_delimiter = Some(",".into());
         opt.complement = true;
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "a-b-c";
+        let line = b"a-b-c";
         opt.bounds = UserBoundsList::from_str("2,2:3,-1").unwrap();
         opt.join = true;
 
@@ -1070,19 +1126,20 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "regex")]
     #[test]
     fn cut_str_json_on_characters_works() {
         let mut opt = make_fields_opt();
         let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
         let eol = &[EOL::Newline as u8];
 
-        let line = "😁🤩😝😎";
+        let line = "😁🤩😝😎".as_bytes();
         opt.bounds = UserBoundsList::from_str("1,2,3:4").unwrap();
         opt.bounds_type = BoundsType::Characters;
-        opt.delimiter = String::new();
         opt.join = true;
         opt.json = true;
-        opt.replace_delimiter = Some(",".to_owned());
+        opt.replace_delimiter = Some(",".into());
+        opt.regex_bag = Some(make_cut_characters_regex_bag());
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(
