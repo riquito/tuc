@@ -13,7 +13,7 @@ use tuc::options::{Opt, EOL};
 use tuc::options::RegexBag;
 
 #[cfg(feature = "regex")]
-use regex::Regex;
+use regex::bytes::Regex;
 
 const HELP: &str = concat!(
     "tuc ",
@@ -120,16 +120,19 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         std::process::exit(1);
     }
 
-    let delimiter = match bounds_type {
+    let delimiter: Vec<u8> = match bounds_type {
         BoundsType::Fields => pargs
             .opt_value_from_str(["-d", "--delimiter"])?
-            .unwrap_or_else(|| String::from('\t')),
-        BoundsType::Lines => String::from("\n"),
-        _ => String::new(),
+            .map(|x: String| x.into())
+            .unwrap_or_else(|| "\t".into()),
+        BoundsType::Lines => "\n".into(),
+        _ => Vec::new(),
     };
 
     let greedy_delimiter = pargs.contains(["-g", "--greedy-delimiter"]);
-    let mut replace_delimiter = pargs.opt_value_from_str(["-r", "--replace-delimiter"])?;
+    let tmp_replace_delimiter: Option<String> =
+        pargs.opt_value_from_str(["-r", "--replace-delimiter"])?;
+    let mut replace_delimiter: Option<Vec<u8>> = tmp_replace_delimiter.map(|x| x.into());
 
     let has_json = pargs.contains("--json");
     let has_join = pargs.contains(["-j", "--join"]);
@@ -164,8 +167,12 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         std::process::exit(1);
     }
 
+    if bounds_type == BoundsType::Characters {
+        replace_delimiter = Some("".into());
+    }
+
     if has_json {
-        replace_delimiter = Some(",".to_owned());
+        replace_delimiter = Some(",".into());
     }
 
     let join = has_join
@@ -185,18 +192,21 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let regex_bag = None;
 
     #[cfg(feature = "regex")]
-    let regex_bag: Option<RegexBag> = pargs
-        .opt_value_from_str::<_, String>(["-e", "--regex"])?
-        .map(|regex_text| RegexBag {
-            normal: Regex::new(&regex_text).unwrap_or_else(|e| {
-                eprintln!("tuc: runtime error. The regular expression is malformed. {e}");
-                std::process::exit(1);
-            }),
-            greedy: Regex::new(&format!("({})+", &regex_text)).unwrap_or_else(|e| {
-                eprintln!("tuc: runtime error. The regular expression is malformed. {e}");
-                std::process::exit(1);
-            }),
-        });
+    let regex_bag: Option<RegexBag> = (if bounds_type == BoundsType::Characters {
+        Some("\\b|\\B".to_owned())
+    } else {
+        pargs.opt_value_from_str::<_, String>(["-e", "--regex"])?
+    })
+    .map(|regex_text| RegexBag {
+        normal: Regex::new(&regex_text).unwrap_or_else(|e| {
+            eprintln!("tuc: runtime error. The regular expression is malformed. {e}");
+            std::process::exit(1);
+        }),
+        greedy: Regex::new(&format!("({})+", &regex_text)).unwrap_or_else(|e| {
+            eprintln!("tuc: runtime error. The regular expression is malformed. {e}");
+            std::process::exit(1);
+        }),
+    });
 
     if regex_bag.is_some() && cfg!(not(feature = "regex")) {
         eprintln!("tuc: invariant error. There should not be any regex when compiled without regex support");

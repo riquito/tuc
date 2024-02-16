@@ -92,7 +92,7 @@ fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> 
     stdin.read_to_end(&mut buffer)?;
     let buffer_as_str = std::str::from_utf8(&buffer)?;
     let mut bounds_as_ranges: Vec<Range<usize>> = Vec::with_capacity(100);
-    let mut compressed_line_buf = String::new();
+    let mut compressed_line_buf = Vec::new();
 
     let buffer_as_str = buffer_as_str
         .strip_suffix(opt.eol as u8 as char)
@@ -100,7 +100,7 @@ fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> 
 
     // Just use cut_str, we're cutting a (big) string whose delimiter is newline
     cut_str(
-        buffer_as_str,
+        buffer_as_str.as_bytes(),
         opt,
         stdout,
         &mut bounds_as_ranges,
@@ -143,7 +143,7 @@ mod tests {
     fn make_lines_opt() -> Opt {
         Opt {
             bounds_type: BoundsType::Lines,
-            delimiter: String::from("\n"),
+            delimiter: "\n".into(),
             join: true,
             ..Opt::default()
         }
@@ -287,7 +287,7 @@ mod tests {
         let mut opt = make_lines_opt();
         opt.bounds = UserBoundsList::from_str("1").unwrap();
         opt.eol = EOL::Zero;
-        opt.delimiter = String::from("\0");
+        opt.delimiter = "\0".into();
 
         let mut input = b"a\0b".as_slice();
         let mut output = Vec::new();
@@ -300,7 +300,7 @@ mod tests {
         let mut opt = make_lines_opt();
         opt.bounds = UserBoundsList::from_str("1").unwrap();
         opt.eol = EOL::Zero;
-        opt.delimiter = String::from("\0");
+        opt.delimiter = "\0".into();
 
         let mut input = b"a\0b".as_slice();
         let mut output = Vec::new();
