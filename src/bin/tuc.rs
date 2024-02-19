@@ -167,6 +167,13 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         std::process::exit(1);
     }
 
+    if bounds_type == BoundsType::Characters && cfg!(not(feature = "regex")) {
+        eprintln!(
+            "tuc: runtime error. The use of --characters requires `tuc` to be compiled with `regex` support"
+        );
+        std::process::exit(1);
+    }
+
     if bounds_type == BoundsType::Characters {
         replace_delimiter = Some("".into());
     }

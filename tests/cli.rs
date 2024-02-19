@@ -99,6 +99,7 @@ fn it_compresses_delimiters_when_requested_and_handles_boundaries() {
     assert.success().stdout("-foo-bar-\n");
 }
 
+#[cfg(feature = "regex")]
 #[test]
 fn it_cuts_on_characters() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
@@ -404,6 +405,7 @@ fn it_emit_output_as_json() {
     );
 }
 
+#[cfg(feature = "regex")]
 #[test]
 fn it_emit_output_as_json_even_when_cutting_on_chars() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
@@ -438,6 +440,18 @@ fn it_is_not_allowed_to_use_character_with_nojoin() {
 
     assert.failure().stderr(
         "tuc: runtime error. Since --characters implies --join, you can\'t pass --no-join\n",
+    );
+}
+
+#[cfg(not(feature = "regex"))]
+#[test]
+fn it_cannot_use_characters_without_regex() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["-c", "1"]).assert();
+
+    assert.failure().stderr(
+        "tuc: runtime error. The use of --characters requires `tuc` to be compiled with `regex` support\n",
     );
 }
 
