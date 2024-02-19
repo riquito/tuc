@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-- feat: much faster (3x) implementation for common scenarios
+- perf: much faster (from 2x up to 3x) implementation:
+  * there is now a fast lane used when conditions apply (more or less
+    it triggers when you cut fields on 1-byte characters)
+  * fields cut is now done on bytes, not strings (as long as your
+    delimiter is proper utf-8 you'll be fine)
+- feat: --characters now depends on the (default) regex feature
+- refactor: --json internally uses serde_json, faster and more precise
 
 ## [1.2.0] - 2024-01-01
 
