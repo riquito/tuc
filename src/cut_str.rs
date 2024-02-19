@@ -5,7 +5,6 @@ use std::io::{BufRead, Write};
 use std::ops::Range;
 
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
-use crate::json::escape_json;
 use crate::options::{Opt, Trim, EOL};
 
 #[cfg(feature = "regex")]
@@ -212,9 +211,11 @@ fn trim_regex<'a>(line: &'a [u8], trim_kind: &Trim, re: &Regex) -> &'a [u8] {
 macro_rules! write_maybe_as_json {
     ($writer:ident, $to_print:ident, $as_json:expr) => {{
         if $as_json {
-            $writer.write_all(b"\"")?;
-            $writer.write_all(&escape_json(&$to_print.to_str_lossy()).as_bytes())?;
-            $writer.write_all(b"\"")?;
+            $writer.write_all(unsafe {
+                // Safe as long as we were not requested to cut in the middle of a codepoint
+                // (and then we're pretty much doing what was asked)
+                serde_json::to_string(std::str::from_utf8_unchecked(&$to_print))?.as_bytes()
+            })?;
         } else {
             $writer.write_all(&$to_print)?;
         }
@@ -1144,7 +1145,7 @@ mod tests {
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(
             &String::from_utf8_lossy(&output),
-            r#"["\uD83D\uDE01","\uD83E\uDD29","\uD83D\uDE1D","\uD83D\uDE0E"]
+            r#"["😁","🤩","😝","😎"]
 "#
         );
     }
