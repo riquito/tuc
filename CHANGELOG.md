@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     it triggers when you cut fields on 1-byte characters)
   * fields cut is now done on bytes, not strings (as long as your
     delimiter is proper utf-8 you'll be fine)
+- feat: display short help when run without arguments
 - feat: --characters now depends on the (default) regex feature
 - refactor: --json internally uses serde_json, faster and more precise
 

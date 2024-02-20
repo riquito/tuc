@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::convert::TryFrom;
+use std::env::args;
 use std::io::Write;
 use std::str::FromStr;
 use tuc::bounds::{BoundOrFiller, BoundsType, UserBoundsList};
@@ -86,8 +87,40 @@ Memory consumption:
 "#
 );
 
+const SHORT_HELP: &str = concat!(
+    "tuc ",
+    env!("CARGO_PKG_VERSION"),
+    r#" - Created by Riccardo Attilio Galli
+
+Cuts selected parts and lets you re-arrange them.
+
+Some examples:
+
+    $ echo "a/b/c" | tuc -d / -f 1,-1
+    ac
+
+    $ echo "a/b/c" | tuc -d / -f 2:
+    b/c
+
+    $ echo "hello.bak" | tuc -d . -f 'mv {1:} {1}'
+    mv hello.bak hello
+
+    $ printf "a\nb\nc\nd\ne" | tuc -l 2:-2
+    b
+    c
+    d
+
+Run `tuc --help` for more detailed information.
+"#
+);
+
 fn parse_args() -> Result<Opt, pico_args::Error> {
     let mut pargs = pico_args::Arguments::from_env();
+
+    if args().len() == 1 {
+        print!("{SHORT_HELP}");
+        std::process::exit(0);
+    }
 
     if pargs.contains(["-h", "--help"]) {
         print!("{HELP}");

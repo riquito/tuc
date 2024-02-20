@@ -1,10 +1,19 @@
 use assert_cmd::Command;
 
 #[test]
+fn it_display_short_help_when_run_without_arguments() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.assert();
+
+    assert.success().stdout(predicates::str::starts_with("tuc"));
+}
+
+#[test]
 fn it_echo_non_delimited_line() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
-    let assert = cmd.write_stdin("foobar").assert();
+    let assert = cmd.args(["-d", "/"]).write_stdin("foobar").assert();
 
     assert.success().stdout("foobar\n");
 }
