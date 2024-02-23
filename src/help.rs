@@ -97,6 +97,7 @@ Some examples:
     d
 
 Run `tuc --help` for more detailed information.
+Send bug reports to: https://github.com/riquito/tuc/issues
 "#
 );
 
@@ -152,6 +153,30 @@ fn get_colored_help(text: &str) -> String {
     text.into_owned()
 }
 
+fn get_colored_short_help(text: &str) -> String {
+    let text = Regex::new(r#"( tuc|echo|printf)"#)
+        .unwrap()
+        .replace_all(text, "\x1b[1;32m$1\x1b[0m");
+
+    let text = Regex::new(r#"(?ms)(\$) (.*?)\n(.*?)\n\n"#)
+        .unwrap()
+        .replace_all(&text, "\x1b[1;36m$1\x1b[0m $2\n\x1b[0m$3\x1b[0m\n\n");
+
+    let text = Regex::new(r#"\|"#)
+        .unwrap()
+        .replace_all(&text, "\x1b[1;35m|\x1b[0m");
+
+    let text = Regex::new(r#"(tuc --help)"#)
+        .unwrap()
+        .replace_all(&text, "\x1b[33m$1\x1b[0m");
+
+    let text = Regex::new(r#"(tuc [^\s]+)"#)
+        .unwrap()
+        .replace_all(&text, "\x1b[1;35m$1\x1b[0m");
+
+    text.into_owned()
+}
+
 fn can_use_color() -> bool {
     let is_tty = std::io::stdout().is_terminal();
     let term = std::env::var("TERM");
@@ -169,5 +194,13 @@ pub fn get_help() -> Cow<'static, str> {
         Cow::Owned(get_colored_help(HELP))
     } else {
         Cow::Borrowed(HELP)
+    }
+}
+
+pub fn get_short_help() -> Cow<'static, str> {
+    if can_use_color() {
+        Cow::Owned(get_colored_short_help(SHORT_HELP))
+    } else {
+        Cow::Borrowed(SHORT_HELP)
     }
 }

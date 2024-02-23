@@ -8,7 +8,7 @@ use tuc::cut_bytes::read_and_cut_bytes;
 use tuc::cut_lines::read_and_cut_lines;
 use tuc::cut_str::read_and_cut_str;
 use tuc::fast_lane::{read_and_cut_text_as_bytes, FastOpt};
-use tuc::help::{get_help, SHORT_HELP};
+use tuc::help::{get_help, get_short_help};
 use tuc::options::{Opt, EOL};
 
 #[cfg(feature = "regex")]
@@ -21,7 +21,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let mut pargs = pico_args::Arguments::from_env();
 
     if args().len() == 1 {
-        print!("{SHORT_HELP}");
+        print!("{}", get_short_help());
         std::process::exit(0);
     }
 
