@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     delimiter is proper utf-8 you'll be fine)
 - feat: display short help when run without arguments
 - feat: --characters now depends on the (default) regex feature
+- feat: help and short help are colored, as long as output is a tty and
+  unless env var TERM=dumb or NO_COLOR (any value) is set
 - refactor: --json internally uses serde_json, faster and more precise
 
 ## [1.2.0] - 2024-01-01
