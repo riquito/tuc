@@ -1,3 +1,5 @@
+use regex::Regex;
+
 pub const HELP: &str = concat!(
     "tuc ",
     env!("CARGO_PKG_VERSION"),
@@ -24,7 +26,7 @@ OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
                                   Use colon to include everything in a range.
                                   Fields can be negative (-1 is the last field).
-                                  [default 1:]
+                                  [default: 1:]
 
                                   e.g. cutting the string 'a-b-c-d' on '-'
                                     -f 1     => a
@@ -74,7 +76,7 @@ pub const SHORT_HELP: &str = concat!(
     env!("CARGO_PKG_VERSION"),
     r#" - Created by Riccardo Attilio Galli
 
-Cuts selected parts and lets you re-arrange them.
+Cut text (or bytes) where a delimiter matches, then keep the desired parts.
 
 Some examples:
 
@@ -95,3 +97,55 @@ Some examples:
 Run `tuc --help` for more detailed information.
 "#
 );
+
+pub fn get_colored_help(text: &str) -> String {
+    // This is very unprofessional but:
+    // - I'm playing around and there's no need to look for serious
+    //   performance for the help
+    // - for getting the colours as I wanted, the alternative
+    //   was to tag the original help, but I'm more afraid
+    //   of desyncing readme/man/help than getting this wrong
+    //   (which I will, no doubt about it)
+
+    // optional parameters
+    let text = Regex::new(r#"<.*?>"#)
+        .unwrap()
+        .replace_all(text, "\x1b[33m$0\x1b[0m");
+
+    // any example using "-f something"
+    let text = Regex::new(r#"-(f|l) ('.+'|[0-9,:-]+)"#)
+        .unwrap()
+        .replace_all(&text, "-$1 \x1b[33m$2\x1b[0m");
+
+    // a few one-shot fields"
+    let text = Regex::new(r#"'2'|'1,3:'|-1 "#)
+        .unwrap()
+        .replace_all(&text, "\x1b[33m$0\x1b[0m");
+
+    // Main labels
+    let text = Regex::new(r#"(?m)^[^\s].+?:.*"#)
+        .unwrap()
+        .replace_all(&text, "\x1b[1;32m$0\x1b[0m");
+
+    // args (e.g. -j, --join)
+    let text = Regex::new(r#"\s-[^\s\d,]+"#)
+        .unwrap()
+        .replace_all(&text, "\x1b[1;36m$0\x1b[0m");
+
+    // first line
+    let text = Regex::new(r#"tuc.*"#)
+        .unwrap()
+        .replace_all(&text, "\x1b[1;35m$0\x1b[0m");
+
+    // trim examples: (l|L)eft, (r|R)ight, (b|B)oth
+    let text = Regex::new(r#"\((.)\|(.)\)(eft|ight|oth)"#)
+        .unwrap()
+        .replace_all(&text, "(\x1b[33m$1\x1b[0m|\x1b[33m$2\x1b[0m)$3");
+
+    // defaults
+    let text = Regex::new(r#"default: ([^\]]+)"#)
+        .unwrap()
+        .replace_all(&text, "\x1b[35mdefault\x1b[0m: \x1b[33m$1\x1b[0m");
+
+    text.into_owned()
+}
