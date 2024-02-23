@@ -8,7 +8,7 @@ use tuc::cut_bytes::read_and_cut_bytes;
 use tuc::cut_lines::read_and_cut_lines;
 use tuc::cut_str::read_and_cut_str;
 use tuc::fast_lane::{read_and_cut_text_as_bytes, FastOpt};
-use tuc::help::{get_colored_help, HELP, SHORT_HELP};
+use tuc::help::{get_help, SHORT_HELP};
 use tuc::options::{Opt, EOL};
 
 #[cfg(feature = "regex")]
@@ -26,7 +26,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     }
 
     if pargs.contains(["-h", "--help"]) {
-        print!("{}", get_colored_help(HELP));
+        print!("{}", get_help());
         std::process::exit(0);
     }
 
