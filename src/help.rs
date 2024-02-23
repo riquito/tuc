@@ -1,6 +1,8 @@
+use std::{borrow::Cow, io::IsTerminal};
+
 use regex::Regex;
 
-pub const HELP: &str = concat!(
+const HELP: &str = concat!(
     "tuc ",
     env!("CARGO_PKG_VERSION"),
     r#"
@@ -98,7 +100,7 @@ Run `tuc --help` for more detailed information.
 "#
 );
 
-pub fn get_colored_help(text: &str) -> String {
+fn get_colored_help(text: &str) -> String {
     // This is very unprofessional but:
     // - I'm playing around and there's no need to look for serious
     //   performance for the help
@@ -148,4 +150,24 @@ pub fn get_colored_help(text: &str) -> String {
         .replace_all(&text, "\x1b[35mdefault\x1b[0m: \x1b[33m$1\x1b[0m");
 
     text.into_owned()
+}
+
+fn can_use_color() -> bool {
+    let is_tty = std::io::stdout().is_terminal();
+    let term = std::env::var("TERM");
+    let no_color = std::env::var("NO_COLOR");
+
+    is_tty
+        && term.is_ok()
+        && term.as_deref() != Ok("dumb")
+        && term.as_deref() != Ok("")
+        && no_color.is_err()
+}
+
+pub fn get_help() -> Cow<'static, str> {
+    if can_use_color() {
+        Cow::Owned(get_colored_help(HELP))
+    } else {
+        Cow::Borrowed(HELP)
+    }
 }
