@@ -380,6 +380,7 @@ pub fn cut_str<W: Write>(
                     l: x,
                     r: y,
                     is_last: _,
+                    fallback_oob: None,
                 }) if x != y || x == &Side::Continue
             )
         }) {
