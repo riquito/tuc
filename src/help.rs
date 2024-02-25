@@ -1,6 +1,9 @@
-use std::{borrow::Cow, io::IsTerminal};
-
+#[cfg(feature = "regex")]
 use regex::Regex;
+#[cfg(feature = "regex")]
+use std::borrow::Cow;
+#[cfg(feature = "regex")]
+use std::io::IsTerminal;
 
 const HELP: &str = concat!(
     "tuc ",
@@ -107,6 +110,7 @@ Send bug reports to: https://github.com/riquito/tuc/issues
 "#
 );
 
+#[cfg(feature = "regex")]
 fn get_colored_help(text: &str) -> String {
     // This is very unprofessional but:
     // - I'm playing around and there's no need to look for serious
@@ -159,6 +163,7 @@ fn get_colored_help(text: &str) -> String {
     text.into_owned()
 }
 
+#[cfg(feature = "regex")]
 fn get_colored_short_help(text: &str) -> String {
     let text = Regex::new(r#"( tuc|echo|printf)"#)
         .unwrap()
@@ -183,6 +188,7 @@ fn get_colored_short_help(text: &str) -> String {
     text.into_owned()
 }
 
+#[cfg(feature = "regex")]
 fn can_use_color() -> bool {
     let is_tty = std::io::stdout().is_terminal();
     let term = std::env::var("TERM");
@@ -195,6 +201,7 @@ fn can_use_color() -> bool {
         && no_color.is_err()
 }
 
+#[cfg(feature = "regex")]
 pub fn get_help() -> Cow<'static, str> {
     if can_use_color() {
         Cow::Owned(get_colored_help(HELP))
@@ -203,10 +210,21 @@ pub fn get_help() -> Cow<'static, str> {
     }
 }
 
+#[cfg(feature = "regex")]
 pub fn get_short_help() -> Cow<'static, str> {
     if can_use_color() {
         Cow::Owned(get_colored_short_help(SHORT_HELP))
     } else {
         Cow::Borrowed(SHORT_HELP)
     }
+}
+
+#[cfg(not(feature = "regex"))]
+pub fn get_help() -> &'static str {
+    HELP
+}
+
+#[cfg(not(feature = "regex"))]
+pub fn get_short_help() -> &'static str {
+    SHORT_HELP
 }
