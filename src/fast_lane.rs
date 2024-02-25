@@ -103,16 +103,23 @@ fn output_parts<W: Write>(
     stdout: &mut W,
     opt: &FastOpt,
 ) -> Result<()> {
-    let r = b.try_into_range(fields.len())?;
+    let r = b.try_into_range(fields.len());
 
-    let idx_start = if r.start == 0 {
-        0
+    let output = if r.is_ok() {
+        let r = r.unwrap();
+
+        let idx_start = if r.start == 0 {
+            0
+        } else {
+            fields[r.start - 1] + 1
+        };
+        let idx_end = fields[r.end - 1];
+        &line[idx_start..idx_end]
+    } else if let Some(generic_fallback) = opt.fallback_oob {
+        generic_fallback
     } else {
-        fields[r.start - 1] + 1
+        return Err(r.unwrap_err());
     };
-    let idx_end = fields[r.end - 1];
-
-    let output = &line[idx_start..idx_end];
 
     let field_to_print = output;
     stdout.write_all(field_to_print)?;
@@ -132,6 +139,7 @@ pub struct FastOpt<'a> {
     bounds: &'a UserBoundsList,
     only_delimited: bool,
     trim: Option<Trim>,
+    fallback_oob: Option<&'a [u8]>,
 }
 
 impl<'a> TryFrom<&'a Opt> for FastOpt<'a> {
@@ -163,6 +171,7 @@ impl<'a> TryFrom<&'a Opt> for FastOpt<'a> {
             bounds: &value.bounds,
             only_delimited: value.only_delimited,
             trim: value.trim,
+            fallback_oob: value.fallback_oob.as_deref(),
         })
     }
 }
@@ -213,6 +222,7 @@ mod tests {
             bounds,
             only_delimited: false,
             trim: None,
+            fallback_oob: None,
         }
     }
 

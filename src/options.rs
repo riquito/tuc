@@ -43,6 +43,7 @@ pub struct Opt {
     pub complement: bool,
     pub join: bool,
     pub json: bool,
+    pub fallback_oob: Option<Vec<u8>>,
     #[cfg(feature = "regex")]
     pub regex_bag: Option<RegexBag>,
     #[cfg(not(feature = "regex"))]
@@ -65,6 +66,7 @@ impl Default for Opt {
             complement: false,
             join: false,
             json: false,
+            fallback_oob: None,
             regex_bag: None,
         }
     }

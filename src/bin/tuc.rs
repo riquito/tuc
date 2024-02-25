@@ -185,6 +185,9 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         bounds,
         replace_delimiter,
         trim: pargs.opt_value_from_str(["-t", "--trim"])?,
+        fallback_oob: pargs
+            .opt_value_from_str("--fallback-oob")?
+            .map(|x: String| x.into()),
         regex_bag,
     };
 
