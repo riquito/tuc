@@ -302,6 +302,7 @@ pub struct UserBounds {
     pub l: Side,
     pub r: Side,
     pub is_last: bool,
+    pub fallback_oob: Option<Vec<u8>>,
 }
 
 impl fmt::Display for UserBounds {
@@ -322,6 +323,13 @@ impl FromStr for UserBounds {
             bail!("Field format error: empty field");
         } else if s == ":" {
             bail!("Field format error, no numbers next to `:`");
+        }
+
+        let mut fallback_oob: Option<Vec<u8>> = None;
+        let mut s = s;
+        if let Some((range_part, fallback)) = s.split_once('=') {
+            fallback_oob = Some(fallback.into());
+            s = range_part;
         }
 
         let (l, r) = match s.find(':') {
@@ -356,7 +364,9 @@ impl FromStr for UserBounds {
             _ => (),
         }
 
-        Ok(UserBounds::new(l, r))
+        let mut b = UserBounds::new(l, r);
+        b.fallback_oob = fallback_oob;
+        Ok(b)
     }
 }
 
@@ -373,6 +383,7 @@ impl UserBoundsTrait<i32> for UserBounds {
             l,
             r,
             is_last: false,
+            fallback_oob: None,
         }
     }
     /**

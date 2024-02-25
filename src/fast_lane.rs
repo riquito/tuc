@@ -115,6 +115,8 @@ fn output_parts<W: Write>(
         };
         let idx_end = fields[r.end - 1];
         &line[idx_start..idx_end]
+    } else if b.fallback_oob.is_some() {
+        b.fallback_oob.as_ref().unwrap()
     } else if let Some(generic_fallback) = opt.fallback_oob {
         generic_fallback
     } else {
