@@ -186,7 +186,16 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         replace_delimiter,
         trim: pargs.opt_value_from_str(["-t", "--trim"])?,
         fallback_oob: pargs
-            .opt_value_from_str("--fallback-oob")?
+            .opt_value_from_str("--fallback-oob")
+            .or_else(|e| match e {
+                pico_args::Error::OptionWithoutAValue(_) => {
+                    // We must consume the arg ourselves (it's not done on error)
+                    pargs.contains("--fallback-oob=");
+
+                    Ok(Some("".into()))
+                }
+                _ => Err(e),
+            })?
             .map(|x: String| x.into()),
         regex_bag,
     };
