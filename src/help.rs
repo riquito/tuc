@@ -70,6 +70,12 @@ Memory consumption:
     the whole input in memory (it also happens when -p or -m are being used)
 
     --bytes allocate the whole input in memory
+
+Colors:
+    Help is displayed using colors. Colors will be suppressed in the
+    following circumstances:
+    - when the TERM environment variable is not set or set to "dumb"
+    - when the NO_COLOR environment variable is set (regardless of value)
 "#
 );
 

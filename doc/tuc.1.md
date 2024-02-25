@@ -116,6 +116,15 @@ MEMORY CONSUMPTION
 
 \--bytes allocate the whole input in memory
 
+COLORS
+======
+
+Help is displayed using colors. Colors will be suppressed in the
+following circumstances:
+
+- when the TERM environment variable is not set or set to "dumb"
+- when the NO_COLOR environment variable is set (regardless of value)
+
 BUGS
 ====
 
