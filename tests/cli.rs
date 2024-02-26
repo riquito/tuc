@@ -159,7 +159,7 @@ fn it_can_complement_the_fields() {
         .write_stdin("a b c")
         .assert();
 
-    assert.success().stdout("\n");
+    assert.failure().stderr("Error: the complement is empty\n");
 }
 
 #[test]

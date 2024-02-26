@@ -10,21 +10,6 @@ use crate::options::{Opt, Trim, EOL};
 #[cfg(feature = "regex")]
 use regex::bytes::Regex;
 
-fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usize>> {
-    match (r.start, r.end) {
-        // full match => no match
-        (0, end) if end == parts_length => Vec::new(),
-        // match left side => match right side
-        #[allow(clippy::single_range_in_vec_init)]
-        (0, right) => vec![right..parts_length],
-        // match right side => match left side
-        #[allow(clippy::single_range_in_vec_init)]
-        (left, end) if end == parts_length => vec![0..left],
-        // match middle of string => match before and after
-        (left, right) => vec![0..left, right..parts_length],
-    }
-}
-
 /// Split a string into parts and fill a buffer with ranges
 /// that match those parts.
 ///
@@ -361,18 +346,28 @@ pub fn cut_str<W: Write>(
         stdout.write_all(b"[")?;
     }
 
-    let _bounds: UserBoundsList;
+    let mut _bounds: UserBoundsList;
     let mut bounds = &opt.bounds;
 
-    if opt.bounds_type == BoundsType::Characters && opt.replace_delimiter.is_some() {
-        // Unpack bounds such as 1:3 or 2: into single character bounds
-        // such as 1:1,2:2,3:3 etc...
-        // We need it to be able to insert a replace character between every field.
-        // It can cost quite a bit and is risky because it may end up creating a
-        // char vector of the whole input (then again -c with -r is quite the
-        // rare usage).
+    if opt.complement {
+        _bounds = bounds.complement(num_fields)?;
+        bounds = &_bounds;
 
-        // Start by checking if we actually need to rewrite the bounds
+        if bounds.is_empty() {
+            // If the original bounds matched all the fields, the complement is empty
+            if !opt.only_delimited {
+                stdout.write_all(eol)?;
+            }
+            return Ok(());
+        }
+    }
+
+    if opt.json || (opt.bounds_type == BoundsType::Characters && opt.replace_delimiter.is_some()) {
+        // Unpack bounds such as 1:3 or 2: into single-field bounds
+        // such as 1:1,2:2,3:3 etc...
+
+        // Start by checking if we actually need to rewrite the bounds, since
+        // it's an expensive operation.
         if bounds.iter().any(|b| {
             matches!(
                 b,
@@ -380,11 +375,10 @@ pub fn cut_str<W: Write>(
                     l: x,
                     r: y,
                     is_last: _,
-                    fallback_oob: None,
+                    fallback_oob: _,
                 }) if x != y || x == &Side::Continue
             )
         }) {
-            // Yep, there at least a range bound. Let's do it
             _bounds = bounds.unpack(num_fields);
             bounds = &_bounds;
         }
@@ -407,42 +401,22 @@ pub fn cut_str<W: Write>(
                         BoundOrFiller::Bound(b) => b,
                     };
 
-                    let mut r_array = vec![b.try_into_range(num_fields)?];
+                    let r = b.try_into_range(num_fields)?;
 
-                    if opt.complement {
-                        r_array = complement_std_range(num_fields, &r_array[0]);
-                    }
+                    let idx_start = fields[r.start].start;
+                    let idx_end = fields[r.end - 1].end;
+                    let output = &line[idx_start..idx_end];
 
-                    if opt.json {
-                        r_array = r_array
-                            .iter()
-                            .flat_map(|r| r.start..r.end)
-                            .map(|i| Range {
-                                start: i,
-                                end: i + 1,
-                            })
-                            .collect();
-                    }
+                    let field_to_print = maybe_replace_delimiter(output, opt);
+                    write_maybe_as_json!(stdout, field_to_print, opt.json);
 
-                    let r_iter = r_array.iter();
-                    let n_ranges = r_array.len();
-
-                    for (idx_r, r) in r_iter.enumerate() {
-                        let idx_start = fields[r.start].start;
-                        let idx_end = fields[r.end - 1].end;
-                        let output = &line[idx_start..idx_end];
-
-                        let field_to_print = maybe_replace_delimiter(output, opt);
-                        write_maybe_as_json!(stdout, field_to_print, opt.json);
-
-                        if opt.join && !(i == bounds.len() - 1 && idx_r == n_ranges - 1) {
-                            stdout.write_all(
-                                opt.replace_delimiter
-                                    .as_ref()
-                                    .unwrap_or(&opt.delimiter)
-                                    .as_bytes(),
-                            )?;
-                        }
+                    if opt.join && i != bounds.len() - 1 {
+                        stdout.write_all(
+                            opt.replace_delimiter
+                                .as_ref()
+                                .unwrap_or(&opt.delimiter)
+                                .as_bytes(),
+                        )?;
                     }
 
                     Ok(())
@@ -539,29 +513,6 @@ mod tests {
             normal: Regex::from_str("\\b|\\B").unwrap(),
             greedy: Regex::from_str("(\\b|\\B)+").unwrap(),
         }
-    }
-
-    #[test]
-    fn test_complement_std_range() {
-        // remember, it assumes that ranges are "legit" (not out of bounds)
-
-        let empty_vec: Vec<Range<usize>> = vec![];
-
-        // test 1-long string
-        assert_eq!(complement_std_range(1, &(0..1)), empty_vec);
-
-        // test ranges that reach left or right bounds
-        assert_eq!(complement_std_range(5, &(0..5)), empty_vec);
-        assert_eq!(complement_std_range(5, &(0..3)), vec![3..5]);
-        assert_eq!(complement_std_range(5, &(3..5)), vec![0..3]);
-
-        // test internal range
-        assert_eq!(complement_std_range(5, &(1..3)), vec![0..1, 3..5]);
-
-        // test 2-long string
-        assert_eq!(complement_std_range(2, &(0..2)), empty_vec);
-        assert_eq!(complement_std_range(2, &(0..1)), vec![1..2]);
-        assert_eq!(complement_std_range(2, &(1..2)), vec![0..1]);
     }
 
     #[test]
@@ -1024,7 +975,6 @@ mod tests {
         opt.regex_bag = Some(make_regex_bag());
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
-        dbg!(std::str::from_utf8(&output).unwrap());
         assert_eq!(output, b"b..,,c\n".as_slice());
     }
 
