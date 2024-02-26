@@ -7,15 +7,40 @@ use tuc::bounds::{BoundOrFiller, BoundsType, UserBoundsList};
 use tuc::cut_bytes::read_and_cut_bytes;
 use tuc::cut_lines::read_and_cut_lines;
 use tuc::cut_str::read_and_cut_str;
-use tuc::fast_lane::{read_and_cut_text_as_bytes, FastOpt};
 use tuc::help::{get_help, get_short_help};
 use tuc::options::{Opt, EOL};
+
+#[cfg(feature = "fast-lane")]
+use tuc::fast_lane::{read_and_cut_text_as_bytes, FastOpt};
 
 #[cfg(feature = "regex")]
 use tuc::options::RegexBag;
 
 #[cfg(feature = "regex")]
 use regex::bytes::Regex;
+
+#[cfg(not(feature = "fast-lane"))]
+struct FastOpt {}
+
+#[cfg(not(feature = "fast-lane"))]
+impl<'a> TryFrom<&'a Opt> for FastOpt {
+    type Error = &'static str;
+
+    fn try_from(_value: &'a Opt) -> Result<Self, Self::Error> {
+        Err("This binary was not compiled with the feature fast-lane")
+    }
+}
+
+#[cfg(not(feature = "fast-lane"))]
+fn read_and_cut_text_as_bytes<R: std::io::BufRead, W: Write>(
+    _stdin: &mut R,
+    _stdout: &mut W,
+    _fast_opt: &FastOpt,
+) -> Result<()> {
+    Err(anyhow::Error::msg(
+        "This binary was not compiled with the feature fast-lane",
+    ))
+}
 
 fn parse_args() -> Result<Opt, pico_args::Error> {
     let mut pargs = pico_args::Arguments::from_env();

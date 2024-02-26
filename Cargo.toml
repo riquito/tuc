@@ -22,7 +22,8 @@ regex = { version = "1.10", default-features = false, features = ["std", "unicod
 serde_json = "1.0.113"
 
 [features]
-default = ["regex"]
+default = ["regex", "fast-lane"]
+fast-lane = []
 
 [dev-dependencies]
 assert_cmd = "2.0.13"
