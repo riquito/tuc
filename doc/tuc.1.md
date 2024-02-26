@@ -54,7 +54,8 @@ OPTIONS
 
 | **-f**, **\--fields** [bounds]
 |        Fields to keep, 1-indexed, comma separated.
-|        Use colon to include everything in a range.
+|        Use colon (:) to match a range (inclusive).
+|        Use equal (=) to apply out of bound fallback.
 |        Fields can be negative (-1 is the last field).
 
 |        [default 1:]
@@ -66,6 +67,7 @@ OPTIONS
 |          `-f 3,2   => cb`
 |          `-f 3,1:2 => ca-b`
 |          `-f -3:-2 => b-c`
+|          `-f 1,8=fallback => afallback`
 
 |        To re-apply the delimiter add -j, to replace
 |        it add -r (followed by the new delimiter)
@@ -100,6 +102,12 @@ OPTIONS
 |        Trim the delimiter (greedy).
 |        Valid values are (l|L)eft, (r|R)ight, (b|B)oth
 
+|     **\--fallback-oob** [fallback]
+|        Generic fallback output for any field that
+|        cannot be found (oob stands for out of bound).
+|        It's overridden by any fallback assigned to a
+|        specific field (see -f for help)
+
 OPTIONS PRECEDENCE
 ==================
 
@@ -110,17 +118,17 @@ MEMORY CONSUMPTION
 
 \--characters and \--fields read and allocate memory one line at a time
 
-\--lines allocate memory one line at a time as long as the requested fields are
- ordered and non-negative (e.g. -l 1,3:4,4,7), otherwise it allocates
- the whole input in memory (it also happens when -p or -m are being used)  
+| \--lines allocate memory one line at a time as long as the requested fields are
+| ordered and non-negative (e.g. -l 1,3:4,4,7), otherwise it allocates
+| the whole input in memory (it also happens when -p or -m are being used)
 
 \--bytes allocate the whole input in memory
 
 COLORS
 ======
 
-Help is displayed using colors. Colors will be suppressed in the
-following circumstances:
+| Help is displayed using colors. Colors will be suppressed in the
+| following circumstances:
 
 - when the TERM environment variable is not set or set to "dumb"
 - when the NO_COLOR environment variable is set (regardless of value)

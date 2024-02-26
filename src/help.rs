@@ -29,7 +29,8 @@ FLAGS:
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
-                                  Use colon to include everything in a range.
+                                  Use colon (:) to match a range (inclusive).
+                                  Use equal (=) to apply out of bound fallback.
                                   Fields can be negative (-1 is the last field).
                                   [default: 1:]
 
@@ -40,6 +41,7 @@ OPTIONS:
                                     -f 3,2   => cb
                                     -f 3,1:2 => ca-b
                                     -f -3:-2 => b-c
+                                    -f 1,8=fallback => afallback
 
                                   To re-apply the delimiter add -j, to replace
                                   it add -r (followed by the new delimiter).
@@ -61,6 +63,10 @@ OPTIONS:
                                   Implies --join
     -t, --trim <type>             Trim the delimiter (greedy). Valid values are
                                   (l|L)eft, (r|R)ight, (b|B)oth
+        --fallback-oob <fallback> Generic fallback output for any field that
+                                  cannot be found (oob stands for out of bound).
+                                  It's overridden by any fallback assigned to a
+                                  specific field (see -f for help)
 
 Options precedence:
     --trim and --compress-delimiter are applied before --fields or similar
@@ -126,7 +132,7 @@ fn get_colored_help(text: &str) -> String {
         .replace_all(text, "\x1b[33m$0\x1b[0m");
 
     // any example using "-f something"
-    let text = Regex::new(r#"-(f|l) ('.+'|[0-9,:-]+)"#)
+    let text = Regex::new(r#"-(f|l) ('.+'|[0-9,:-]+(=[^\s]+)?)"#)
         .unwrap()
         .replace_all(&text, "-$1 \x1b[33m$2\x1b[0m");
 

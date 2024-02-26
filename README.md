@@ -53,7 +53,8 @@ FLAGS:
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.
-                                  Use colon to include everything in a range.
+                                  Use colon (:) to match a range (inclusive).
+                                  Use equal (=) to apply out of bound fallback.
                                   Fields can be negative (-1 is the last field).
                                   [default 1:]
 
@@ -64,6 +65,7 @@ OPTIONS:
                                     -f 3,2   => cb
                                     -f 3,1:2 => ca-b
                                     -f -3:-2 => b-c
+                                    -f 1,8=fallback => afallback
 
                                   To re-apply the delimiter add -j, to replace
                                   it add -r (followed by the new delimiter).
@@ -84,6 +86,10 @@ OPTIONS:
     -r, --replace-delimiter <new> Replace the delimiter with the provided text
     -t, --trim <type>             Trim the delimiter (greedy). Valid values are
                                   (l|L)eft, (r|R)ight, (b|B)oth
+        --fallback-oob <fallback> Generic fallback output for any field that
+                                  cannot be found (oob stands for out of bound).
+                                  It's overridden by any fallback assigned to a
+                                  specific field (see -f for help)
 
 Options precedence:
     --trim and --compress-delimiter are applied before --fields or similar
