@@ -743,6 +743,24 @@ mod tests {
             )),
         );
 
+        assert_eq!(
+            UserBounds::from_str("1=allow:colon:in:fallback").ok(),
+            Some(UserBounds::with_fallback(
+                Side::Some(1),
+                Side::Some(1),
+                Some("allow:colon:in:fallback".as_bytes().to_owned())
+            )),
+        );
+
+        assert_eq!(
+            UserBounds::from_str("1:2=allow:colon:in:fallback").ok(),
+            Some(UserBounds::with_fallback(
+                Side::Some(1),
+                Side::Some(2),
+                Some("allow:colon:in:fallback".as_bytes().to_owned())
+            )),
+        );
+
         {
             #![allow(clippy::bind_instead_of_map)]
             assert_eq!(
