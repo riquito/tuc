@@ -441,6 +441,7 @@ impl From<Range<usize>> for UserBounds {
 
 pub trait UserBoundsTrait<T> {
     fn new(l: Side, r: Side) -> Self;
+    fn with_fallback(l: Side, r: Side, fallback_oob: Option<Vec<u8>>) -> Self;
     fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>>;
     fn matches(&self, idx: T) -> Result<bool>;
     fn unpack(&self, num_fields: usize) -> Vec<UserBounds>;
@@ -456,6 +457,16 @@ impl UserBoundsTrait<i32> for UserBounds {
             fallback_oob: None,
         }
     }
+
+    fn with_fallback(l: Side, r: Side, fallback_oob: Option<Vec<u8>>) -> Self {
+        UserBounds {
+            l,
+            r,
+            is_last: false,
+            fallback_oob,
+        }
+    }
+
     /**
      * Check if a field is between the bounds.
      *
@@ -694,6 +705,42 @@ mod tests {
         assert_eq!(
             UserBounds::from_str(":-1").ok(),
             Some(UserBounds::new(Side::Continue, Side::Some(-1))),
+        );
+
+        assert_eq!(
+            UserBounds::from_str("1").ok(),
+            Some(UserBounds::with_fallback(
+                Side::Some(1),
+                Side::Some(1),
+                None
+            )),
+        );
+
+        assert_eq!(
+            UserBounds::from_str("1=foo").ok(),
+            Some(UserBounds::with_fallback(
+                Side::Some(1),
+                Side::Some(1),
+                Some("foo".as_bytes().to_owned())
+            )),
+        );
+
+        assert_eq!(
+            UserBounds::from_str("1:2=foo").ok(),
+            Some(UserBounds::with_fallback(
+                Side::Some(1),
+                Side::Some(2),
+                Some("foo".as_bytes().to_owned())
+            )),
+        );
+
+        assert_eq!(
+            UserBounds::from_str("-1=foo").ok(),
+            Some(UserBounds::with_fallback(
+                Side::Some(-1),
+                Side::Some(-1),
+                Some("foo".as_bytes().to_owned())
+            )),
         );
 
         {

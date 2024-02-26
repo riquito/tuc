@@ -260,13 +260,18 @@ fn it_format_fields() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
-        .args(["-f", "Say {1} to our {2}.\nJust {{saying}}"])
+        .args([
+            "--fallback-oob",
+            "generic fallback",
+            "-f",
+            "Say {1} to our {2}.\nJust {{saying}} {3=dedicated fallback} {4}",
+        ])
         .write_stdin("hello\tworld")
         .assert();
 
     assert
         .success()
-        .stdout("Say hello to our world.\nJust {saying}\n");
+        .stdout("Say hello to our world.\nJust {saying} dedicated fallback generic fallback\n");
 }
 
 #[test]
