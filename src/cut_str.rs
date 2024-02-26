@@ -401,11 +401,20 @@ pub fn cut_str<W: Write>(
                         BoundOrFiller::Bound(b) => b,
                     };
 
-                    let r = b.try_into_range(num_fields)?;
+                    let r = b.try_into_range(num_fields);
 
-                    let idx_start = fields[r.start].start;
-                    let idx_end = fields[r.end - 1].end;
-                    let output = &line[idx_start..idx_end];
+                    let output = if r.is_ok() {
+                        let r = r.unwrap();
+                        let idx_start = fields[r.start].start;
+                        let idx_end = fields[r.end - 1].end;
+                        &line[idx_start..idx_end]
+                    } else if b.fallback_oob.is_some() {
+                        b.fallback_oob.as_ref().unwrap()
+                    } else if let Some(generic_fallback) = &opt.fallback_oob {
+                        generic_fallback
+                    } else {
+                        return Err(r.unwrap_err());
+                    };
 
                     let field_to_print = maybe_replace_delimiter(output, opt);
                     write_maybe_as_json!(stdout, field_to_print, opt.json);
