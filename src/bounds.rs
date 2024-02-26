@@ -231,23 +231,76 @@ impl UserBoundsList {
         self.is_sortable() && self.is_sorted() && !self.has_negative_indices()
     }
 
-    /**
-     * Create a new UserBoundsList with only the bounds (no fillers)
-     * and with every ranged bound converted into single slot bounds.
-     */
+    /// Create a new UserBoundsList with every ranged bound converted
+    /// into single-field bounds.
+    ///
+    /// ```rust
+    /// # use tuc::bounds::{UserBoundsList, UserBoundsTrait};
+    /// # use std::ops::Range;
+    /// # use tuc::bounds::Side;
+    /// # use std::str::FromStr;
+    ///
+    /// assert_eq!(
+    ///   UserBoundsList::from_str("1:3,4,-2:").unwrap().unpack(6).list,
+    ///   UserBoundsList::from_str("1,2,3,4,5,6").unwrap().list,
+    /// );
+    /// ```
     pub fn unpack(&self, num_fields: usize) -> UserBoundsList {
         let list: Vec<BoundOrFiller> = self
             .list
             .iter()
-            .filter_map(|x| match x {
-                BoundOrFiller::Filler(_) => None,
-                BoundOrFiller::Bound(b) => Some(b.unpack(num_fields)),
+            .flat_map(|bof| match bof {
+                // XXX how to do it using only iterators, no collect?
+                BoundOrFiller::Bound(b) => b
+                    .unpack(num_fields)
+                    .into_iter()
+                    .map(BoundOrFiller::Bound)
+                    .collect(),
+                BoundOrFiller::Filler(f) => vec![BoundOrFiller::Filler(f.clone())],
             })
-            .flatten()
-            .map(BoundOrFiller::Bound)
             .collect();
 
         list.into()
+    }
+
+    /// Create a new UserBoundsList with every range complemented (inverted).
+    pub fn complement(&self, num_fields: usize) -> Result<UserBoundsList> {
+        let list: Vec<BoundOrFiller> = self
+            .list
+            .iter()
+            .flat_map(|bof| match bof {
+                // XXX how to do it using only iterators, no collect?
+                BoundOrFiller::Bound(b) => anyhow::Ok(
+                    b.complement(num_fields)?
+                        .into_iter()
+                        .map(BoundOrFiller::Bound)
+                        .collect(),
+                ),
+                BoundOrFiller::Filler(f) => Ok(vec![BoundOrFiller::Filler(f.clone())]),
+            })
+            .flatten()
+            .collect();
+
+        if list.is_empty() {
+            bail!("the complement is empty");
+        }
+
+        Ok(list.into())
+    }
+}
+
+fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usize>> {
+    match (r.start, r.end) {
+        // full match => no match
+        (0, end) if end == parts_length => Vec::new(),
+        // match left side => match right side
+        #[allow(clippy::single_range_in_vec_init)]
+        (0, right) => vec![right..parts_length],
+        // match right side => match left side
+        #[allow(clippy::single_range_in_vec_init)]
+        (left, end) if end == parts_length => vec![0..left],
+        // match middle of string => match before and after
+        (left, right) => vec![0..left, right..parts_length],
     }
 }
 
@@ -370,11 +423,28 @@ impl FromStr for UserBounds {
     }
 }
 
+impl From<Range<usize>> for UserBounds {
+    fn from(value: Range<usize>) -> Self {
+        let start: i32 = value
+            .start
+            .try_into()
+            .expect("range was bigger than expected");
+
+        let end: i32 = value
+            .end
+            .try_into()
+            .expect("range was bigger than expected");
+
+        UserBounds::new(Side::Some(start + 1), Side::Some(end))
+    }
+}
+
 pub trait UserBoundsTrait<T> {
     fn new(l: Side, r: Side) -> Self;
     fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>>;
     fn matches(&self, idx: T) -> Result<bool>;
     fn unpack(&self, num_fields: usize) -> Vec<UserBounds>;
+    fn complement(&self, num_fields: usize) -> Result<Vec<UserBounds>>;
 }
 
 impl UserBoundsTrait<i32> for UserBounds {
@@ -509,6 +579,13 @@ impl UserBoundsTrait<i32> for UserBounds {
 
         bounds
     }
+
+    /// Transform a bound in its complement (invert the bound).
+    fn complement(&self, num_fields: usize) -> Result<Vec<UserBounds>> {
+        let r = self.try_into_range(num_fields)?;
+        let r_complement = complement_std_range(num_fields, &r);
+        Ok(r_complement.into_iter().map(|x| x.into()).collect())
+    }
 }
 
 impl PartialOrd for UserBounds {
@@ -536,6 +613,29 @@ impl Default for UserBounds {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_complement_std_range() {
+        // remember, it assumes that ranges are "legit" (not out of bounds)
+
+        let empty_vec: Vec<Range<usize>> = vec![];
+
+        // test 1-long string
+        assert_eq!(complement_std_range(1, &(0..1)), empty_vec);
+
+        // test ranges that reach left or right bounds
+        assert_eq!(complement_std_range(5, &(0..5)), empty_vec);
+        assert_eq!(complement_std_range(5, &(0..3)), vec![3..5]);
+        assert_eq!(complement_std_range(5, &(3..5)), vec![0..3]);
+
+        // test internal range
+        assert_eq!(complement_std_range(5, &(1..3)), vec![0..1, 3..5]);
+
+        // test 2-long string
+        assert_eq!(complement_std_range(2, &(0..2)), empty_vec);
+        assert_eq!(complement_std_range(2, &(0..1)), vec![1..2]);
+        assert_eq!(complement_std_range(2, &(1..2)), vec![0..1]);
+    }
 
     #[test]
     fn test_user_bounds_formatting() {
@@ -781,6 +881,33 @@ mod tests {
     }
 
     #[test]
+    fn test_complement_bound() {
+        assert_eq!(
+            UserBounds::new(Side::Some(1), Side::Some(1))
+                .complement(2)
+                .unwrap(),
+            vec![UserBounds::new(Side::Some(2), Side::Some(2))],
+        );
+
+        assert_eq!(
+            UserBounds::new(Side::Some(1), Side::Continue)
+                .complement(2)
+                .unwrap(),
+            Vec::new(),
+        );
+
+        assert_eq!(
+            UserBounds::new(Side::Some(-3), Side::Some(3))
+                .complement(4)
+                .unwrap(),
+            vec![
+                UserBounds::new(Side::Some(1), Side::Some(1)),
+                UserBounds::new(Side::Some(4), Side::Some(4)),
+            ],
+        );
+    }
+
+    #[test]
     fn test_user_bounds_cannot_be_empty() {
         assert!(UserBoundsList::from_str("").is_err());
     }
@@ -845,14 +972,42 @@ mod tests {
         );
 
         assert_eq!(
-            UserBoundsList::from_str("a{1}b{2}c")
-                .unwrap()
-                .unpack(4)
-                .list,
+            UserBoundsList::from_str("a{1:2}b").unwrap().unpack(4).list,
             vec![
+                BoundOrFiller::Filler(String::from("a")),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Filler(String::from("b")),
             ]
+        );
+    }
+
+    #[test]
+    fn test_vec_of_bounds_can_complement() {
+        assert_eq!(
+            UserBoundsList::from_str("1:2,2:3,5,-2")
+                .unwrap()
+                .complement(6)
+                .unwrap()
+                .list,
+            vec![
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(3), Side::Some(6))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(4), Side::Some(6))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(4))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(6), Side::Some(6))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(4))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(6), Side::Some(6))),
+            ]
+        );
+
+        assert_eq!(
+            UserBoundsList::from_str("1:")
+                .unwrap()
+                .complement(6)
+                .err()
+                .map(|x| x.to_string()),
+            Some("the complement is empty".to_owned())
         );
     }
 }
