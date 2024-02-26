@@ -67,7 +67,11 @@ Print fields as a JSON array of strings
 .PD 0
 .P
 .PD
-\ \ \ \ \ \ \ Use colon to include everything in a range.
+\ \ \ \ \ \ \ Use colon (:) to match a range (inclusive).
+.PD 0
+.P
+.PD
+\ \ \ \ \ \ \ Use equal (=) to apply out of bound fallback.
 .PD 0
 .P
 .PD
@@ -100,6 +104,10 @@ Print fields as a JSON array of strings
 .P
 .PD
 \ \ \ \ \ \ \ \ \ \f[V]-f -3:-2 => b-c\f[R]
+.PD 0
+.P
+.PD
+\ \ \ \ \ \ \ \ \ \f[V]-f 1,8=fallback => afallback\f[R]
 .PP
 \ \ \ \ \ \ \ To re-apply the delimiter add -j, to replace
 .PD 0
@@ -173,6 +181,24 @@ To merge lines, use --no-join
 .P
 .PD
 \ \ \ \ \ \ \ Valid values are (l|L)eft, (r|R)ight, (b|B)oth
+.PP
+\ \ \ \ \f[B]--fallback-oob\f[R] [fallback]
+.PD 0
+.P
+.PD
+\ \ \ \ \ \ \ Generic fallback output for any field that
+.PD 0
+.P
+.PD
+\ \ \ \ \ \ \ cannot be found (oob stands for out of bound).
+.PD 0
+.P
+.PD
+\ \ \ \ \ \ \ It\[cq]s overridden by any fallback assigned to a
+.PD 0
+.P
+.PD
+\ \ \ \ \ \ \ specific field (see -f for help)
 .SH OPTIONS PRECEDENCE
 .PP
 --trim and --compress-delimiter are applied before --fields or similar
@@ -181,15 +207,25 @@ To merge lines, use --no-join
 --characters and --fields read and allocate memory one line at a time
 .PP
 --lines allocate memory one line at a time as long as the requested
-fields are ordered and non-negative (e.g.\ -l 1,3:4,4,7), otherwise it
-allocates the whole input in memory (it also happens when -p or -m are
-being used)
+fields are
+.PD 0
+.P
+.PD
+ordered and non-negative (e.g.\ -l 1,3:4,4,7), otherwise it allocates
+.PD 0
+.P
+.PD
+the whole input in memory (it also happens when -p or -m are being used)
 .PP
 --bytes allocate the whole input in memory
 .SH COLORS
 .PP
 Help is displayed using colors.
-Colors will be suppressed in the following circumstances:
+Colors will be suppressed in the
+.PD 0
+.P
+.PD
+following circumstances:
 .IP \[bu] 2
 when the TERM environment variable is not set or set to \[lq]dumb\[rq]
 .IP \[bu] 2
