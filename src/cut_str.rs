@@ -389,47 +389,44 @@ pub fn cut_str<W: Write>(
             write_maybe_as_json!(stdout, line, opt.json);
         }
         _ => {
-            bounds
-                .iter()
-                .enumerate()
-                .try_for_each(|(i, bof)| -> Result<()> {
-                    let b = match bof {
-                        BoundOrFiller::Filler(f) => {
-                            stdout.write_all(f.as_bytes())?;
-                            return Ok(());
-                        }
-                        BoundOrFiller::Bound(b) => b,
-                    };
-
-                    let r = b.try_into_range(num_fields);
-
-                    let output = if r.is_ok() {
-                        let r = r.unwrap();
-                        let idx_start = fields[r.start].start;
-                        let idx_end = fields[r.end - 1].end;
-                        &line[idx_start..idx_end]
-                    } else if b.fallback_oob.is_some() {
-                        b.fallback_oob.as_ref().unwrap()
-                    } else if let Some(generic_fallback) = &opt.fallback_oob {
-                        generic_fallback
-                    } else {
-                        return Err(r.unwrap_err());
-                    };
-
-                    let field_to_print = maybe_replace_delimiter(output, opt);
-                    write_maybe_as_json!(stdout, field_to_print, opt.json);
-
-                    if opt.join && i != bounds.len() - 1 {
-                        stdout.write_all(
-                            opt.replace_delimiter
-                                .as_ref()
-                                .unwrap_or(&opt.delimiter)
-                                .as_bytes(),
-                        )?;
+            bounds.iter().try_for_each(|bof| -> Result<()> {
+                let b = match bof {
+                    BoundOrFiller::Filler(f) => {
+                        stdout.write_all(f.as_bytes())?;
+                        return Ok(());
                     }
+                    BoundOrFiller::Bound(b) => b,
+                };
 
-                    Ok(())
-                })?;
+                let r = b.try_into_range(num_fields);
+
+                let output = if r.is_ok() {
+                    let r = r.unwrap();
+                    let idx_start = fields[r.start].start;
+                    let idx_end = fields[r.end - 1].end;
+                    &line[idx_start..idx_end]
+                } else if b.fallback_oob.is_some() {
+                    b.fallback_oob.as_ref().unwrap()
+                } else if let Some(generic_fallback) = &opt.fallback_oob {
+                    generic_fallback
+                } else {
+                    return Err(r.unwrap_err());
+                };
+
+                let field_to_print = maybe_replace_delimiter(output, opt);
+                write_maybe_as_json!(stdout, field_to_print, opt.json);
+
+                if opt.join && !b.is_last {
+                    stdout.write_all(
+                        opt.replace_delimiter
+                            .as_ref()
+                            .unwrap_or(&opt.delimiter)
+                            .as_bytes(),
+                    )?;
+                }
+
+                Ok(())
+            })?;
         }
     }
 
