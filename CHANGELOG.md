@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * fields cut is now done on bytes, not strings (as long as your
     delimiter is proper utf-8 you'll be fine)
 - feat: display short help when run without arguments
+- feat: add the ability to display fallback output when a field is out of bound
+  (you can set it per-field using `-f <range>=somefallback` or by providing
+  a generic fallback using `--fallback-oob somefallback`)
 - feat: --characters now depends on the (default) regex feature
 - feat: help and short help are colored, as long as output is a tty and
   unless env var TERM=dumb or NO_COLOR (any value) is set
