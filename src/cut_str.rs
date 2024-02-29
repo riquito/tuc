@@ -677,6 +677,19 @@ mod tests {
         assert_eq!(output, b"a\n".as_slice());
     }
 
+    #[test]
+    fn cut_str_it_cut_ranges() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = b"a-b-c";
+        opt.bounds = UserBoundsList::from_str("1,1:3").unwrap();
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+        assert_eq!(output, b"aa-b-c\n".as_slice());
+    }
+
     #[cfg(feature = "regex")]
     #[test]
     fn cut_str_regex_it_cut_a_field() {
