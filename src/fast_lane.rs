@@ -45,10 +45,13 @@ fn cut_str_fast_lane<W: Write>(
 
     fields.clear();
 
+    // fields is going to hold at what index each field starts
+    fields.push(0);
+
     for i in memchr::memchr_iter(opt.delimiter, buffer) {
         curr_field += 1;
 
-        fields.push(i);
+        fields.push(i + 1);
 
         if Side::Some(curr_field) == last_interesting_field {
             // We have no use for any other fields in this line
@@ -64,13 +67,16 @@ fn cut_str_fast_lane<W: Write>(
     if Side::Some(curr_field) != last_interesting_field {
         // We reached the end of the line. Who knows, maybe
         // the user is interested in this field too.
-        fields.push(buffer.len());
+
+        // We add a fake start (+1 because we account for the fake delimiter)
+        // This allows us to avoid one if/else in the output loop
+        fields.push(buffer.len() + 1);
     }
 
-    let num_fields = fields.len();
+    let num_fields = fields.len() - 1;
 
     match num_fields {
-        1 if bounds.len() == 1 && fields[0] == buffer.len() => {
+        1 if bounds.len() == 1 && fields[1] == buffer.len() + 1 => {
             stdout.write_all(buffer)?;
         }
         _ => {
@@ -103,17 +109,12 @@ fn output_parts<W: Write>(
     stdout: &mut W,
     opt: &FastOpt,
 ) -> Result<()> {
-    let r = b.try_into_range(fields.len());
+    let r = b.try_into_range(fields.len() - 1);
 
     let output = if r.is_ok() {
         let r = r.unwrap();
-
-        let idx_start = if r.start == 0 {
-            0
-        } else {
-            fields[r.start - 1] + 1
-        };
-        let idx_end = fields[r.end - 1];
+        let idx_start = fields[r.start];
+        let idx_end = fields[r.end] - 1;
         &line[idx_start..idx_end]
     } else if b.fallback_oob.is_some() {
         b.fallback_oob.as_ref().unwrap()
