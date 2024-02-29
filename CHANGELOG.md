@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - feat: add the ability to display fallback output when a field is out of bound
   (you can set it per-field using `-f <range>=somefallback` or by providing
   a generic fallback using `--fallback-oob somefallback`)
+- feat: it is now possible to type \t while formatting fields and
+  output a TAB (as we similary do for \n) e.g. `-f '{1}\t{2}'`
 - feat: --characters now depends on the (default) regex feature
 - feat: help and short help are colored, as long as output is a tty and
   unless env var TERM=dumb or NO_COLOR (any value) is set

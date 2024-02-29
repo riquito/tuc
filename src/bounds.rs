@@ -56,7 +56,8 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
                         s[part_start..idx]
                             .replace("{{", "{")
                             .replace("}}", "}")
-                            .replace("\\n", "\n"),
+                            .replace("\\n", "\n")
+                            .replace("\\t", "\t"),
                     ));
                 }
 
@@ -81,7 +82,8 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
                 s[part_start..]
                     .replace("{{", "{")
                     .replace("}}", "}")
-                    .replace("\\n", "\n"),
+                    .replace("\\n", "\n")
+                    .replace("\\t", "\t"),
             ));
         }
 
@@ -888,6 +890,16 @@ mod tests {
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
                 BoundOrFiller::Filler(String::from("😎")),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2)))
+            ],
+        );
+
+        assert_eq!(
+            parse_bounds_list("\\n\\t{{}}{1,2}\\n\\t{{}}").unwrap(),
+            vec![
+                BoundOrFiller::Filler(String::from("\n\t{}")),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Filler(String::from("\n\t{}")),
             ],
         );
     }
