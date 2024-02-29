@@ -344,6 +344,24 @@ mod tests {
     }
 
     #[test]
+    fn cut_str_it_cut_ranges() {
+        let opt = make_fields_opt("1,1:3");
+        let (mut output, mut fields) = make_cut_str_buffers();
+
+        let line = b"a-b-c";
+
+        cut_str_fast_lane(
+            line,
+            &opt,
+            &mut output,
+            &mut fields,
+            opt.bounds.last_interesting_field,
+        )
+        .unwrap();
+        assert_eq!(output, b"aa-b-c\n".as_slice());
+    }
+
+    #[test]
     fn cut_str_it_cut_with_negative_indices() {
         // just one negative index
         let opt = make_fields_opt("-1");
