@@ -16,7 +16,7 @@ pub enum BoundsType {
 #[derive(Clone, Debug, PartialEq)]
 pub enum BoundOrFiller {
     Bound(UserBounds),
-    Filler(String),
+    Filler(Vec<u8>),
 }
 
 /**
@@ -57,7 +57,8 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
                             .replace("{{", "{")
                             .replace("}}", "}")
                             .replace("\\n", "\n")
-                            .replace("\\t", "\t"),
+                            .replace("\\t", "\t")
+                            .into_bytes(),
                     ));
                 }
 
@@ -83,7 +84,8 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
                     .replace("{{", "{")
                     .replace("}}", "}")
                     .replace("\\n", "\n")
-                    .replace("\\t", "\t"),
+                    .replace("\\t", "\t")
+                    .into_bytes(),
             ));
         }
 
@@ -877,10 +879,10 @@ mod tests {
         assert_eq!(
             parse_bounds_list("hello {1,2} {{world}}").unwrap(),
             vec![
-                BoundOrFiller::Filler(String::from("hello ")),
+                BoundOrFiller::Filler("hello ".into()),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
-                BoundOrFiller::Filler(String::from(" {world}")),
+                BoundOrFiller::Filler(" {world}".into()),
             ],
         );
 
@@ -888,7 +890,7 @@ mod tests {
             parse_bounds_list("{1}😎{2}").unwrap(),
             vec![
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Filler(String::from("😎")),
+                BoundOrFiller::Filler("😎".into()),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2)))
             ],
         );
@@ -896,10 +898,10 @@ mod tests {
         assert_eq!(
             parse_bounds_list("\\n\\t{{}}{1,2}\\n\\t{{}}").unwrap(),
             vec![
-                BoundOrFiller::Filler(String::from("\n\t{}")),
+                BoundOrFiller::Filler("\n\t{}".into()),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
-                BoundOrFiller::Filler(String::from("\n\t{}")),
+                BoundOrFiller::Filler("\n\t{}".into()),
             ],
         );
     }
@@ -1051,10 +1053,10 @@ mod tests {
         assert_eq!(
             UserBoundsList::from_str("a{1:2}b").unwrap().unpack(4).list,
             vec![
-                BoundOrFiller::Filler(String::from("a")),
+                BoundOrFiller::Filler("a".into()),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
                 BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
-                BoundOrFiller::Filler(String::from("b")),
+                BoundOrFiller::Filler("b".into()),
             ]
         );
     }

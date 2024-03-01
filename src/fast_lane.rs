@@ -83,7 +83,7 @@ fn cut_str_fast_lane<W: Write>(
             bounds.iter().try_for_each(|bof| -> Result<()> {
                 match bof {
                     BoundOrFiller::Filler(f) => {
-                        stdout.write_all(f.as_bytes())?;
+                        stdout.write_all(f)?;
                     }
                     BoundOrFiller::Bound(b) => {
                         output_parts(buffer, b, fields, stdout, opt)?;
@@ -166,7 +166,7 @@ impl<'a> TryFrom<&'a Opt> for FastOpt<'a> {
             );
         }
 
-        let delimiter = value.delimiter.as_bytes().first().unwrap().to_owned();
+        let delimiter: u8 = *value.delimiter.as_bytes().first().unwrap();
         Ok(FastOpt {
             delimiter,
             join: value.join,
