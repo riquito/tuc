@@ -16,7 +16,7 @@ fn cut_bytes<W: Write>(data: &[u8], opt: &Opt, stdout: &mut W) -> Result<()> {
                 let r = b.try_into_range(data.len())?;
                 &data[r.start..r.end]
             }
-            BoundOrFiller::Filler(f) => f.as_bytes(),
+            BoundOrFiller::Filler(f) => f,
         };
 
         stdout.write_all(output)?;

@@ -31,7 +31,7 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
 
             let b = match bof {
                 BoundOrFiller::Filler(f) => {
-                    stdout.write_all(f.as_bytes())?;
+                    stdout.write_all(f)?;
                     bounds_idx += 1;
 
                     if opt.join && bounds_idx != opt.bounds.len() {
