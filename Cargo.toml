@@ -19,7 +19,7 @@ bstr = "1.10.0"
 memchr = "2.7.4"
 pico-args = { version = "0.5.0", features = ["short-space-opt", "combined-flags", "eq-separator"] }
 regex = { version = "1.11", default-features = false, features = ["std", "unicode-bool", "unicode-perl", "unicode-gencat"], optional = true }
-serde_json = "1.0.128"
+serde_json = "1.0.132"
 
 [features]
 default = ["regex", "fast-lane"]
