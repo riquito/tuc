@@ -213,30 +213,32 @@ impl UserBoundsTrait<i32> for UserBounds {
     /// );
     /// ```
     fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>> {
-        let start: usize = match self.l {
+        let parts_length = parts_length as i32;
+
+        let start: i32 = match self.l {
             Side::Continue => 0,
             Side::Some(v) => {
-                if v.unsigned_abs() as usize > parts_length {
+                if v > parts_length || v < -parts_length {
                     bail!("Out of bounds: {}", v);
                 }
                 if v < 0 {
-                    parts_length - v.unsigned_abs() as usize
+                    parts_length + v
                 } else {
-                    v as usize - 1
+                    v - 1
                 }
             }
         };
 
-        let end: usize = match self.r {
+        let end: i32 = match self.r {
             Side::Continue => parts_length,
             Side::Some(v) => {
-                if v.unsigned_abs() as usize > parts_length {
+                if v > parts_length || v < -parts_length {
                     bail!("Out of bounds: {}", v);
                 }
                 if v < 0 {
-                    parts_length - v.unsigned_abs() as usize + 1
+                    parts_length + v + 1
                 } else {
-                    v as usize
+                    v
                 }
             }
         };
@@ -246,7 +248,10 @@ impl UserBoundsTrait<i32> for UserBounds {
             bail!("Field left value cannot be greater than right value");
         }
 
-        Ok(Range { start, end })
+        Ok(Range {
+            start: start as usize,
+            end: end as usize,
+        })
     }
 
     /// Transform a ranged bound into a list of one or more
