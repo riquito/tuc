@@ -15,7 +15,7 @@ categories = ["command-line-utilities"]
 
 [dependencies]
 anyhow = "1.0.95"
-bstr = "1.11.1"
+bstr = "1.11.3"
 memchr = "2.7.4"
 pico-args = { version = "0.5.0", features = ["short-space-opt", "combined-flags", "eq-separator"] }
 regex = { version = "1.11", default-features = false, features = ["std", "unicode-bool", "unicode-perl", "unicode-gencat"], optional = true }
