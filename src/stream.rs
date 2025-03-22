@@ -399,6 +399,32 @@ mod tests {
     }
 
     #[test]
+    fn test_try_from_valid_forward_bounds() {
+        let bounds = UserBoundsList::from_str("1,2,3:5").unwrap();
+        assert!(ForwardBounds::try_from(&bounds).is_ok());
+    }
+
+    #[test]
+    fn test_try_from_repeated_bounds() {
+        let bounds = UserBoundsList::from_str("1,2,2,3").unwrap();
+        let error = ForwardBounds::try_from(&bounds).unwrap_err();
+        assert_eq!(
+            format!("{}", error),
+            "Bounds are sorted, but can't be repeated"
+        );
+    }
+
+    #[test]
+    fn test_try_from_non_forward_bounds() {
+        let bounds = UserBoundsList::from_str("1,3,2").unwrap();
+        let error = ForwardBounds::try_from(&bounds).unwrap_err();
+        assert_eq!(
+            format!("{}", error),
+            "The provided UserBoundsList is not forward only"
+        );
+    }
+
+    #[test]
     fn test_cut_bytes_stream_cut_simplest_field_no_eol() {
         let mut stdout = Vec::new();
         let mut stdin = b"a".as_slice();
