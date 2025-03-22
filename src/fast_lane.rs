@@ -233,6 +233,19 @@ mod tests {
     }
 
     #[test]
+    fn test_read_and_cut_str_echo_non_delimited_strings_with_zero_eol() {
+        // read_and_cut_str is difficult to test, let's verify at least
+        // that it reads the input and appears to call cut_str
+
+        let mut opt = make_fields_opt("1:");
+        opt.eol = EOL::Zero;
+        let mut input = b"foo".as_slice();
+        let mut output = Vec::new();
+        read_and_cut_text_as_bytes(&mut input, &mut output, &opt).unwrap();
+        assert_eq!(output, b"foo\0".as_slice());
+    }
+
+    #[test]
     fn fail_to_convert_opt_with_long_delimiter_to_fastopt() {
         let opt = Opt {
             delimiter: "foo".into(),
@@ -350,6 +363,44 @@ mod tests {
         )
         .unwrap();
         assert_eq!(output, b"aa-b-c\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_use_fallbacks() {
+        let mut opt = make_fields_opt("{1}{3=local}{4}");
+        opt.fallback_oob = Some(b"general");
+        opt.join = true;
+        let (mut output, mut fields) = make_cut_str_buffers();
+
+        let line = b"a-b";
+
+        cut_str_fast_lane(
+            line,
+            &opt,
+            &mut output,
+            &mut fields,
+            opt.bounds.last_interesting_field,
+        )
+        .unwrap();
+        assert_eq!(output, b"a-local-general\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_fails_without_fallbacks() {
+        let opt = make_fields_opt("{1}{3}");
+        let (mut output, mut fields) = make_cut_str_buffers();
+
+        let line = b"a-b";
+
+        let res = cut_str_fast_lane(
+            line,
+            &opt,
+            &mut output,
+            &mut fields,
+            opt.bounds.last_interesting_field,
+        );
+        let error = res.unwrap_err();
+        assert_eq!(format!("{}", error), "Out of bounds: 3");
     }
 
     #[test]
