@@ -73,26 +73,17 @@ fn cut_str_fast_lane<W: Write>(
         fields.push(buffer.len() + 1);
     }
 
-    let num_fields = fields.len() - 1;
-
-    match num_fields {
-        1 if bounds.len() == 1 && fields[1] == buffer.len() + 1 => {
-            stdout.write_all(buffer)?;
-        }
-        _ => {
-            bounds.iter().try_for_each(|bof| -> Result<()> {
-                match bof {
-                    BoundOrFiller::Filler(f) => {
-                        stdout.write_all(f)?;
-                    }
-                    BoundOrFiller::Bound(b) => {
-                        output_parts(buffer, b, fields, stdout, opt)?;
-                    }
-                };
-                Ok(())
-            })?;
-        }
-    }
+    bounds.iter().try_for_each(|bof| -> Result<()> {
+        match bof {
+            BoundOrFiller::Filler(f) => {
+                stdout.write_all(f)?;
+            }
+            BoundOrFiller::Bound(b) => {
+                output_parts(buffer, b, fields, stdout, opt)?;
+            }
+        };
+        Ok(())
+    })?;
 
     stdout.write_all(&[opt.eol.into()])?;
 
@@ -359,6 +350,24 @@ mod tests {
         )
         .unwrap();
         assert_eq!(output, b"aa-b-c\n".as_slice());
+    }
+
+    #[test]
+    fn cut_str_it_accept_repeated_fields() {
+        let opt = make_fields_opt("2,2");
+        let (mut output, mut fields) = make_cut_str_buffers();
+
+        let line = b"a-b-c";
+
+        cut_str_fast_lane(
+            line,
+            &opt,
+            &mut output,
+            &mut fields,
+            opt.bounds.last_interesting_field,
+        )
+        .unwrap();
+        assert_eq!(output, b"bb\n".as_slice());
     }
 
     #[test]
