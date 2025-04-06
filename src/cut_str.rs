@@ -484,7 +484,7 @@ mod tests {
     use crate::{bounds::UserBoundsList, options::EOL};
 
     #[cfg(feature = "regex")]
-    use crate::options::RegexBag;
+    use crate::options::{RegexBag, Trim};
 
     use std::str::FromStr;
 
@@ -611,6 +611,19 @@ mod tests {
         assert_eq!(output, b"foo\n".as_slice());
     }
 
+    #[test]
+    fn test_read_and_cut_str_echo_non_delimited_strings_with_eol_zero() {
+        // read_and_cut_str is difficult to test, let's verify at least
+        // that it reads the input and appears to call cut_str
+
+        let mut opt = make_fields_opt();
+        opt.eol = EOL::Zero;
+        let mut input = b"foo".as_slice();
+        let mut output = Vec::new();
+        read_and_cut_str(&mut input, &mut output, opt).unwrap();
+        assert_eq!(output, b"foo\0".as_slice());
+    }
+
     fn make_cut_str_buffers() -> (Vec<u8>, Vec<Range<usize>>, Vec<u8>) {
         let output = Vec::new();
         let bounds_as_ranges = Vec::new();
@@ -696,6 +709,83 @@ mod tests {
 
         cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
         assert_eq!(output, b"abc\n".as_slice());
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn test_trim_regex_left_match() {
+        let line: &[u8] = b"---a-b---";
+        let trim_kind = Trim::Left;
+        let regex = Regex::new("-+").unwrap();
+        let result = trim_regex(line, &trim_kind, &regex);
+
+        assert_eq!(result, b"a-b---");
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn test_trim_regex_left_no_match_risk_wrong_match() {
+        let line: &[u8] = b"a-b---";
+        let trim_kind = Trim::Left;
+        let regex = Regex::new("-+").unwrap();
+        let result = trim_regex(line, &trim_kind, &regex);
+
+        assert_eq!(result, b"a-b---");
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn test_trim_regex_left_no_match() {
+        let line: &[u8] = b"abc";
+        let trim_kind = Trim::Left;
+        let regex = Regex::new("-+").unwrap();
+        let result = trim_regex(line, &trim_kind, &regex);
+
+        assert_eq!(result, b"abc");
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn test_trim_regex_right() {
+        let line: &[u8] = b"---a-b---";
+        let trim_kind = Trim::Right;
+        let regex = Regex::new("-+").unwrap();
+        let result = trim_regex(line, &trim_kind, &regex);
+
+        assert_eq!(result, b"---a-b");
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn test_trim_regex_right_no_match() {
+        let line: &[u8] = b"---a-b";
+        let trim_kind = Trim::Right;
+        let regex = Regex::new("-+").unwrap();
+        let result = trim_regex(line, &trim_kind, &regex);
+
+        assert_eq!(result, b"---a-b");
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn test_trim_regex_both() {
+        let line: &[u8] = b"---a-b---";
+        let trim_kind = Trim::Both;
+        let regex = Regex::new("-+").unwrap();
+        let result = trim_regex(line, &trim_kind, &regex);
+
+        assert_eq!(result, b"a-b");
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn test_trim_regex_both_no_match() {
+        let line: &[u8] = b"a-b";
+        let trim_kind = Trim::Both;
+        let regex = Regex::new("-+").unwrap();
+        let result = trim_regex(line, &trim_kind, &regex);
+
+        assert_eq!(result, b"a-b");
     }
 
     #[test]
