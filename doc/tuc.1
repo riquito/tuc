@@ -31,31 +31,31 @@ parts.
 The data is read from standard input.
 .SH FLAGS
 .TP
-.B \-g, --greedy-delimiter
+-g, --greedy-delimiter
 Match consecutive delimiters as if it was one
 .TP
-.B \-p, --compress-delimiter
+-p, --compress-delimiter
 Print only the first delimiter of a sequence
 .TP
-.B \-s, --only-delimited
+-s, --only-delimited
 Print only lines containing the delimiter
 .TP
-.B \-V, --version
+-V, --version
 Print version information
 .TP
-.B \-z, --zero-terminated
+-z, --zero-terminated
 Line delimiter is NUL (\[rs]0), not LF (\[rs]n)
 .TP
-.B \-h, --help
+-h, --help
 Print this help and exit
 .TP
-.B \-m, --complement
+-m, --complement
 Invert fields (e.g.\ \[aq]2\[aq] becomes \[aq]1,3:\[aq])
 .TP
-.B \-j, --(no-)join
+-j, --(no-)join
 Print selected parts with delimiter in between
 .TP
-.B --json
+--json
 Print fields as a JSON array of strings
 .SH OPTIONS
 .PP
@@ -199,6 +199,24 @@ To merge lines, use --no-join
 .P
 .PD
 \ \ \ \ \ \ \ specific field (see -f for help)
+.PP
+\f[B]-M\f[R], \f[B]--fixed-memory\f[R] [size]
+.PD 0
+.P
+.PD
+\ \ \ \ \ \ \ Read the input in chunks of kilobytes.
+.PD 0
+.P
+.PD
+\ \ \ \ \ \ \ This allows to read lines arbitrarily large.
+.PD 0
+.P
+.PD
+\ \ \ \ \ \ \ Works only with single-byte delimiters,
+.PD 0
+.P
+.PD
+\ \ \ \ \ \ \ fields in ascending order, -z, -j, -r
 .SH OPTIONS PRECEDENCE
 .PP
 --trim and --compress-delimiter are applied before --fields or similar
@@ -218,6 +236,18 @@ ordered and non-negative (e.g.\ -l 1,3:4,4,7), otherwise it allocates
 the whole input in memory (it also happens when -p or -m are being used)
 .PP
 --bytes allocate the whole input in memory
+.PP
+--fixed-memory will read the input in chunks of kilobytes.
+This
+.PD 0
+.P
+.PD
+allows to read lines arbitrarily large.
+Works only with single-byte
+.PD 0
+.P
+.PD
+delimiters, fields in ascending order, -z, -j, -r
 .SH COLORS
 .PP
 Help is displayed using colors.
