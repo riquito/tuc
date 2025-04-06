@@ -1232,4 +1232,22 @@ mod tests {
 "#
         );
     }
+
+    #[test]
+    fn test_cut_bytes_stream_cut_simplest_field_with_eol_and_fallbacks() {
+        let mut opt = make_fields_opt();
+        let (mut output, mut buffer1, mut buffer2) = make_cut_str_buffers();
+        let eol = &[EOL::Newline as u8];
+
+        let line = b"a";
+        opt.fallback_oob = Some(b"generic fallback".to_vec());
+        opt.bounds = UserBoundsList::from_str("{1}-fill-{2}-more fill-{3=last fill}").unwrap();
+
+        cut_str(line, &opt, &mut output, &mut buffer1, &mut buffer2, eol).unwrap();
+
+        assert_eq!(
+            &String::from_utf8_lossy(&output),
+            "a-fill-generic fallback-more fill-last fill\n"
+        );
+    }
 }
