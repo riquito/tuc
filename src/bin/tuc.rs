@@ -96,6 +96,13 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         pargs.opt_value_from_str(["-r", "--replace-delimiter"])?;
     let mut replace_delimiter: Option<Vec<u8>> = tmp_replace_delimiter.map(|x| x.into());
 
+    let fixed_memory_kb: Option<usize> = pargs.opt_value_from_str(["-M", "--fixed-memory"])?;
+
+    if fixed_memory_kb == Some(0) {
+        eprintln!("tuc: runtime error. --fixed-memory cannot be 0");
+        std::process::exit(1);
+    }
+
     let has_json = pargs.contains("--json");
     let has_join = pargs.contains(["-j", "--join"]);
     let has_no_join = pargs.contains("--no-join");
@@ -206,6 +213,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         },
         join,
         json: has_json,
+        fixed_memory: fixed_memory_kb.map(|x| x * 1024),
         delimiter,
         bounds_type,
         bounds,
@@ -248,12 +256,21 @@ fn main() -> Result<()> {
     let mut stdin = std::io::BufReader::with_capacity(64 * 1024, std::io::stdin().lock());
     let mut stdout = std::io::BufWriter::with_capacity(64 * 1024, std::io::stdout().lock());
 
+    if opt.fixed_memory.is_some() {
+        let stream_opt = StreamOpt::try_from(&opt).unwrap_or_else(|e| {
+            eprintln!("tuc: runtime error. {e}");
+            std::process::exit(1);
+        });
+
+        read_and_cut_bytes_stream(&mut stdin, &mut stdout, &stream_opt)?;
+
+        return Ok(());
+    }
+
     if opt.bounds_type == BoundsType::Bytes {
         read_and_cut_bytes(&mut stdin, &mut stdout, &opt)?;
     } else if opt.bounds_type == BoundsType::Lines {
         read_and_cut_lines(&mut stdin, &mut stdout, &opt)?;
-    } else if let Ok(stream_opt) = StreamOpt::try_from(&opt) {
-        read_and_cut_bytes_stream(&mut stdin, &mut stdout, &stream_opt)?;
     } else if let Ok(fast_opt) = FastOpt::try_from(&opt) {
         read_and_cut_text_as_bytes(&mut stdin, &mut stdout, &fast_opt)?;
     } else {
