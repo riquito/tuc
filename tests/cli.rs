@@ -537,3 +537,43 @@ fn it_cannot_format_fields_alongside_json() {
         .failure()
         .stderr("tuc: runtime error. Cannot format fields when using --json\n");
 }
+
+#[test]
+fn it_accept_fixed_memory_option() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["-d", "-", "-f", "2", "-M", "1"])
+        .write_stdin("ab-cd")
+        .assert();
+
+    assert.success().stdout("cd\n");
+}
+
+#[test]
+fn it_fails_if_fixed_memory_option_is_used_with_unsupported_fields() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["-d", "-", "-f", "2", "-M", "1", "--json"])
+        .write_stdin("ab-cd")
+        .assert();
+
+    assert
+        .failure()
+        .stderr("tuc: runtime error. StreamOpt supports solely forward fields, join and single-character delimiters\n");
+}
+
+#[test]
+fn it_fails_if_fixed_memory_value_is_zero() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["-d", "-", "-f", "2", "-M", "0"])
+        .write_stdin("ab-cd")
+        .assert();
+
+    assert
+        .failure()
+        .stderr("tuc: runtime error. --fixed-memory cannot be 0\n");
+}
