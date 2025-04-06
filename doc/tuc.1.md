@@ -108,6 +108,12 @@ OPTIONS
 |        It's overridden by any fallback assigned to a
 |        specific field (see -f for help)
 
+| **-M**, **\--fixed-memory** [size]
+|        Read the input in chunks of <size> kilobytes.
+|        This allows to read lines arbitrarily large.
+|        Works only with single-byte delimiters,
+|        fields in ascending order, -z, -j, -r
+
 OPTIONS PRECEDENCE
 ==================
 
@@ -123,6 +129,10 @@ MEMORY CONSUMPTION
 | the whole input in memory (it also happens when -p or -m are being used)
 
 \--bytes allocate the whole input in memory
+
+| \--fixed-memory will read the input in chunks of <size> kilobytes. This
+| allows to read lines arbitrarily large. Works only with single-byte
+| delimiters, fields in ascending order, -z, -j, -r
 
 COLORS
 ======
