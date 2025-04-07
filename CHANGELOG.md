@@ -7,20 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 - perf: much faster (from 2x up to 3x) implementation:
-  * there is now a fast lane used when conditions apply (more or less
+  - there is now a fast lane used when conditions apply (more or less
     it triggers when you cut fields on 1-byte characters)
-  * fields cut is now done on bytes, not strings (as long as your
+  - fields cut is now done on bytes, not strings (as long as your
     delimiter is proper utf-8 you'll be fine)
 - feat: display short help when run without arguments
 - feat: add the ability to display fallback output when a field is out of bound
   (you can set it per-field using `-f <range>=somefallback` or by providing
   a generic fallback using `--fallback-oob somefallback`)
 - feat: it is now possible to type \t while formatting fields and
-  output a TAB (as we similary do for \n) e.g. `-f '{1}\t{2}'`
+  output a TAB (as we already do for \n) e.g. `-f '{1}\t{2}'`
+- feat: new argument --fixed-memory (-M) to cut lines in chunks of
+  a fixed size (in kilobytes), to allow cutting arbitrary long lines
 - feat: --characters now depends on the (default) regex feature
 - feat: help and short help are colored, as long as output is a tty and
   unless env var TERM=dumb or NO_COLOR (any value) is set
 - refactor: --json internally uses serde_json, faster and more precise
+- chore: improved test coverage
 
 ## [1.2.0] - 2024-01-01
 
@@ -114,12 +117,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [0.4.0] - 2020-05-31
 
 ### Changed
+
 - Build binaries for multiple operative systems
 - Fixed typos in the documentation
 
 ## [0.3.0] - 2020-05-31
 
 ### Changed
+
 - More examples
 - New releases system
 
