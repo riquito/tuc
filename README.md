@@ -1,9 +1,10 @@
 # tuc (when cut doesn't cut it)
+
 [![version](https://img.shields.io/crates/v/tuc.svg)](https://crates.io/crates/tuc)
 ![ci](https://github.com/riquito/tuc/actions/workflows/ci.yml/badge.svg)
 [![license](https://img.shields.io/crates/l/tuc.svg)](https://crates.io/crates/tuc)
 
-You want to `cut` on more than just a character, perhaps using negative indexes 
+You want to `cut` on more than just a character, perhaps using negative indexes
 or format the selected fields as you want...
 Maybe you want to cut on lines (ever needed to drop or keep first and last line?)...
 That's where `tuc` can help.
@@ -90,6 +91,10 @@ OPTIONS:
                                   cannot be found (oob stands for out of bound).
                                   It's overridden by any fallback assigned to a
                                   specific field (see -f for help)
+    -M, --fixed-memory <size>     Read the input in chunks of <size> kilobytes.
+                                  This allows to read lines arbitrarily large.
+                                  Works only with single-byte delimiters,
+                                  fields in ascending order, -z, -j, -r
 
 Options precedence:
     --trim and --compress-delimiter are applied before --fields or similar
@@ -102,6 +107,10 @@ Memory consumption:
     the whole input in memory (it also happens when -p or -m are being used)
 
     --bytes allocate the whole input in memory
+
+    --fixed-memory will read the input in chunks of <size> kilobytes. This
+    allows to read lines arbitrarily large. Works only with single-byte
+    delimiters, fields in ascending order, -z, -j, -r
 
 Colors:
     Help is displayed using colors. Colors will be suppressed in the
@@ -228,12 +237,14 @@ Heartfelt thanks to package maintainers: you make it easy to access open source 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/tuc-cut.svg)](https://repology.org/project/tuc-cut/versions)
 
 - [ArchLinux](https://aur.archlinux.org/packages/tuc):
+
   ```sh
   yay -S tuc # compile from source
   yay -S tuc-bin # install pre-built binaries tuc and tuc-regex
   ```
 
 - [Brew](https://formulae.brew.sh/formula/tuc):
+
   ```sh
   brew install tuc
   ```
