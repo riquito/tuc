@@ -10,6 +10,37 @@ fn it_display_short_help_when_run_without_arguments() {
 }
 
 #[test]
+fn it_display_help_when_requested() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["-h"]).assert();
+    assert.success().stdout(predicates::str::starts_with("tuc"));
+
+    let assert = cmd.args(["--help"]).assert();
+    assert.success().stdout(predicates::str::starts_with("tuc"));
+}
+
+#[test]
+fn it_display_the_version_when_requested() {
+    use bstr::ByteSlice;
+    use predicates::prelude::*;
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let expected_version_line = format!("tuc {}\n", env!("CARGO_PKG_VERSION"));
+
+    let assert = cmd.args(["-V"]).assert();
+    assert.success().stdout(predicate::function(|x: &[u8]| {
+        x.to_str_lossy() == expected_version_line
+    }));
+
+    let assert = cmd.args(["--version"]).assert();
+    assert.success().stdout(predicate::function(|x: &[u8]| {
+        x.to_str_lossy() == expected_version_line
+    }));
+}
+
+#[test]
 fn it_echo_first_field_in_non_delimited_line() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
@@ -43,6 +74,18 @@ fn it_use_fallbacks_in_non_delimited_line() {
         .assert();
 
     assert.success().stdout("ok\n");
+}
+
+#[test]
+fn it_accept_empty_fallbacks() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["-d", "/", "-f", "1,5,3", "--fallback-oob="])
+        .write_stdin("foobar/baz/what")
+        .assert();
+
+    assert.success().stdout("foobarwhat\n");
 }
 
 #[test]
@@ -146,6 +189,19 @@ fn it_cuts_on_characters() {
         .assert();
 
     assert.success().stdout("🤩😝\n");
+}
+
+#[cfg(not(feature = "regex"))]
+#[test]
+fn it_fails_to_cut_characters_when_no_regex_support() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["--characters", "2,-2"])
+        .write_stdin("😁🤩😝😎")
+        .assert();
+
+    assert.failure().stderr("tuc: runtime error. The use of --characters requires `tuc` to be compiled with `regex` support\n");
 }
 
 #[test]
@@ -480,6 +536,17 @@ fn it_does_not_allow_to_replace_delimiter_with_json() {
     assert
         .failure()
         .stderr("tuc: runtime error. The use of --replace with --json is not supported\n");
+}
+
+#[test]
+fn it_fails_if_you_use_json_and_nojoin_at_once() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["--json", "--no-join"]).assert();
+
+    assert
+        .failure()
+        .stderr("tuc: runtime error. Using both --json and --no-join is not permitted\n");
 }
 
 #[test]
