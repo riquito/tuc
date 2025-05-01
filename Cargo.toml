@@ -26,7 +26,7 @@ default = ["regex", "fast-lane"]
 fast-lane = []
 
 [dev-dependencies]
-assert_cmd = "2.0.16"
+assert_cmd = "2.0.17"
 predicates = { version = "3.1.3",  default-features = false }
 
 [profile.release]
