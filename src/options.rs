@@ -1,6 +1,6 @@
 use crate::bounds::{BoundsType, UserBoundsList};
 use anyhow::Result;
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 
 #[cfg(feature = "regex")]
 use regex::bytes::Regex;
@@ -45,6 +45,8 @@ pub struct Opt {
     pub json: bool,
     pub fixed_memory: Option<usize>,
     pub fallback_oob: Option<Vec<u8>>,
+    pub path: Option<PathBuf>,
+    pub use_mmap: bool,
     #[cfg(feature = "regex")]
     pub regex_bag: Option<RegexBag>,
     #[cfg(not(feature = "regex"))]
@@ -69,7 +71,9 @@ impl Default for Opt {
             json: false,
             fixed_memory: None,
             fallback_oob: None,
+            path: None,
             regex_bag: None,
+            use_mmap: false,
         }
     }
 }

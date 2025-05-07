@@ -1,14 +1,17 @@
 use anyhow::Result;
+use memmap2::Mmap;
 use std::convert::TryFrom;
 use std::env::args;
-use std::io::Write;
+use std::ffi::OsStr;
+use std::io::{IsTerminal, Write};
+use std::path::PathBuf;
 use std::str::FromStr;
 use tuc::bounds::{BoundOrFiller, BoundsType, UserBoundsList};
 use tuc::cut_bytes::read_and_cut_bytes;
 use tuc::cut_lines::read_and_cut_lines;
 use tuc::cut_str::read_and_cut_str;
 use tuc::help::{get_help, get_short_help};
-use tuc::options::{Opt, EOL};
+use tuc::options::{Opt, Trim, EOL};
 use tuc::stream::{read_and_cut_bytes_stream, StreamOpt};
 
 #[cfg(feature = "fast-lane")]
@@ -200,17 +203,49 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         std::process::exit(1);
     }
 
+    let complement = pargs.contains(["-m", "--complement"]);
+    let only_delimited = pargs.contains(["-s", "--only-delimited"]);
+    let compress_delimiter = pargs.contains(["-p", "--compress-delimiter"]);
+    let trim: Option<Trim> = pargs.opt_value_from_str(["-t", "--trim"])?;
+    let version = pargs.contains(["-V", "--version"]);
+
+    let eol = if pargs.contains(["-z", "--zero-terminated"]) {
+        EOL::Zero
+    } else {
+        EOL::Newline
+    };
+
+    let fallback_oob: Option<Vec<u8>> = pargs
+        .opt_value_from_str("--fallback-oob")
+        .or_else(|e| match e {
+            pico_args::Error::OptionWithoutAValue(_) => {
+                // We must consume the arg ourselves (it's not done on error)
+                pargs.contains("--fallback-oob=");
+
+                Ok(Some("".into()))
+            }
+            _ => Err(e),
+        })?
+        .map(|x: String| x.into());
+
+    // Use mmap if there's a file to open and it's not macOS (performance reasons)
+    let has_nommap_arg = pargs.contains("--no-mmap");
+
+    // MUST BE READ LAST (free argument)
+    let path: Option<PathBuf> =
+        pargs.opt_free_from_os_str::<std::path::PathBuf, anyhow::Error>(|x: &OsStr| {
+            Ok(PathBuf::from(x))
+        })?;
+
+    let use_mmap = path.is_some() && !has_nommap_arg && !cfg!(target_os = "macos");
+
     let args = Opt {
-        complement: pargs.contains(["-m", "--complement"]),
-        only_delimited: pargs.contains(["-s", "--only-delimited"]),
+        complement,
+        only_delimited,
         greedy_delimiter,
-        compress_delimiter: pargs.contains(["-p", "--compress-delimiter"]),
-        version: pargs.contains(["-V", "--version"]),
-        eol: if pargs.contains(["-z", "--zero-terminated"]) {
-            EOL::Zero
-        } else {
-            EOL::Newline
-        },
+        compress_delimiter,
+        version,
+        eol,
         join,
         json: has_json,
         fixed_memory: fixed_memory_kb.map(|x| x * 1024),
@@ -218,20 +253,11 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         bounds_type,
         bounds,
         replace_delimiter,
-        trim: pargs.opt_value_from_str(["-t", "--trim"])?,
-        fallback_oob: pargs
-            .opt_value_from_str("--fallback-oob")
-            .or_else(|e| match e {
-                pico_args::Error::OptionWithoutAValue(_) => {
-                    // We must consume the arg ourselves (it's not done on error)
-                    pargs.contains("--fallback-oob=");
-
-                    Ok(Some("".into()))
-                }
-                _ => Err(e),
-            })?
-            .map(|x: String| x.into()),
+        trim,
+        fallback_oob,
         regex_bag,
+        path,
+        use_mmap,
     };
 
     let remaining = pargs.finish();
@@ -253,8 +279,36 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
 fn main() -> Result<()> {
     let opt: Opt = parse_args()?;
 
-    let mut stdin = std::io::BufReader::with_capacity(64 * 1024, std::io::stdin().lock());
     let mut stdout = std::io::BufWriter::with_capacity(64 * 1024, std::io::stdout().lock());
+
+    let mmap;
+    let mut mmap_cursor;
+    let mut file_reader;
+    let mut stdin;
+
+    let mut reader: &mut dyn std::io::BufRead = if opt.path.is_some() {
+        let file = std::fs::File::open(opt.path.as_ref().unwrap()).map_err(|e| {
+            anyhow::anyhow!(
+                "{}.\nWas attempting to read {:?}",
+                e,
+                &opt.path.as_ref().unwrap()
+            )
+        })?;
+
+        if opt.use_mmap {
+            // This is unsafe because there's no guarantee that the underline
+            // file won't be mutated.
+            mmap = unsafe { Mmap::map(&file)? };
+            mmap_cursor = std::io::Cursor::new(&mmap[..]);
+            &mut mmap_cursor
+        } else {
+            file_reader = std::io::BufReader::with_capacity(64 * 1024, file);
+            &mut file_reader
+        }
+    } else {
+        stdin = std::io::BufReader::with_capacity(64 * 1024, std::io::stdin().lock());
+        &mut stdin
+    };
 
     if opt.fixed_memory.is_some() {
         let stream_opt = StreamOpt::try_from(&opt).unwrap_or_else(|e| {
@@ -262,19 +316,19 @@ fn main() -> Result<()> {
             std::process::exit(1);
         });
 
-        read_and_cut_bytes_stream(&mut stdin, &mut stdout, &stream_opt)?;
+        read_and_cut_bytes_stream(&mut reader, &mut stdout, &stream_opt)?;
 
         return Ok(());
     }
 
     if opt.bounds_type == BoundsType::Bytes {
-        read_and_cut_bytes(&mut stdin, &mut stdout, &opt)?;
+        read_and_cut_bytes(&mut reader, &mut stdout, &opt)?;
     } else if opt.bounds_type == BoundsType::Lines {
-        read_and_cut_lines(&mut stdin, &mut stdout, &opt)?;
+        read_and_cut_lines(&mut reader, &mut stdout, &opt)?;
     } else if let Ok(fast_opt) = FastOpt::try_from(&opt) {
-        read_and_cut_text_as_bytes(&mut stdin, &mut stdout, &fast_opt)?;
+        read_and_cut_text_as_bytes(&mut reader, &mut stdout, &fast_opt)?;
     } else {
-        read_and_cut_str(&mut stdin, &mut stdout, opt)?;
+        read_and_cut_str(&mut reader, &mut stdout, opt)?;
     }
 
     stdout.flush()?;
