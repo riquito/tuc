@@ -10,14 +10,13 @@ NAME
 SYNOPSIS
 ========
 
-| **tuc** \[FLAGS]... \[OPTIONS]...
+| **tuc** \[FLAGS]... \[OPTIONS]... \< input
+| **tuc** \[FLAGS]... \[OPTIONS]... filepath
 
 DESCRIPTION
 ===========
 
 Cut text (or bytes) where a delimiter matches, then keep the desired parts.  
-
-The data is read from standard input.
 
 FLAGS
 =====
@@ -48,6 +47,9 @@ FLAGS
 
 \--json
 :   Print fields as a JSON array of strings
+
+\--no-mmap
+:   Disable memory mapping
 
 OPTIONS
 =======

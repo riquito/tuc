@@ -11,10 +11,9 @@ const HELP: &str = concat!(
     r#"
 Cut text (or bytes) where a delimiter matches, then keep the desired parts.
 
-The data is read from standard input.
-
 USAGE:
-    tuc [FLAGS] [OPTIONS]
+    tuc [FLAGS] [OPTIONS] < input
+    tuc [FLAGS] [OPTIONS] filepath
 
 FLAGS:
     -g, --greedy-delimiter        Match consecutive delimiters as if it was one
@@ -26,6 +25,7 @@ FLAGS:
     -m, --complement              Invert fields (e.g. '2' becomes '1,3:')
     -j, --(no-)join               Print selected parts with delimiter in between
     --json                        Print fields as a JSON array of strings
+    --no-mmap                     Disable memory mapping
 
 OPTIONS:
     -f, --fields <bounds>         Fields to keep, 1-indexed, comma separated.

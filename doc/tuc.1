@@ -23,12 +23,17 @@
 .PP
 \f[B]tuc\f[R] [FLAGS]\&...
 [OPTIONS]\&...
+< input
+.PD 0
+.P
+.PD
+\f[B]tuc\f[R] [FLAGS]\&...
+[OPTIONS]\&...
+filepath
 .SH DESCRIPTION
 .PP
 Cut text (or bytes) where a delimiter matches, then keep the desired
 parts.
-.PP
-The data is read from standard input.
 .SH FLAGS
 .TP
 -g, --greedy-delimiter
@@ -57,6 +62,9 @@ Print selected parts with delimiter in between
 .TP
 --json
 Print fields as a JSON array of strings
+.TP
+--no-mmap
+Disable memory mapping
 .SH OPTIONS
 .PP
 \f[B]-f\f[R], \f[B]--fields\f[R] [bounds]
