@@ -11,12 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     it triggers when you cut fields on 1-byte characters)
   - fields cut is now done on bytes, not strings (as long as your
     delimiter is proper utf-8 you'll be fine)
+  - files can be opened directly with mmap
 - feat: display short help when run without arguments
 - feat: add the ability to display fallback output when a field is out of bound
   (you can set it per-field using `-f <range>=somefallback` or by providing
   a generic fallback using `--fallback-oob somefallback`)
 - feat: it is now possible to type \t while formatting fields and
   output a TAB (as we already do for \n) e.g. `-f '{1}\t{2}'`
+- feat: you can now pass a file name as argument to tuc
+  (it will use mmap if available and as long as --no-mmap is not set)
 - feat: new argument --fixed-memory (-M) to cut lines in chunks of
   a fixed size (in kilobytes), to allow cutting arbitrary long lines
 - feat: --characters now depends on the (default) regex feature
