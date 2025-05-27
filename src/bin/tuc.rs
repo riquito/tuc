@@ -2,8 +2,7 @@ use anyhow::Result;
 use memmap2::Mmap;
 use std::convert::TryFrom;
 use std::env::args;
-use std::ffi::OsStr;
-use std::io::{IsTerminal, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use tuc::bounds::{BoundOrFiller, BoundsType, UserBoundsList};
@@ -231,11 +230,44 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     // Use mmap if there's a file to open and it's not macOS (performance reasons)
     let has_nommap_arg = pargs.contains("--no-mmap");
 
-    // MUST BE READ LAST (free argument)
-    let path: Option<PathBuf> =
-        pargs.opt_free_from_os_str::<std::path::PathBuf, anyhow::Error>(|x: &OsStr| {
-            Ok(PathBuf::from(x))
-        })?;
+    // We read all the options. We can still have (one) free argument
+    let remaining = pargs.finish();
+
+    if remaining.len() > 1 {
+        eprintln!("tuc: unexpected arguments: {:?}", remaining);
+        eprintln!("Try 'tuc --help' for more information.");
+        std::process::exit(1);
+    }
+
+    let path = remaining
+        .first()
+        .and_then(|x| x.to_str())
+        .map(PathBuf::from);
+
+    if path.is_some() {
+        let some_path = path.as_ref().unwrap();
+
+        if !some_path.exists() {
+            // Last argument should be a path, but if it looks like an option
+            // (e.g. starts with a dash), we print a dedicated error message.
+            if some_path.as_path().to_string_lossy().starts_with("-") {
+                eprintln!("tuc: unexpected arguments {:?}", remaining);
+                eprintln!("Try 'tuc --help' for more information.");
+                std::process::exit(1);
+            }
+
+            eprintln!(
+                "tuc: runtime error. The file {:?} does not exist",
+                some_path
+            );
+            std::process::exit(1);
+        }
+
+        if !some_path.is_file() {
+            eprintln!("tuc: runtime error. The path {:?} is not a file", some_path);
+            std::process::exit(1);
+        }
+    }
 
     let use_mmap = path.is_some() && !has_nommap_arg && !cfg!(target_os = "macos");
 
@@ -260,17 +292,9 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         use_mmap,
     };
 
-    let remaining = pargs.finish();
-
     if args.version {
         println!("tuc {}", env!("CARGO_PKG_VERSION"));
         std::process::exit(0);
-    }
-
-    if !remaining.is_empty() {
-        eprintln!("tuc: unexpected arguments {remaining:?}");
-        eprintln!("Try 'tuc --help' for more information.");
-        std::process::exit(1);
     }
 
     Ok(args)
@@ -288,11 +312,10 @@ fn main() -> Result<()> {
 
     let mut reader: &mut dyn std::io::BufRead = if opt.path.is_some() {
         let file = std::fs::File::open(opt.path.as_ref().unwrap()).map_err(|e| {
-            anyhow::anyhow!(
-                "{}.\nWas attempting to read {:?}",
-                e,
-                &opt.path.as_ref().unwrap()
-            )
+            let path = opt.path.as_ref().unwrap();
+            // Common errors (file not found, not a file, where checked above)
+            // Another common one that could happen here is permission denied.
+            anyhow::anyhow!("{}.\nWas attempting to read {:?}", e, &path)
         })?;
 
         if opt.use_mmap {
