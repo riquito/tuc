@@ -34,6 +34,8 @@ fn it_display_the_version_when_requested() {
         x.to_str_lossy() == expected_version_line
     }));
 
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
     let assert = cmd.args(["--version"]).assert();
     assert.success().stdout(predicate::function(|x: &[u8]| {
         x.to_str_lossy() == expected_version_line
