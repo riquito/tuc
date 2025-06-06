@@ -183,13 +183,13 @@ pub fn read_and_cut_text_as_bytes<R: BufRead, W: Write>(
         EOL::Newline => stdin.for_byte_line(|line| {
             cut_str_fast_lane(line, opt, stdout, &mut fields, last_interesting_field)
                 // XXX Should map properly the error
-                .map_err(|x| io::Error::new(io::ErrorKind::Other, x.to_string()))
+                .map_err(|x| io::Error::other(x.to_string()))
                 .and(Ok(true))
         })?,
         EOL::Zero => stdin.for_byte_record(opt.eol.into(), |line| {
             cut_str_fast_lane(line, opt, stdout, &mut fields, last_interesting_field)
                 // XXX Should map properly the error
-                .map_err(|x| io::Error::new(io::ErrorKind::Other, x.to_string()))
+                .map_err(|x| io::Error::other(x.to_string()))
                 .and(Ok(true))
         })?,
     }

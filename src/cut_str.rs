@@ -457,7 +457,7 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
                 &[opt.eol as u8],
             )
             // XXX Should map properly the error
-            .map_err(|x| std::io::Error::new(std::io::ErrorKind::Other, x.to_string()))
+            .map_err(|x| std::io::Error::other(x.to_string()))
             .and(Ok(true))
         })?,
         EOL::Zero => stdin.for_byte_record(opt.eol.into(), |line| {
@@ -471,7 +471,7 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
                 &[opt.eol as u8],
             )
             // XXX Should map properly the error
-            .map_err(|x| std::io::Error::new(std::io::ErrorKind::Other, x.to_string()))
+            .map_err(|x| std::io::Error::other(x.to_string()))
             .and(Ok(true))
         })?,
     }
