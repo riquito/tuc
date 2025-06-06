@@ -18,8 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   a generic fallback using `--fallback-oob somefallback`)
 - feat: it is now possible to type \t while formatting fields and
   output a TAB (as we already do for \n) e.g. `-f '{1}\t{2}'`
-- feat: you can now pass a file name as argument to tuc
-  (it will use mmap if available and as long as --no-mmap is not set)
+- feat: you can now pass a file path as argument to tuc
+  (it will be opened with mmap if available and as long as --no-mmap is not set)
 - feat: new argument --fixed-memory (-M) to cut lines in chunks of
   a fixed size (in kilobytes), to allow cutting arbitrary long lines
 - feat: --characters now depends on the (default) regex feature
