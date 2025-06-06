@@ -251,7 +251,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             // Last argument should be a path, but if it looks like an option
             // (e.g. starts with a dash), we print a dedicated error message.
             if some_path.as_path().to_string_lossy().starts_with("-") {
-                eprintln!("tuc: unexpected arguments {:?}", remaining);
+                eprintln!("tuc: unexpected arguments: {:?}", remaining);
                 eprintln!("Try 'tuc --help' for more information.");
                 std::process::exit(1);
             }

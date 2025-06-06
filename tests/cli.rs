@@ -439,7 +439,7 @@ fn it_fails_if_there_are_unknown_arguments() {
     let assert = cmd.args(["--whatever"]).write_stdin("foobar").assert();
 
     assert.failure().stderr(
-        "tuc: unexpected arguments [\"--whatever\"]\nTry 'tuc --help' for more information.\n",
+        "tuc: unexpected arguments: [\"--whatever\"]\nTry 'tuc --help' for more information.\n",
     );
 }
 
@@ -494,7 +494,7 @@ fn does_not_panic_if_attemtping_to_use_regex_arg_with_noregex_build() {
     let assert = cmd.args(["-e", "."]).write_stdin("foobar").assert();
 
     assert.failure().stderr(
-        "tuc: unexpected arguments [\"-e\", \".\"]\nTry 'tuc --help' for more information.\n",
+        "tuc: unexpected arguments: [\"-e\", \".\"]\nTry 'tuc --help' for more information.\n",
     );
 }
 
