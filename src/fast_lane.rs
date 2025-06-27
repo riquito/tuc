@@ -400,7 +400,7 @@ mod tests {
             opt.bounds.last_interesting_field,
         );
         let error = res.unwrap_err();
-        assert_eq!(format!("{}", error), "Out of bounds: 3");
+        assert_eq!(format!("{error}"), "Out of bounds: 3");
     }
 
     #[test]
