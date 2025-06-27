@@ -1,11 +1,11 @@
-use anyhow::{bail, Result};
-use bstr::io::BufReadExt;
+use anyhow::{Result, bail};
 use bstr::ByteSlice;
+use bstr::io::BufReadExt;
 use std::io::{BufRead, Write};
 use std::ops::Range;
 
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
-use crate::options::{Opt, Trim, EOL};
+use crate::options::{EOL, Opt, Trim};
 
 #[cfg(feature = "regex")]
 use regex::bytes::Regex;

@@ -440,13 +440,17 @@ mod tests {
 
     #[test]
     fn test_vec_of_bounds_is_forward_only() {
-        assert!(UserBoundsList::from_str("{1}foo{2}")
-            .unwrap()
-            .is_forward_only());
+        assert!(
+            UserBoundsList::from_str("{1}foo{2}")
+                .unwrap()
+                .is_forward_only()
+        );
 
-        assert!(!UserBoundsList::from_str("{2}foo{1}")
-            .unwrap()
-            .is_forward_only());
+        assert!(
+            !UserBoundsList::from_str("{2}foo{1}")
+                .unwrap()
+                .is_forward_only()
+        );
     }
 
     #[test]

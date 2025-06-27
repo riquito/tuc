@@ -1,5 +1,5 @@
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
-use crate::options::{Opt, Trim, EOL};
+use crate::options::{EOL, Opt, Trim};
 use anyhow::Result;
 use bstr::ByteSlice;
 use std::convert::TryFrom;
