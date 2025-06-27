@@ -61,7 +61,7 @@ fn fill_with_fields_locations_greedy(
     let delimiter_length = delimiter.len();
     let mut prev_part_start = 0;
 
-    while let Some(mut idx) = &line[prev_part_start..].find(delimiter) {
+    while let &Some(mut idx) = &line[prev_part_start..].find(delimiter) {
         idx += prev_part_start;
 
         buffer.push(Range {
@@ -230,10 +230,12 @@ fn trim_regex<'a>(line: &'a [u8], trim_kind: &Trim, re: &Regex) -> &'a [u8] {
 macro_rules! write_maybe_as_json {
     ($writer:ident, $to_print:ident, $as_json:expr) => {{
         if $as_json {
+            let x;
             $writer.write_all(unsafe {
                 // Safe as long as we were not requested to cut in the middle of a codepoint
                 // (and then we're pretty much doing what was asked)
-                serde_json::to_string(std::str::from_utf8_unchecked(&$to_print))?.as_bytes()
+                x = serde_json::to_string(std::str::from_utf8_unchecked(&$to_print))?;
+                x.as_bytes()
             })?;
         } else {
             $writer.write_all(&$to_print)?;
