@@ -1,7 +1,7 @@
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
-use crate::options::{Opt, EOL};
-use anyhow::bail;
+use crate::options::{EOL, Opt};
 use anyhow::Result;
+use anyhow::bail;
 use bstr::ByteSlice;
 use core::panic;
 use std::convert::TryFrom;
