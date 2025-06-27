@@ -1,5 +1,5 @@
 use crate::bounds::{BoundOrFiller, Side, UserBounds, UserBoundsTrait};
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use std::ops::Deref;
 use std::str::FromStr;
 

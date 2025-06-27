@@ -234,7 +234,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let remaining = pargs.finish();
 
     if remaining.len() > 1 {
-        eprintln!("tuc: unexpected arguments: {:?}", remaining);
+        eprintln!("tuc: unexpected arguments: {remaining:?}");
         eprintln!("Try 'tuc --help' for more information.");
         std::process::exit(1);
     }
@@ -251,20 +251,17 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             // Last argument should be a path, but if it looks like an option
             // (e.g. starts with a dash), we print a dedicated error message.
             if some_path.as_path().to_string_lossy().starts_with("-") {
-                eprintln!("tuc: unexpected arguments: {:?}", remaining);
+                eprintln!("tuc: unexpected arguments: {remaining:?}");
                 eprintln!("Try 'tuc --help' for more information.");
                 std::process::exit(1);
             }
 
-            eprintln!(
-                "tuc: runtime error. The file {:?} does not exist",
-                some_path
-            );
+            eprintln!("tuc: runtime error. The file {some_path:?} does not exist");
             std::process::exit(1);
         }
 
         if !some_path.is_file() {
-            eprintln!("tuc: runtime error. The path {:?} is not a file", some_path);
+            eprintln!("tuc: runtime error. The path {some_path:?} is not a file");
             std::process::exit(1);
         }
     }
