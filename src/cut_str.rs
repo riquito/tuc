@@ -208,20 +208,18 @@ fn trim_regex<'a>(line: &'a [u8], trim_kind: &Trim, re: &Regex) -> &'a [u8] {
     let mut idx_start = 0;
     let mut idx_end = line.len();
 
-    if trim_kind == &Trim::Both || trim_kind == &Trim::Left {
-        if let Some(m) = iter.next() {
-            if m.start() == 0 {
-                idx_start = m.end();
-            }
-        }
+    if (trim_kind == &Trim::Both || trim_kind == &Trim::Left)
+        && let Some(m) = iter.next()
+        && m.start() == 0
+    {
+        idx_start = m.end();
     }
 
-    if trim_kind == &Trim::Both || trim_kind == &Trim::Right {
-        if let Some(m) = iter.last() {
-            if m.end() == line.len() {
-                idx_end = m.start();
-            }
-        }
+    if (trim_kind == &Trim::Both || trim_kind == &Trim::Right)
+        && let Some(m) = iter.last()
+        && m.end() == line.len()
+    {
+        idx_end = m.start();
     }
 
     &line[idx_start..idx_end]
