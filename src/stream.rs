@@ -1,7 +1,7 @@
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
-use crate::options::{Opt, EOL};
-use anyhow::bail;
+use crate::options::{EOL, Opt};
 use anyhow::Result;
+use anyhow::bail;
 use bstr::ByteSlice;
 use core::panic;
 use std::convert::TryFrom;
@@ -409,7 +409,7 @@ mod tests {
         let bounds = UserBoundsList::from_str("1,2,2,3").unwrap();
         let error = ForwardBounds::try_from(&bounds).unwrap_err();
         assert_eq!(
-            format!("{}", error),
+            format!("{error}"),
             "Bounds are sorted, but can't be repeated"
         );
     }
@@ -419,7 +419,7 @@ mod tests {
         let bounds = UserBoundsList::from_str("1,3,2").unwrap();
         let error = ForwardBounds::try_from(&bounds).unwrap_err();
         assert_eq!(
-            format!("{}", error),
+            format!("{error}"),
             "The provided UserBoundsList is not forward only"
         );
     }
@@ -479,7 +479,7 @@ mod tests {
 
         let res = cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field);
         let error = res.unwrap_err();
-        assert_eq!(format!("{}", error), "Out of bounds: 2");
+        assert_eq!(format!("{error}"), "Out of bounds: 2");
     }
 
     #[test]
@@ -511,7 +511,7 @@ mod tests {
 
         let res = cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field);
         let error = res.unwrap_err();
-        assert_eq!(format!("{}", error), "Out of bounds: 2");
+        assert_eq!(format!("{error}"), "Out of bounds: 2");
     }
 
     #[test]

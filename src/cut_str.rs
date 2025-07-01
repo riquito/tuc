@@ -1,11 +1,11 @@
-use anyhow::{bail, Result};
-use bstr::io::BufReadExt;
+use anyhow::{Result, bail};
 use bstr::ByteSlice;
+use bstr::io::BufReadExt;
 use std::io::{BufRead, Write};
 use std::ops::Range;
 
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
-use crate::options::{Opt, Trim, EOL};
+use crate::options::{EOL, Opt, Trim};
 
 #[cfg(feature = "regex")]
 use regex::bytes::Regex;
@@ -61,7 +61,7 @@ fn fill_with_fields_locations_greedy(
     let delimiter_length = delimiter.len();
     let mut prev_part_start = 0;
 
-    while let Some(mut idx) = &line[prev_part_start..].find(delimiter) {
+    while let &Some(mut idx) = &line[prev_part_start..].find(delimiter) {
         idx += prev_part_start;
 
         buffer.push(Range {
@@ -208,20 +208,18 @@ fn trim_regex<'a>(line: &'a [u8], trim_kind: &Trim, re: &Regex) -> &'a [u8] {
     let mut idx_start = 0;
     let mut idx_end = line.len();
 
-    if trim_kind == &Trim::Both || trim_kind == &Trim::Left {
-        if let Some(m) = iter.next() {
-            if m.start() == 0 {
-                idx_start = m.end();
-            }
-        }
+    if (trim_kind == &Trim::Both || trim_kind == &Trim::Left)
+        && let Some(m) = iter.next()
+        && m.start() == 0
+    {
+        idx_start = m.end();
     }
 
-    if trim_kind == &Trim::Both || trim_kind == &Trim::Right {
-        if let Some(m) = iter.last() {
-            if m.end() == line.len() {
-                idx_end = m.start();
-            }
-        }
+    if (trim_kind == &Trim::Both || trim_kind == &Trim::Right)
+        && let Some(m) = iter.last()
+        && m.end() == line.len()
+    {
+        idx_end = m.start();
     }
 
     &line[idx_start..idx_end]
@@ -230,10 +228,12 @@ fn trim_regex<'a>(line: &'a [u8], trim_kind: &Trim, re: &Regex) -> &'a [u8] {
 macro_rules! write_maybe_as_json {
     ($writer:ident, $to_print:ident, $as_json:expr) => {{
         if $as_json {
+            let x;
             $writer.write_all(unsafe {
                 // Safe as long as we were not requested to cut in the middle of a codepoint
                 // (and then we're pretty much doing what was asked)
-                serde_json::to_string(std::str::from_utf8_unchecked(&$to_print))?.as_bytes()
+                x = serde_json::to_string(std::str::from_utf8_unchecked(&$to_print))?;
+                x.as_bytes()
             })?;
         } else {
             $writer.write_all(&$to_print)?;

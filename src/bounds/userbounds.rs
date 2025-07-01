@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::fmt;
@@ -221,11 +221,7 @@ impl UserBoundsTrait<i32> for UserBounds {
                 if v > parts_length || v < -parts_length {
                     bail!("Out of bounds: {}", v);
                 }
-                if v < 0 {
-                    parts_length + v
-                } else {
-                    v - 1
-                }
+                if v < 0 { parts_length + v } else { v - 1 }
             }
         };
 
@@ -235,11 +231,7 @@ impl UserBoundsTrait<i32> for UserBounds {
                 if v > parts_length || v < -parts_length {
                     bail!("Out of bounds: {}", v);
                 }
-                if v < 0 {
-                    parts_length + v + 1
-                } else {
-                    v
-                }
+                if v < 0 { parts_length + v + 1 } else { v }
             }
         };
 

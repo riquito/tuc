@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use std::cmp::Ordering;
 use std::fmt;
 use std::str::FromStr;

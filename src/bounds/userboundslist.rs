@@ -1,5 +1,5 @@
 use crate::bounds::{BoundOrFiller, Side, UserBounds, UserBoundsTrait};
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use std::ops::Deref;
 use std::str::FromStr;
 
@@ -115,19 +115,17 @@ impl UserBoundsList {
 
     fn has_negative_indices(&self) -> bool {
         self.get_userbounds_only().any(|b| {
-            if let Side::Some(left) = b.l {
-                if left.is_negative() {
-                    return true;
-                }
+            if let Side::Some(left) = b.l
+                && left.is_negative()
+            {
+                true
+            } else if let Side::Some(right) = b.r
+                && right.is_negative()
+            {
+                true
+            } else {
+                false
             }
-
-            if let Side::Some(right) = b.r {
-                if right.is_negative() {
-                    return true;
-                }
-            }
-
-            false
         })
     }
 
@@ -440,13 +438,17 @@ mod tests {
 
     #[test]
     fn test_vec_of_bounds_is_forward_only() {
-        assert!(UserBoundsList::from_str("{1}foo{2}")
-            .unwrap()
-            .is_forward_only());
+        assert!(
+            UserBoundsList::from_str("{1}foo{2}")
+                .unwrap()
+                .is_forward_only()
+        );
 
-        assert!(!UserBoundsList::from_str("{2}foo{1}")
-            .unwrap()
-            .is_forward_only());
+        assert!(
+            !UserBoundsList::from_str("{2}foo{1}")
+                .unwrap()
+                .is_forward_only()
+        );
     }
 
     #[test]

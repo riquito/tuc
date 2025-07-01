@@ -1,5 +1,5 @@
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
-use crate::options::{Opt, Trim, EOL};
+use crate::options::{EOL, Opt, Trim};
 use anyhow::Result;
 use bstr::ByteSlice;
 use std::convert::TryFrom;
@@ -400,7 +400,7 @@ mod tests {
             opt.bounds.last_interesting_field,
         );
         let error = res.unwrap_err();
-        assert_eq!(format!("{}", error), "Out of bounds: 3");
+        assert_eq!(format!("{error}"), "Out of bounds: 3");
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use std::io::{BufRead, Write};
 use std::ops::Range;
 

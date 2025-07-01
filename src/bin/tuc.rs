@@ -10,11 +10,11 @@ use tuc::cut_bytes::read_and_cut_bytes;
 use tuc::cut_lines::read_and_cut_lines;
 use tuc::cut_str::read_and_cut_str;
 use tuc::help::{get_help, get_short_help};
-use tuc::options::{Opt, Trim, EOL};
-use tuc::stream::{read_and_cut_bytes_stream, StreamOpt};
+use tuc::options::{EOL, Opt, Trim};
+use tuc::stream::{StreamOpt, read_and_cut_bytes_stream};
 
 #[cfg(feature = "fast-lane")]
-use tuc::fast_lane::{read_and_cut_text_as_bytes, FastOpt};
+use tuc::fast_lane::{FastOpt, read_and_cut_text_as_bytes};
 
 #[cfg(feature = "regex")]
 use tuc::options::RegexBag;
@@ -123,7 +123,9 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
 
     if replace_delimiter.is_some() {
         if has_no_join {
-            eprintln!("tuc: runtime error. You can't pass --no-join when using --replace, which implies --join");
+            eprintln!(
+                "tuc: runtime error. You can't pass --no-join when using --replace, which implies --join"
+            );
             std::process::exit(1);
         } else if has_json {
             eprintln!("tuc: runtime error. The use of --replace with --json is not supported");
@@ -187,7 +189,9 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     });
 
     if regex_bag.is_some() && cfg!(not(feature = "regex")) {
-        eprintln!("tuc: invariant error. There should not be any regex when compiled without regex support");
+        eprintln!(
+            "tuc: invariant error. There should not be any regex when compiled without regex support"
+        );
         std::process::exit(1);
     }
 
@@ -234,7 +238,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let remaining = pargs.finish();
 
     if remaining.len() > 1 {
-        eprintln!("tuc: unexpected arguments: {:?}", remaining);
+        eprintln!("tuc: unexpected arguments: {remaining:?}");
         eprintln!("Try 'tuc --help' for more information.");
         std::process::exit(1);
     }
@@ -251,20 +255,17 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
             // Last argument should be a path, but if it looks like an option
             // (e.g. starts with a dash), we print a dedicated error message.
             if some_path.as_path().to_string_lossy().starts_with("-") {
-                eprintln!("tuc: unexpected arguments: {:?}", remaining);
+                eprintln!("tuc: unexpected arguments: {remaining:?}");
                 eprintln!("Try 'tuc --help' for more information.");
                 std::process::exit(1);
             }
 
-            eprintln!(
-                "tuc: runtime error. The file {:?} does not exist",
-                some_path
-            );
+            eprintln!("tuc: runtime error. The file {some_path:?} does not exist");
             std::process::exit(1);
         }
 
         if !some_path.is_file() {
-            eprintln!("tuc: runtime error. The path {:?} is not a file", some_path);
+            eprintln!("tuc: runtime error. The path {some_path:?} is not a file");
             std::process::exit(1);
         }
     }
