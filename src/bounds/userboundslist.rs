@@ -115,19 +115,17 @@ impl UserBoundsList {
 
     fn has_negative_indices(&self) -> bool {
         self.get_userbounds_only().any(|b| {
-            if let Side::Some(left) = b.l {
-                if left.is_negative() {
-                    return true;
-                }
+            if let Side::Some(left) = b.l
+                && left.is_negative()
+            {
+                true
+            } else if let Side::Some(right) = b.r
+                && right.is_negative()
+            {
+                true
+            } else {
+                false
             }
-
-            if let Side::Some(right) = b.r {
-                if right.is_negative() {
-                    return true;
-                }
-            }
-
-            false
         })
     }
 
