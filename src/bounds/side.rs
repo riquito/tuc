@@ -36,7 +36,7 @@ impl PartialOrd for Side {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
             (Side::Some(s), Side::Some(o)) => {
-                if !(s * o).is_positive() {
+                if s.is_negative() ^ o.is_negative() {
                     // We can't compare two sides with different sign
                     return None;
                 }
