@@ -48,3 +48,102 @@ impl PartialOrd for Side {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_str_some() {
+        assert_eq!(Side::from_str("42").unwrap(), Side::Some(42));
+        assert_eq!(Side::from_str("-7").unwrap(), Side::Some(-7));
+    }
+
+    #[test]
+    fn test_from_str_continue() {
+        assert_eq!(Side::from_str("").unwrap(), Side::Continue);
+    }
+
+    #[test]
+    fn test_from_str_zero() {
+        assert_eq!(Side::from_str("0").unwrap(), Side::Some(0));
+    }
+
+    #[test]
+    fn test_from_str_invalid() {
+        assert!(Side::from_str("abc").is_err());
+        assert!(Side::from_str("4.2").is_err());
+    }
+
+    #[test]
+    fn test_partial_ord_same_sign() {
+        assert_eq!(
+            Side::Some(3).partial_cmp(&Side::Some(5)),
+            Some(Ordering::Less)
+        );
+        assert_eq!(
+            Side::Some(5).partial_cmp(&Side::Some(3)),
+            Some(Ordering::Greater)
+        );
+        assert_eq!(
+            Side::Some(7).partial_cmp(&Side::Some(7)),
+            Some(Ordering::Equal)
+        );
+        assert_eq!(
+            Side::Some(-2).partial_cmp(&Side::Some(-1)),
+            Some(Ordering::Less)
+        );
+    }
+
+    #[test]
+    fn test_partial_ord_different_sign() {
+        assert_eq!(Side::Some(3).partial_cmp(&Side::Some(-5)), None);
+        assert_eq!(Side::Some(-5).partial_cmp(&Side::Some(3)), None);
+    }
+
+    #[test]
+    fn test_partial_ord_continue() {
+        assert_eq!(
+            Side::Continue.partial_cmp(&Side::Some(1)),
+            Some(Ordering::Greater)
+        );
+        assert_eq!(
+            Side::Some(1).partial_cmp(&Side::Continue),
+            Some(Ordering::Less)
+        );
+        assert_eq!(
+            Side::Continue.partial_cmp(&Side::Continue),
+            Some(Ordering::Equal)
+        );
+    }
+
+    #[test]
+    fn test_partial_ord_zero() {
+        // Zero compared to positive
+        assert_eq!(
+            Side::Some(0).partial_cmp(&Side::Some(5)),
+            Some(Ordering::Less)
+        );
+        assert_eq!(
+            Side::Some(5).partial_cmp(&Side::Some(0)),
+            Some(Ordering::Greater)
+        );
+        assert_eq!(
+            Side::Some(0).partial_cmp(&Side::Some(0)),
+            Some(Ordering::Equal)
+        );
+
+        // Zero compared to negative
+        assert_eq!(Side::Some(0).partial_cmp(&Side::Some(-5)), None);
+        assert_eq!(Side::Some(-5).partial_cmp(&Side::Some(0)), None);
+    }
+
+    #[test]
+    fn test_eq_trait() {
+        assert_eq!(Side::Some(1), Side::Some(1));
+        assert_eq!(Side::Continue, Side::Continue);
+
+        assert_ne!(Side::Some(1), Side::Some(2));
+        assert_ne!(Side::Continue, Side::Some(0));
+    }
+}
