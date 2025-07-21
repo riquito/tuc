@@ -9,6 +9,7 @@ use tuc::bounds::{BoundOrFiller, BoundsType, UserBoundsList};
 use tuc::cut_bytes::read_and_cut_bytes;
 use tuc::cut_lines::read_and_cut_lines;
 use tuc::cut_str::read_and_cut_str;
+use tuc::cut_str_fixed_delim::read_and_cut_str_multibyte;
 use tuc::help::{get_help, get_short_help};
 use tuc::options::{EOL, Opt, Trim};
 use tuc::stream::{StreamOpt, read_and_cut_bytes_stream};
@@ -63,6 +64,8 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         pargs.opt_value_from_str(["-c", "--characters"])?;
     let maybe_bytes: Option<UserBoundsList> = pargs.opt_value_from_str(["-b", "--bytes"])?;
     let maybe_lines: Option<UserBoundsList> = pargs.opt_value_from_str(["-l", "--lines"])?;
+
+    let use_multibyte_str = pargs.contains("--multibyte-str");
 
     let bounds_type = if maybe_fields.is_some() {
         BoundsType::Fields
@@ -291,6 +294,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         regex_bag,
         path,
         use_mmap,
+        use_multibyte_str,
     };
 
     if args.version {
@@ -314,14 +318,10 @@ fn main() -> Result<()> {
     let mut reader: &mut dyn std::io::BufRead = if opt.path.is_some() {
         let file = std::fs::File::open(opt.path.as_ref().unwrap()).map_err(|e| {
             let path = opt.path.as_ref().unwrap();
-            // Common errors (file not found, not a file, where checked above)
-            // Another common one that could happen here is permission denied.
             anyhow::anyhow!("{}.\nWas attempting to read {:?}", e, &path)
         })?;
 
         if opt.use_mmap {
-            // This is unsafe because there's no guarantee that the underline
-            // file won't be mutated.
             mmap = unsafe { Mmap::map(&file)? };
             mmap_cursor = std::io::Cursor::new(&mmap[..]);
             &mut mmap_cursor
@@ -339,9 +339,7 @@ fn main() -> Result<()> {
             eprintln!("tuc: runtime error. {e}");
             std::process::exit(1);
         });
-
         read_and_cut_bytes_stream(&mut reader, &mut stdout, &stream_opt)?;
-
         return Ok(());
     }
 
@@ -349,6 +347,8 @@ fn main() -> Result<()> {
         read_and_cut_bytes(&mut reader, &mut stdout, &opt)?;
     } else if opt.bounds_type == BoundsType::Lines {
         read_and_cut_lines(&mut reader, &mut stdout, &opt)?;
+    } else if opt.use_multibyte_str {
+        read_and_cut_str_multibyte(&mut reader, &mut stdout, opt)?;
     } else if let Ok(fast_opt) = FastOpt::try_from(&opt) {
         read_and_cut_text_as_bytes(&mut reader, &mut stdout, &fast_opt)?;
     } else {
@@ -356,6 +356,5 @@ fn main() -> Result<()> {
     }
 
     stdout.flush()?;
-
     Ok(())
 }
