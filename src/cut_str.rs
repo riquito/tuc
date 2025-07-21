@@ -448,6 +448,7 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
     match opt.eol {
         EOL::Newline => stdin.for_byte_line(|line| {
             let line = line.strip_suffix(&[opt.eol as u8]).unwrap_or(line);
+
             cut_str(
                 line,
                 &opt,

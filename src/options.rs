@@ -47,6 +47,7 @@ pub struct Opt {
     pub fallback_oob: Option<Vec<u8>>,
     pub path: Option<PathBuf>,
     pub use_mmap: bool,
+    pub use_multibyte_str: bool,
     #[cfg(feature = "regex")]
     pub regex_bag: Option<RegexBag>,
     #[cfg(not(feature = "regex"))]
@@ -74,6 +75,7 @@ impl Default for Opt {
             path: None,
             regex_bag: None,
             use_mmap: false,
+            use_multibyte_str: false,
         }
     }
 }
