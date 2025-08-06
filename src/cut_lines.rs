@@ -4,6 +4,7 @@ use std::ops::Range;
 
 use crate::bounds::{BoundOrFiller, Side, UserBoundsTrait};
 use crate::cut_str::cut_str;
+use crate::multibyte_str::FieldPlan;
 use crate::options::Opt;
 use crate::read_utils::read_line_with_eol;
 
@@ -91,21 +92,22 @@ fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> 
     let mut buffer: Vec<u8> = Vec::with_capacity(32 * 1024);
     stdin.read_to_end(&mut buffer)?;
     let buffer_as_str = std::str::from_utf8(&buffer)?;
-    let mut bounds_as_ranges: Vec<Range<usize>> = Vec::with_capacity(100);
     let mut compressed_line_buf = Vec::new();
 
     let buffer_as_str = buffer_as_str
         .strip_suffix(opt.eol as u8 as char)
         .unwrap_or(buffer_as_str);
 
+    let mut plan = FieldPlan::from_opt(opt)?;
+
     // Just use cut_str, we're cutting a (big) string whose delimiter is newline
     cut_str(
         buffer_as_str.as_bytes(),
         opt,
         stdout,
-        &mut bounds_as_ranges,
         &mut compressed_line_buf,
         &[opt.eol as u8],
+        &mut plan,
     )
 }
 
