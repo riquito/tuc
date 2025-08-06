@@ -6,10 +6,14 @@
 //! The main entrypoint is `pub fn extract_fields`, which takes a line, delimiter, and a list of bounds,
 //! and yields the requested fields in user order, minimizing allocations and delimiter scans.
 
-use std::ops::Range;
+use std::{ops::Range, usize};
 
-use crate::bounds::{BoundOrFiller, Side, UserBounds};
+use crate::{
+    bounds::{BoundOrFiller, BoundsType, Side, UserBounds},
+    options::Opt,
+};
 use anyhow::{Result, bail};
+use bstr::ByteSlice;
 use regex::bytes::Regex;
 
 // override dbg macro with a no-op to avoid debug output in release builds
@@ -26,29 +30,38 @@ pub struct FieldPlan<'a> {
     negative_indices: Vec<usize>,
     pub positive_fields: Vec<Range<usize>>,
     negative_fields: Vec<Range<usize>>,
-    pub extract_func: fn(&[u8], &mut FieldPlan) -> Result<()>,
+    pub extract_func: fn(&[u8], &mut FieldPlan) -> Result<Option<usize>>,
     finder: DelimiterStrategy<'a>,
     finder_rev: DelimiterStrategy<'a>,
+    need_num_fields: bool,
 }
 
 impl<'a> FieldPlan<'a> {
     /// Build a plan from a list of UserBounds, for a line with unknown field count.
-    ///
-    /// This flattens all bounds into a Vec<usize> of indices, 0-indexed, sorted and unique.
-    /// "Continue" as right bound is ignored.
-    ///
-    /// e.g. for bounds `1,2:8,4:,:2`, it would produce
-    /// `[0,1,3,7]`
-    pub fn from_bounds(
-        bounds: &[BoundOrFiller],
-        needle: &'a [u8],
-        maybe_regex: Option<&'a Regex>,
-    ) -> Result<Self> {
+    pub fn from_opt(opt: &'a Opt) -> Result<Self> {
         // Create a vector to hold the indices. At most we will have as many indices as bounds, doubled to hold both ends of ranges.
-        let mut indices: Vec<i32> = Vec::with_capacity(bounds.len() * 2);
+        let mut indices: Vec<i32> = Vec::with_capacity(opt.bounds.len() * 2);
+
+        let trim_empty_delimiter_at_bounds = opt.bounds_type == BoundsType::Characters;
+        let need_num_fields = opt.only_delimited
+            || opt.complement
+            || opt.json
+            || (opt.bounds_type == BoundsType::Characters && opt.replace_delimiter.is_some());
+
+        let maybe_regex: Option<&Regex> = opt.regex_bag.as_ref().map(|x| {
+            if opt.greedy_delimiter {
+                &x.greedy
+            } else {
+                &x.normal
+            }
+        });
+
+        // XXX should we expose this to reuse it?
+        let should_compress_delimiter = opt.compress_delimiter
+            && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines);
 
         // First collect all indices from bounds, keeping duplicates and original order.
-        for bof in bounds {
+        for bof in opt.bounds.iter() {
             if let BoundOrFiller::Bound(b) = bof {
                 indices.push(match b.l {
                     Side::Some(l) => l,
@@ -60,23 +73,6 @@ impl<'a> FieldPlan<'a> {
                 } // else ignore "continue" as right bound
             }
         }
-
-        // XXX to test
-        //         let indices: Vec<i32> = bounds.iter().flat_map(|bof| {
-        //     if let BoundOrFiller::Bound(b) = bof {
-        //         let left = match b.l {
-        //             Side::Some(l) => Some(l),
-        //             Side::Continue => Some(0),
-        //         };
-        //         let right = match b.r {
-        //             Side::Some(r) => Some(r),
-        //             Side::Continue => None,
-        //         };
-        //         left.into_iter().chain(right)
-        //     } else {
-        //         std::iter::empty()
-        //     }
-        // }).collect();
 
         // Then sort and deduplicate the indices.
         indices.sort_unstable();
@@ -107,48 +103,66 @@ impl<'a> FieldPlan<'a> {
         let max_field_to_search_pos = positive_indices.last().map(|x| x + 1).unwrap_or(0);
         let max_field_to_search_neg = negative_indices.last().map(|x| x + 1).unwrap_or(0);
 
-        let extract_func = match (max_field_to_search_pos, max_field_to_search_neg) {
-            (0, 0) => bail!("No indices found in bounds"), // invariant, shouldn't occur
-            (_, 0) => extract_fields_using_pos_indices,
-            (0, _) => extract_fields_using_negative_indices,
-            _ => |line: &[u8], plan: &mut FieldPlan| {
-                extract_fields_using_pos_indices(line, plan)?;
-                extract_fields_using_negative_indices(line, plan)?;
-                Ok(())
-            },
+        let extract_func = if need_num_fields {
+            extract_every_field
+        } else {
+            match (!positive_indices.is_empty(), !negative_indices.is_empty()) {
+                (false, false) => bail!("No indices found in bounds"), // invariant, shouldn't occur
+                (true, false) => extract_fields_using_pos_indices,
+                (_, true) if maybe_regex.is_some() => {
+                    // I can't reverse search a regex, so if there are negative indices,
+                    // I'll have to search for every field.
+                    extract_every_field
+                }
+                (false, true) => extract_fields_using_negative_indices,
+                (true, true) => |line: &[u8], plan: &mut FieldPlan| {
+                    extract_fields_using_pos_indices(line, plan)?;
+                    extract_fields_using_negative_indices(line, plan)?;
+                    Ok(None)
+                },
+            }
         };
 
         // Build the delimiter strategy once
-        let finder = if let Some(regex) = maybe_regex {
+        let finder = if should_compress_delimiter
+            && maybe_regex.is_some()
+            && let Some(replace_delimiter) = &opt.replace_delimiter
+        {
+            // This is the scenario where we update early on the line to replace
+            // the delimiter, so later on we must search for the fields using
+            // the new delimiter.
+            let finder = memchr::memmem::Finder::new(replace_delimiter).into_owned();
+            let len = replace_delimiter.len();
+            DelimiterStrategy::Memmem(finder, len)
+        } else if let Some(regex) = maybe_regex {
             #[cfg(feature = "regex")]
             {
-                DelimiterStrategy::Regex(regex)
+                DelimiterStrategy::Regex(regex, trim_empty_delimiter_at_bounds)
             }
             #[cfg(not(feature = "regex"))]
             {
                 unreachable!()
             }
         } else {
-            let finder = memchr::memmem::Finder::new(&needle).into_owned();
-            let len = needle.len();
+            let finder = memchr::memmem::Finder::new(&opt.delimiter).into_owned();
+            let len = opt.delimiter.len();
             DelimiterStrategy::Memmem(finder, len)
         };
 
         let finder_rev = if let Some(regex) = maybe_regex {
             #[cfg(feature = "regex")]
             {
-                // DelimiterStrategy::RegexRev(regex)
-
-                use core::panic;
-                panic!("RegexRev is not implemented yet");
+                // Storing regular regex, but we won't use it for reverse search
+                // (we'll fallback to retrieve every field)
+                DelimiterStrategy::Regex(regex, trim_empty_delimiter_at_bounds)
             }
             #[cfg(not(feature = "regex"))]
             {
                 unreachable!()
             }
         } else {
-            let rfinder = memchr::memmem::FinderRev::new(&needle).into_owned();
-            let len = needle.len();
+            let rfinder = memchr::memmem::FinderRev::new(&opt.delimiter).into_owned();
+            let len = opt.delimiter.len();
             DelimiterStrategy::MemmemRev(rfinder, len)
         };
 
@@ -158,11 +172,12 @@ impl<'a> FieldPlan<'a> {
             negative_indices,
             // XXX maybe I can reduce the capacity here
             // by storing fields by original index position?
-            positive_fields: vec![0..0; max_field_to_search_pos], // initialize with empty ranges
-            negative_fields: vec![0..0; max_field_to_search_neg], // initialize with empty ranges,
+            positive_fields: vec![usize::MAX..usize::MAX; max_field_to_search_pos], // initialize with empty ranges
+            negative_fields: vec![usize::MAX..usize::MAX; max_field_to_search_neg], // initialize with empty ranges,
             extract_func,
             finder,
             finder_rev,
+            need_num_fields,
         })
     }
 
@@ -174,11 +189,13 @@ impl<'a> FieldPlan<'a> {
                 (if l < 0 {
                     self.negative_fields
                         .get(l.unsigned_abs() as usize - 1)
+                        .and_then(|x| if x.start == usize::MAX { None } else { Some(x) })
                         .ok_or_else(|| anyhow::anyhow!("Out of bounds: {}", l))?
                 } else {
-                    self.positive_fields.get(l as usize - 1).ok_or_else(|| {
-                        anyhow::anyhow!("Out of bounds: {} (max {})", l, self.positive_fields.len())
-                    })?
+                    self.positive_fields
+                        .get(l as usize - 1)
+                        .and_then(|x| if x.start == usize::MAX { None } else { Some(x) })
+                        .ok_or_else(|| anyhow::anyhow!("Out of bounds: {}", l,))?
                 })
                 .start
             }
@@ -190,34 +207,49 @@ impl<'a> FieldPlan<'a> {
                 (if r < 0 {
                     self.negative_fields
                         .get(r.unsigned_abs() as usize - 1)
+                        .and_then(|x| if x.start == usize::MAX { None } else { Some(x) })
                         .ok_or_else(|| anyhow::anyhow!("Out of bounds: {}", r))?
                 } else {
-                    self.positive_fields.get(r as usize - 1).ok_or_else(|| {
-                        anyhow::anyhow!("Out of bounds: {} (max {})", r, self.positive_fields.len())
-                    })?
+                    self.positive_fields
+                        .get(r as usize - 1)
+                        .and_then(|x| if x.start == usize::MAX { None } else { Some(x) })
+                        .ok_or_else(|| anyhow::anyhow!("Out of bounds: {}", r,))?
                 })
                 .end
             }
             Side::Continue => line_len,
         };
 
+        if end < start {
+            // `start` can't ever be greater than end
+            bail!("Field left value cannot be greater than right value");
+        }
+
         Ok(start..end)
     }
 }
 
-pub fn extract_fields_using_pos_indices(line: &[u8], plan: &mut FieldPlan) -> Result<()> {
+pub fn extract_fields_using_pos_indices(
+    line: &[u8],
+    plan: &mut FieldPlan,
+) -> Result<Option<usize>> {
     if line.is_empty() {
-        return Ok(());
+        return Ok(None);
     }
 
     dbg!("extract_fields_using_pos_indices");
 
-    dbg!(line, &plan.indices);
+    dbg!(line.to_str_lossy(), &plan.indices);
     let mut seen = 0;
     // Define an iterator over the delimiter positions, starting with a sentinel value.
-    // This allows us to get the starting position (0) of the first field, which is gotten by
-    // adding the delimiter length to the first found position.
-    // During the first iteration we will get 0 because we will overflow the usize.
+    // This allows us to get the starting position (0) of the first field.
+
+    // let mut all: Vec<Range<usize>> = std::iter::once(std::ops::Range { start: 0, end: 0 })
+    //     .chain(plan.finder.find_ranges(line))
+    //     .collect();
+
+    // dbg!(&all);
+
     let mut delim_iterator = std::iter::once(std::ops::Range { start: 0, end: 0 })
         .chain(plan.finder.find_ranges(line))
         .peekable();
@@ -228,14 +260,18 @@ pub fn extract_fields_using_pos_indices(line: &[u8], plan: &mut FieldPlan) -> Re
         end: line_len,
     };
 
-    //for &desired_field in plan.indices() {
-
     for i in 0..plan.positive_indices.len() {
         let desired_field = plan.positive_indices[i];
         dbg!(desired_field, seen);
         let f_start = delim_iterator
             .nth(desired_field - seen)
-            .ok_or_else(|| anyhow::anyhow!("Out of bounds: {}", desired_field + 1))?
+            .ok_or_else(|| {
+                plan.positive_fields[desired_field] = Range {
+                    start: usize::MAX,
+                    end: usize::MAX,
+                };
+                anyhow::anyhow!("Out of bounds: {}", desired_field + 1)
+            })?
             .end;
 
         dbg!(f_start);
@@ -251,12 +287,15 @@ pub fn extract_fields_using_pos_indices(line: &[u8], plan: &mut FieldPlan) -> Re
         seen = desired_field + 1;
     }
 
-    Ok(())
+    Ok(None)
 }
 
-pub fn extract_fields_using_negative_indices(line: &[u8], plan: &mut FieldPlan) -> Result<()> {
+pub fn extract_fields_using_negative_indices(
+    line: &[u8],
+    plan: &mut FieldPlan,
+) -> Result<Option<usize>> {
     if line.is_empty() {
-        return Ok(());
+        return Ok(None);
     }
 
     dbg!("extract_fields_using_negative_indices");
@@ -286,7 +325,13 @@ pub fn extract_fields_using_negative_indices(line: &[u8], plan: &mut FieldPlan) 
 
         let f_end = delim_iterator
             .nth(desired_field - seen) // unwrap or bail with bail! macro if out of bounds
-            .ok_or_else(|| anyhow::anyhow!("Out of bounds: {}", desired_field - 1))?
+            .ok_or_else(|| {
+                plan.negative_fields[desired_field] = Range {
+                    start: usize::MAX,
+                    end: usize::MAX,
+                };
+                anyhow::anyhow!("Out of bounds: -{}", desired_field + 1)
+            })?
             .start;
 
         let f_start = delim_iterator.peek().unwrap_or(&start_range).end;
@@ -302,14 +347,70 @@ pub fn extract_fields_using_negative_indices(line: &[u8], plan: &mut FieldPlan) 
         seen = desired_field + 1;
     }
 
-    Ok(())
+    Ok(None)
+}
+
+fn extract_every_field(line: &[u8], plan: &mut FieldPlan) -> Result<(Option<usize>)> {
+    dbg!("extract_every_field");
+
+    let mut num_fields = 0;
+
+    if line.is_empty() {
+        return Ok(Some(num_fields));
+    }
+
+    let mut next_part_start = 0;
+
+    // "clear()" is necessary because we push on top of the vec.
+    // Other "extract_" algorithms do not clear it because they
+    // update the fields they need and read only those later.
+    plan.positive_fields.clear();
+
+    for r in plan.finder.find_ranges(line) {
+        plan.positive_fields.push(Range {
+            start: next_part_start,
+            end: r.start,
+        });
+
+        next_part_start = r.end;
+    }
+
+    plan.positive_fields.push(Range {
+        start: next_part_start,
+        end: line.len(),
+    });
+
+    // Now that I know about every positive field,
+    // let's fill the negative fields.
+    num_fields = plan.positive_fields.len();
+
+    // XXX TODO we are not "zeroing" with usize::umax the unmatched negative_indices
+
+    for i in 0..plan.negative_indices.len() {
+        let desired_field = plan.negative_indices[i];
+
+        if num_fields < desired_field + 1 {
+            bail!("Out of bounds: -{}", desired_field + 1);
+        }
+
+        let field = &plan.positive_fields[num_fields - desired_field - 1];
+
+        let f_start = field.start;
+        let f_end = field.end;
+
+        plan.negative_fields[desired_field] = Range {
+            start: f_start,
+            end: f_end,
+        };
+    }
+
+    Ok(Some(num_fields))
 }
 
 // Simple enum for delimiter strategy: Regex or Finder (owned)
 enum DelimiterStrategy<'a> {
     #[cfg(feature = "regex")]
-    Regex(&'a regex::bytes::Regex),
-    // RegexRev(&'a regex::bytes::Regex),
+    Regex(&'a regex::bytes::Regex, bool),
     Memmem(memchr::memmem::Finder<'a>, usize),
     MemmemRev(memchr::memmem::FinderRev<'a>, usize),
 }
@@ -318,16 +419,23 @@ impl<'a> DelimiterStrategy<'a> {
     fn find_ranges(&'a self, line: &'a [u8]) -> DelimiterFindIter<'a> {
         match self {
             #[cfg(feature = "regex")]
-            DelimiterStrategy::Regex(re) => DelimiterFindIter::Regex(re.find_iter(line)),
+            DelimiterStrategy::Regex(re, false) => DelimiterFindIter::Regex(re.find_iter(line)),
+            // This case is useful when we are cutting by characters,
+            // because we want to skip empty matches at the start and end of the line.
+            DelimiterStrategy::Regex(re, true) => {
+                // If we're cutting by characters, the delimiter is the empty strings
+                // and it will match at start and end of line, e.g. _f_o_o_. We drop those matches.
+                DelimiterFindIter::RegexTrimmed(re.find_iter(line).skip_while(Box::new(move |m| {
+                    (m.start() == 0 && m.end() == 0)
+                        || (m.start() == line.len() && m.end() == line.len())
+                })))
+            }
             DelimiterStrategy::Memmem(finder, len) => {
                 DelimiterFindIter::Memmem(finder.find_iter(line), *len)
             }
             DelimiterStrategy::MemmemRev(finder_rev, len) => {
                 DelimiterFindIter::MemmemRev(finder_rev.rfind_iter(line), *len)
-            } // DelimiterStrategy::RegexRev(re) => {
-              //     let m = re.find_iter(line).rev();
-              //     DelimiterFindIter::RegexRev(re.find_iter(line).rev())
-              // }
+            }
         }
     }
 }
@@ -335,7 +443,12 @@ impl<'a> DelimiterStrategy<'a> {
 enum DelimiterFindIter<'a> {
     #[cfg(feature = "regex")]
     Regex(regex::bytes::Matches<'a, 'a>),
-    // RegexRev(std::iter::Rev<regex::bytes::Matches<'a, 'a>>),
+    RegexTrimmed(
+        std::iter::SkipWhile<
+            regex::bytes::Matches<'a, 'a>,
+            Box<dyn FnMut(&regex::bytes::Match) -> bool + 'a>,
+        >,
+    ),
     Memmem(memchr::memmem::FindIter<'a, 'a>, usize),
     MemmemRev(memchr::memmem::FindRevIter<'a, 'a>, usize),
 }
@@ -346,6 +459,8 @@ impl<'a> Iterator for DelimiterFindIter<'a> {
         match self {
             #[cfg(feature = "regex")]
             DelimiterFindIter::Regex(iter) => iter.next().map(|m| m.start()..m.end()),
+            #[cfg(feature = "regex")]
+            DelimiterFindIter::RegexTrimmed(iter) => iter.next().map(|m| m.start()..m.end()),
             DelimiterFindIter::Memmem(iter, len) => iter.next().map(|idx| idx..idx + *len),
             DelimiterFindIter::MemmemRev(iter, len) => iter.next().map(|idx| idx..idx + *len),
         }
@@ -355,19 +470,26 @@ impl<'a> Iterator for DelimiterFindIter<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bounds::UserBounds;
+    use crate::bounds::{UserBounds, UserBoundsList};
     use std::str::FromStr;
+
+    fn make_fields_opt() -> Opt {
+        Opt {
+            bounds_type: BoundsType::Fields,
+            delimiter: "-".into(),
+            ..Opt::default()
+        }
+    }
 
     #[test]
     fn extract_fields_basic() {
         let line = b"a--b--c";
-        let delimiter = b"--";
-        let bounds = vec![
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("2").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("3").unwrap()),
-        ];
-        let mut plan = FieldPlan::from_bounds(&bounds, delimiter, None).unwrap();
+
+        let mut opt = make_fields_opt();
+        opt.delimiter = "--".into();
+        opt.bounds = UserBoundsList::from_str("1,2,3").unwrap();
+
+        let mut plan = FieldPlan::from_opt(&opt).unwrap();
         assert!(extract_fields_using_pos_indices(line, &mut plan).is_ok());
         assert_eq!(plan.positive_fields, vec![0..1, 3..4, 6..7]);
     }
@@ -375,12 +497,12 @@ mod tests {
     #[test]
     fn extract_fields_out_of_order() {
         let line = b"foo--bar--baz";
-        let delimiter = b"--";
-        let bounds = vec![
-            BoundOrFiller::Bound(UserBounds::from_str("3").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-        ];
-        let mut plan = FieldPlan::from_bounds(&bounds, delimiter, None).unwrap();
+
+        let mut opt = make_fields_opt();
+        opt.delimiter = "--".into();
+        opt.bounds = UserBoundsList::from_str("3,1").unwrap();
+
+        let mut plan = FieldPlan::from_opt(&opt).unwrap();
         assert!(extract_fields_using_pos_indices(line, &mut plan).is_ok());
         assert_eq!(plan.positive_fields[2], 10..13);
         assert_eq!(plan.positive_fields[0], 0..3);
@@ -389,58 +511,66 @@ mod tests {
     #[test]
     fn extract_fields_multibyte_delim_and_missing_field() {
         let line = b"x==y==z";
-        let delimiter = b"==";
-        let bounds = vec![
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("4").unwrap()), // out of bounds
-        ];
-        let mut plan = FieldPlan::from_bounds(&bounds, delimiter, None).unwrap();
+
+        let mut opt = make_fields_opt();
+        opt.delimiter = "==".into();
+        opt.bounds = UserBoundsList::from_str("1,4").unwrap();
+
+        let mut plan = FieldPlan::from_opt(&opt).unwrap();
         let result = extract_fields_using_pos_indices(line, &mut plan);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), "Out of bounds: 4");
     }
 
     #[test]
+    fn extract_fields_no_delimiter() {
+        let line = b"singlefield";
+
+        let mut opt = make_fields_opt();
+        opt.delimiter = "--".into();
+        opt.bounds = UserBoundsList::from_str("1").unwrap();
+
+        let mut plan = FieldPlan::from_opt(&opt).unwrap();
+
+        assert!(extract_fields_using_pos_indices(line, &mut plan).is_ok());
+        assert_eq!(plan.positive_fields, vec![0..11]);
+        assert_eq!(plan.negative_fields, Vec::<Range<usize>>::new());
+    }
+
+    #[test]
     fn test_field_plan_from_bounds_single_and_range() {
-        let bounds = vec![
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("2:4").unwrap()),
-        ];
-        let delimiter = b"-";
-        let plan = FieldPlan::from_bounds(&bounds, delimiter, None).unwrap();
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("1,2,4").unwrap();
+
+        let plan = FieldPlan::from_opt(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0, 1, 3]);
     }
 
     #[test]
     fn test_field_plan_from_bounds_range_and_single_out_of_order() {
-        let bounds = vec![
-            BoundOrFiller::Bound(UserBounds::from_str("2:3").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("1").unwrap()),
-        ];
-        let delimiter = b"-";
-        let plan = FieldPlan::from_bounds(&bounds, delimiter, None).unwrap();
+        let mut opt = make_fields_opt();
+        opt.delimiter = "--".into();
+        opt.bounds = UserBoundsList::from_str("2:3,1").unwrap();
+
+        let plan = FieldPlan::from_opt(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0, 1, 2]);
     }
 
     #[test]
     fn test_field_plan_from_bounds_multiple_ranges_and_order() {
-        let bounds = vec![
-            BoundOrFiller::Bound(UserBounds::from_str("4:5").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str(":2").unwrap()),
-        ];
-        let delimiter = b"-";
-        let plan = FieldPlan::from_bounds(&bounds, delimiter, None).unwrap();
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("4:5,:2").unwrap();
+
+        let plan = FieldPlan::from_opt(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0, 1, 3, 4]);
     }
 
     #[test]
     fn test_field_plan_from_bounds_duplicate_fields() {
-        let bounds = vec![
-            BoundOrFiller::Bound(UserBounds::from_str("1:2").unwrap()),
-            BoundOrFiller::Bound(UserBounds::from_str("2:3").unwrap()),
-        ];
-        let delimiter = b"-";
-        let plan = FieldPlan::from_bounds(&bounds, delimiter, None).unwrap();
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("1:2,2:3").unwrap();
+
+        let plan = FieldPlan::from_opt(&opt).unwrap();
         // 1:2 gives 0,1; 2:3 gives 1,2; deduped order: 0,1,2
         assert_eq!(plan.positive_indices, vec![0, 1, 2]);
     }
@@ -448,9 +578,11 @@ mod tests {
     #[test]
     fn test_field_plan_from_bounds_full_range() {
         // Use "1:-1" to mean all fields (from 1 to last)
-        let bounds = vec![BoundOrFiller::Bound(UserBounds::from_str("1:-1").unwrap())];
-        let delimiter = b"-";
-        let plan = FieldPlan::from_bounds(&bounds, delimiter, None).unwrap();
+
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("1:-1").unwrap();
+
+        let plan = FieldPlan::from_opt(&opt).unwrap();
         assert_eq!(plan.indices, vec![-1, 1]);
         assert_eq!(plan.positive_indices, vec![0]);
         assert_eq!(plan.negative_indices, vec![0]);

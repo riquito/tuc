@@ -211,7 +211,7 @@ pub fn cut_str<W: Write>(
         }
     }
 
-    (plan.extract_func)(line, plan);
+    (plan.extract_func)(line, plan)?;
 
     let fields = &mut plan.positive_fields;
 
@@ -332,8 +332,7 @@ pub fn read_and_cut_str_multibyte<B: BufRead, W: Write>(
         Vec::new()
     };
 
-    let the_regex = opt.regex_bag.as_ref().map(|x| &x.greedy);
-    let mut plan = FieldPlan::from_bounds(&opt.bounds, &opt.delimiter, the_regex)?;
+    let mut plan = FieldPlan::from_opt(&opt)?;
 
     match opt.eol {
         EOL::Newline => stdin.for_byte_line(|line| {
