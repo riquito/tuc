@@ -133,7 +133,7 @@ impl<'a> FieldPlan<'a> {
             // the new delimiter.
             let finder = memchr::memmem::Finder::new(replace_delimiter).into_owned();
             let len = replace_delimiter.len();
-            DelimiterStrategy::Memmem(finder, len)
+            DelimiterStrategy::Fixed(finder, len)
         } else if let Some(regex) = maybe_regex {
             #[cfg(feature = "regex")]
             {
@@ -146,7 +146,7 @@ impl<'a> FieldPlan<'a> {
         } else {
             let finder = memchr::memmem::Finder::new(&opt.delimiter).into_owned();
             let len = opt.delimiter.len();
-            DelimiterStrategy::Memmem(finder, len)
+            DelimiterStrategy::Fixed(finder, len)
         };
 
         let finder_rev = if let Some(regex) = maybe_regex {
@@ -163,7 +163,7 @@ impl<'a> FieldPlan<'a> {
         } else {
             let rfinder = memchr::memmem::FinderRev::new(&opt.delimiter).into_owned();
             let len = opt.delimiter.len();
-            DelimiterStrategy::MemmemRev(rfinder, len)
+            DelimiterStrategy::FixedRev(rfinder, len)
         };
 
         Ok(FieldPlan {
@@ -411,8 +411,8 @@ fn extract_every_field(line: &[u8], plan: &mut FieldPlan) -> Result<(Option<usiz
 enum DelimiterStrategy<'a> {
     #[cfg(feature = "regex")]
     Regex(&'a regex::bytes::Regex, bool),
-    Memmem(memchr::memmem::Finder<'a>, usize),
-    MemmemRev(memchr::memmem::FinderRev<'a>, usize),
+    Fixed(memchr::memmem::Finder<'a>, usize),
+    FixedRev(memchr::memmem::FinderRev<'a>, usize),
 }
 
 impl<'a> DelimiterStrategy<'a> {
@@ -430,11 +430,11 @@ impl<'a> DelimiterStrategy<'a> {
                         || (m.start() == line.len() && m.end() == line.len())
                 })))
             }
-            DelimiterStrategy::Memmem(finder, len) => {
-                DelimiterFindIter::Memmem(finder.find_iter(line), *len)
+            DelimiterStrategy::Fixed(finder, len) => {
+                DelimiterFindIter::Fixed(finder.find_iter(line), *len)
             }
-            DelimiterStrategy::MemmemRev(finder_rev, len) => {
-                DelimiterFindIter::MemmemRev(finder_rev.rfind_iter(line), *len)
+            DelimiterStrategy::FixedRev(finder_rev, len) => {
+                DelimiterFindIter::FixedRev(finder_rev.rfind_iter(line), *len)
             }
         }
     }
@@ -449,8 +449,8 @@ enum DelimiterFindIter<'a> {
             Box<dyn FnMut(&regex::bytes::Match) -> bool + 'a>,
         >,
     ),
-    Memmem(memchr::memmem::FindIter<'a, 'a>, usize),
-    MemmemRev(memchr::memmem::FindRevIter<'a, 'a>, usize),
+    Fixed(memchr::memmem::FindIter<'a, 'a>, usize),
+    FixedRev(memchr::memmem::FindRevIter<'a, 'a>, usize),
 }
 
 impl<'a> Iterator for DelimiterFindIter<'a> {
@@ -461,8 +461,8 @@ impl<'a> Iterator for DelimiterFindIter<'a> {
             DelimiterFindIter::Regex(iter) => iter.next().map(|m| m.start()..m.end()),
             #[cfg(feature = "regex")]
             DelimiterFindIter::RegexTrimmed(iter) => iter.next().map(|m| m.start()..m.end()),
-            DelimiterFindIter::Memmem(iter, len) => iter.next().map(|idx| idx..idx + *len),
-            DelimiterFindIter::MemmemRev(iter, len) => iter.next().map(|idx| idx..idx + *len),
+            DelimiterFindIter::Fixed(iter, len) => iter.next().map(|idx| idx..idx + *len),
+            DelimiterFindIter::FixedRev(iter, len) => iter.next().map(|idx| idx..idx + *len),
         }
     }
 }
