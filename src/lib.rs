@@ -7,7 +7,7 @@ pub mod fast_lane;
 pub mod help;
 pub mod multibyte_str;
 // pub mod multibyte_str2;
-pub mod cut_str_fixed_delim;
+//pub mod cut_str_fixed_delim;
 pub mod options;
 mod read_utils;
 pub mod stream;

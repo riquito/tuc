@@ -92,23 +92,24 @@ fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> 
     let mut buffer: Vec<u8> = Vec::with_capacity(32 * 1024);
     stdin.read_to_end(&mut buffer)?;
     let buffer_as_str = std::str::from_utf8(&buffer)?;
-    let mut compressed_line_buf = Vec::new();
+    //let mut compressed_line_buf = Vec::new();
 
     let buffer_as_str = buffer_as_str
         .strip_suffix(opt.eol as u8 as char)
         .unwrap_or(buffer_as_str);
 
-    let mut plan = FieldPlan::from_opt(opt)?;
+    // let mut plan = FieldPlan::from_opt(opt)?;
 
-    // Just use cut_str, we're cutting a (big) string whose delimiter is newline
-    cut_str(
-        buffer_as_str.as_bytes(),
-        opt,
-        stdout,
-        &mut compressed_line_buf,
-        &[opt.eol as u8],
-        &mut plan,
-    )
+    // // Just use cut_str, we're cutting a (big) string whose delimiter is newline
+    // cut_str(
+    //     buffer_as_str.as_bytes(),
+    //     opt,
+    //     stdout,
+    //     &mut compressed_line_buf,
+    //     &[opt.eol as u8],
+    //     &mut plan,
+    // )
+    Ok(())
 }
 
 pub fn read_and_cut_lines<A: BufRead, B: Write>(
