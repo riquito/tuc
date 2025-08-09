@@ -9,7 +9,6 @@ use tuc::bounds::{BoundOrFiller, BoundsType, UserBoundsList};
 use tuc::cut_bytes::read_and_cut_bytes;
 use tuc::cut_lines::read_and_cut_lines;
 use tuc::cut_str::read_and_cut_str;
-use tuc::cut_str_fixed_delim::read_and_cut_str_multibyte;
 use tuc::help::{get_help, get_short_help};
 use tuc::options::{EOL, Opt, Trim};
 use tuc::stream::{StreamOpt, read_and_cut_bytes_stream};
@@ -347,8 +346,6 @@ fn main() -> Result<()> {
         read_and_cut_bytes(&mut reader, &mut stdout, &opt)?;
     } else if opt.bounds_type == BoundsType::Lines {
         read_and_cut_lines(&mut reader, &mut stdout, &opt)?;
-    } else if opt.use_multibyte_str {
-        read_and_cut_str_multibyte(&mut reader, &mut stdout, opt)?;
     } else if let Ok(fast_opt) = FastOpt::try_from(&opt) {
         read_and_cut_text_as_bytes(&mut reader, &mut stdout, &fast_opt)?;
     } else {

@@ -5,7 +5,7 @@ use std::io::{BufRead, Write};
 use std::ops::Range;
 
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
-use crate::multibyte_str::FieldPlan;
+use crate::multibyte_str::{DelimiterFinder, FieldPlan, MemmemFinder, MemmemRevFinder};
 use crate::options::{EOL, Opt, Trim};
 
 #[cfg(feature = "regex")]
@@ -242,14 +242,18 @@ macro_rules! write_maybe_as_json {
     }};
 }
 
-pub fn cut_str<W: Write>(
+pub fn cut_str<W: Write, F, R>(
     line: &[u8],
     opt: &Opt,
     stdout: &mut W,
     compressed_line_buf: &mut Vec<u8>,
     eol: &[u8],
-    plan: &mut FieldPlan,
-) -> Result<()> {
+    plan: &mut FieldPlan<F, R>,
+) -> Result<()>
+where
+    F: DelimiterFinder,
+    R: DelimiterFinder,
+{
     if opt.regex_bag.is_some() {
         if opt.compress_delimiter && opt.replace_delimiter.is_none() {
             // TODO return a proper error; do not tie cli options to errors at this level
@@ -426,28 +430,78 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
     opt: Opt,
 ) -> Result<()> {
     let line_buf: Vec<u8> = Vec::with_capacity(1024);
-    //let mut bounds_as_ranges: Vec<Range<usize>> = Vec::with_capacity(16);
     let mut compressed_line_buf = if opt.compress_delimiter {
         Vec::with_capacity(line_buf.capacity())
     } else {
         Vec::new()
     };
 
-    let mut plan = FieldPlan::from_opt(&opt)?;
+    // Determine which plan type to use based on options
+    let should_compress_delimiter = opt.compress_delimiter
+        && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines);
 
+    let maybe_regex = opt.regex_bag.as_ref().map(|x| {
+        if opt.greedy_delimiter {
+            &x.greedy
+        } else {
+            &x.normal
+        }
+    });
+
+    if should_compress_delimiter && maybe_regex.is_some() && opt.replace_delimiter.is_some() {
+        // Special case: compressed delimiter with regex and replacement
+        // This would need a custom plan type for the replacement delimiter
+        let replace_delimiter = opt.replace_delimiter.as_ref().unwrap();
+        let mut plan = FieldPlan::from_opt_with_finders(
+            &opt,
+            MemmemFinder::new(replace_delimiter),
+            MemmemRevFinder::new(replace_delimiter),
+        )?;
+
+        process_lines_with_plan(stdin, stdout, &opt, &mut compressed_line_buf, &mut plan)
+    } else if let Some(regex) = maybe_regex {
+        #[cfg(feature = "regex")]
+        {
+            let trim_empty = opt.bounds_type == BoundsType::Characters;
+            let mut plan = FieldPlan::from_opt_regex(&opt, regex.clone(), trim_empty)?;
+            process_lines_with_plan(stdin, stdout, &opt, &mut compressed_line_buf, &mut plan)
+        }
+        #[cfg(not(feature = "regex"))]
+        {
+            unreachable!()
+        }
+    } else {
+        // Default memmem case
+        let mut plan = FieldPlan::from_opt_memmem(&opt)?;
+        process_lines_with_plan(stdin, stdout, &opt, &mut compressed_line_buf, &mut plan)
+    }
+}
+
+// Generic helper function that works with any plan type
+fn process_lines_with_plan<B, W, F, R>(
+    stdin: &mut B,
+    stdout: &mut W,
+    opt: &Opt,
+    compressed_line_buf: &mut Vec<u8>,
+    plan: &mut FieldPlan<F, R>,
+) -> Result<()>
+where
+    B: BufRead,
+    W: Write,
+    F: DelimiterFinder,
+    R: DelimiterFinder,
+{
     match opt.eol {
         EOL::Newline => stdin.for_byte_line(|line| {
             let line = line.strip_suffix(&[opt.eol as u8]).unwrap_or(line);
-
             cut_str(
                 line,
-                &opt,
+                opt,
                 stdout,
-                &mut compressed_line_buf,
+                compressed_line_buf,
                 &[opt.eol as u8],
-                &mut plan,
+                plan,
             )
-            // XXX Should map properly the error
             .map_err(|x| std::io::Error::other(x.to_string()))
             .and(Ok(true))
         })?,
@@ -457,16 +511,15 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
                 line,
                 &opt,
                 stdout,
-                &mut compressed_line_buf,
+                compressed_line_buf,
                 &[opt.eol as u8],
-                &mut plan,
+                plan,
             )
             // XXX Should map properly the error
             .map_err(|x| std::io::Error::other(x.to_string()))
             .and(Ok(true))
         })?,
     }
-
     Ok(())
 }
 

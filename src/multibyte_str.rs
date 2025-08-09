@@ -14,6 +14,7 @@ use crate::{
 };
 use anyhow::{Result, bail};
 use bstr::ByteSlice;
+use itertools::Itertools;
 use regex::bytes::Regex;
 
 // override dbg macro with a no-op to avoid debug output in release builds
@@ -22,23 +23,127 @@ macro_rules! dbg {
     ($($arg:tt)*) => {};
 }
 
+pub trait DelimiterFinder {
+    type Iter<'a>: Iterator<Item = Range<usize>> + 'a
+    where
+        Self: 'a;
+    fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a>;
+}
+
+// Implementations for different finder types
+pub struct MemmemFinder {
+    finder: memchr::memmem::Finder<'static>,
+    len: usize,
+}
+
+impl MemmemFinder {
+    pub fn new(pattern: &[u8]) -> Self {
+        Self {
+            finder: memchr::memmem::Finder::new(pattern).into_owned(),
+            len: pattern.len(),
+        }
+    }
+}
+
+impl DelimiterFinder for MemmemFinder {
+    type Iter<'a> =
+        std::iter::Map<memchr::memmem::FindIter<'a, 'a>, Box<dyn Fn(usize) -> Range<usize> + 'a>>;
+
+    fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a> {
+        let len = self.len;
+        self.finder
+            .find_iter(line)
+            .map(Box::new(move |idx| idx..idx + len))
+    }
+}
+
+pub struct MemmemRevFinder {
+    finder: memchr::memmem::FinderRev<'static>,
+    len: usize,
+}
+
+impl MemmemRevFinder {
+    pub fn new(pattern: &[u8]) -> Self {
+        Self {
+            finder: memchr::memmem::FinderRev::new(pattern).into_owned(),
+            len: pattern.len(),
+        }
+    }
+}
+
+impl DelimiterFinder for MemmemRevFinder {
+    type Iter<'a> = std::iter::Map<
+        memchr::memmem::FindRevIter<'a, 'a>,
+        Box<dyn Fn(usize) -> Range<usize> + 'a>,
+    >;
+
+    fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a> {
+        let len = self.len;
+        self.finder
+            .rfind_iter(line)
+            .map(Box::new(move |idx| idx..idx + len))
+    }
+}
+
+#[cfg(feature = "regex")]
+pub struct RegexFinder {
+    regex: Regex,
+    trim_empty: bool,
+}
+
+#[cfg(feature = "regex")]
+impl RegexFinder {
+    pub fn new(regex: Regex, trim_empty: bool) -> Self {
+        Self { regex, trim_empty }
+    }
+}
+
+#[cfg(feature = "regex")]
+impl DelimiterFinder for RegexFinder {
+    type Iter<'a> = Box<dyn Iterator<Item = Range<usize>> + 'a>;
+
+    fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a> {
+        if self.trim_empty {
+            let line_len = line.len();
+            Box::new(
+                self.regex
+                    .find_iter(line)
+                    .filter(move |m| {
+                        !((m.start() == 0 && m.end() == 0)
+                            || (m.start() == line_len && m.end() == line_len))
+                    })
+                    .map(|m| m.start()..m.end()),
+            )
+        } else {
+            Box::new(self.regex.find_iter(line).map(|m| m.start()..m.end()))
+        }
+    }
+}
+
 /// A compact, sorted, deduplicated list of field indices to extract, in user order.
-pub struct FieldPlan<'a> {
+pub struct FieldPlan<F, R>
+where
+    F: DelimiterFinder,
+    R: DelimiterFinder,
+{
     /// The user-specified order of fields/ranges (flattened to indices, 0-based).
     indices: Vec<i32>,
     positive_indices: Vec<usize>,
     negative_indices: Vec<usize>,
     pub positive_fields: Vec<Range<usize>>,
     negative_fields: Vec<Range<usize>>,
-    pub extract_func: fn(&[u8], &mut FieldPlan) -> Result<Option<usize>>,
-    finder: DelimiterStrategy<'a>,
-    finder_rev: DelimiterStrategy<'a>,
+    pub extract_func: fn(&[u8], &mut FieldPlan<F, R>) -> Result<Option<usize>>,
+    finder: F,
+    finder_rev: R,
     need_num_fields: bool,
 }
-
-impl<'a> FieldPlan<'a> {
+impl<F, R> FieldPlan<F, R>
+where
+    F: DelimiterFinder,
+    R: DelimiterFinder,
+{
     /// Build a plan from a list of UserBounds, for a line with unknown field count.
-    pub fn from_opt(opt: &'a Opt) -> Result<Self> {
+    pub fn from_opt_with_finders(opt: &Opt, finder: F, finder_rev: R) -> Result<Self> {
         // Create a vector to hold the indices. At most we will have as many indices as bounds, doubled to hold both ends of ranges.
         let mut indices: Vec<i32> = Vec::with_capacity(opt.bounds.len() * 2);
 
@@ -98,7 +203,7 @@ impl<'a> FieldPlan<'a> {
 
         negative_indices.sort_unstable();
 
-        dbg!(&indices, &positive_indices, &negative_indices);
+        //dbg!(&indices, &positive_indices, &negative_indices);
 
         let max_field_to_search_pos = positive_indices.last().map(|x| x + 1).unwrap_or(0);
         let max_field_to_search_neg = negative_indices.last().map(|x| x + 1).unwrap_or(0);
@@ -115,7 +220,7 @@ impl<'a> FieldPlan<'a> {
                     extract_every_field
                 }
                 (false, true) => extract_fields_using_negative_indices,
-                (true, true) => |line: &[u8], plan: &mut FieldPlan| {
+                (true, true) => |line: &[u8], plan: &mut FieldPlan<F, R>| {
                     extract_fields_using_pos_indices(line, plan)?;
                     extract_fields_using_negative_indices(line, plan)?;
                     Ok(None)
@@ -123,48 +228,52 @@ impl<'a> FieldPlan<'a> {
             }
         };
 
-        // Build the delimiter strategy once
-        let finder = if should_compress_delimiter
-            && maybe_regex.is_some()
-            && let Some(replace_delimiter) = &opt.replace_delimiter
-        {
-            // This is the scenario where we update early on the line to replace
-            // the delimiter, so later on we must search for the fields using
-            // the new delimiter.
-            let finder = memchr::memmem::Finder::new(replace_delimiter).into_owned();
-            let len = replace_delimiter.len();
-            DelimiterStrategy::Fixed(finder, len)
-        } else if let Some(regex) = maybe_regex {
-            #[cfg(feature = "regex")]
-            {
-                DelimiterStrategy::Regex(regex, trim_empty_delimiter_at_bounds)
-            }
-            #[cfg(not(feature = "regex"))]
-            {
-                unreachable!()
-            }
-        } else {
-            let finder = memchr::memmem::Finder::new(&opt.delimiter).into_owned();
-            let len = opt.delimiter.len();
-            DelimiterStrategy::Fixed(finder, len)
-        };
+        // // Build the delimiter strategy once
+        // let finder = if should_compress_delimiter
+        //     && maybe_regex.is_some()
+        //     && let Some(replace_delimiter) = &opt.replace_delimiter
+        // {
+        //     // This is the scenario where we update early on the line to replace
+        //     // the delimiter, so later on we must search for the fields using
+        //     // the new delimiter.
+        //     let finder = memchr::memmem::Finder::new(replace_delimiter).into_owned();
+        //     let len = replace_delimiter.len();
+        //     DelimiterStrategy::Fixed(finder, len)
+        // } else if let Some(regex) = maybe_regex {
+        //     #[cfg(feature = "regex")]
+        //     {
+        //         DelimiterStrategy::Regex(regex, trim_empty_delimiter_at_bounds)
+        //     }
+        //     #[cfg(not(feature = "regex"))]
+        //     {
+        //         unreachable!()
+        //     }
+        // } else if opt.greedy_delimiter {
+        //     let finder = memchr::memmem::Finder::new(&opt.delimiter).into_owned();
+        //     let len = opt.delimiter.len();
+        //     DelimiterStrategy::FixedGreedy(finder, len)
+        // } else {
+        //     let finder = memchr::memmem::Finder::new(&opt.delimiter).into_owned();
+        //     let len = opt.delimiter.len();
+        //     DelimiterStrategy::Fixed(finder, len)
+        // };
 
-        let finder_rev = if let Some(regex) = maybe_regex {
-            #[cfg(feature = "regex")]
-            {
-                // Storing regular regex, but we won't use it for reverse search
-                // (we'll fallback to retrieve every field)
-                DelimiterStrategy::Regex(regex, trim_empty_delimiter_at_bounds)
-            }
-            #[cfg(not(feature = "regex"))]
-            {
-                unreachable!()
-            }
-        } else {
-            let rfinder = memchr::memmem::FinderRev::new(&opt.delimiter).into_owned();
-            let len = opt.delimiter.len();
-            DelimiterStrategy::FixedRev(rfinder, len)
-        };
+        // let finder_rev = if let Some(regex) = maybe_regex {
+        //     #[cfg(feature = "regex")]
+        //     {
+        //         // Storing regular regex, but we won't use it for reverse search
+        //         // (we'll fallback to retrieve every field)
+        //         DelimiterStrategy::Regex(regex, trim_empty_delimiter_at_bounds)
+        //     }
+        //     #[cfg(not(feature = "regex"))]
+        //     {
+        //         unreachable!()
+        //     }
+        // } else {
+        //     let rfinder = memchr::memmem::FinderRev::new(&opt.delimiter).into_owned();
+        //     let len = opt.delimiter.len();
+        //     DelimiterStrategy::FixedRev(rfinder, len)
+        // };
 
         Ok(FieldPlan {
             indices,
@@ -184,6 +293,7 @@ impl<'a> FieldPlan<'a> {
     pub fn get_field(&self, b: &UserBounds, line_len: usize) -> Result<Range<usize>> {
         // if a side is negative, search in negative_fields, otherwise
         // in positive_fields
+        //dbg!("get field", &b);
         let start = match b.l {
             Side::Some(l) => {
                 (if l < 0 {
@@ -229,17 +339,21 @@ impl<'a> FieldPlan<'a> {
     }
 }
 
-pub fn extract_fields_using_pos_indices(
+pub fn extract_fields_using_pos_indices<F, R>(
     line: &[u8],
-    plan: &mut FieldPlan,
-) -> Result<Option<usize>> {
+    plan: &mut FieldPlan<F, R>,
+) -> Result<Option<usize>>
+where
+    F: DelimiterFinder,
+    R: DelimiterFinder,
+{
     if line.is_empty() {
         return Ok(None);
     }
 
-    dbg!("extract_fields_using_pos_indices");
+    //dbg!("extract_fields_using_pos_indices");
 
-    dbg!(line.to_str_lossy(), &plan.indices);
+    //dbg!(line.to_str_lossy(), &plan.indices);
     let mut seen = 0;
     // Define an iterator over the delimiter positions, starting with a sentinel value.
     // This allows us to get the starting position (0) of the first field.
@@ -248,7 +362,7 @@ pub fn extract_fields_using_pos_indices(
     //     .chain(plan.finder.find_ranges(line))
     //     .collect();
 
-    // dbg!(&all);
+    // //dbg!(&all);
 
     let mut delim_iterator = std::iter::once(std::ops::Range { start: 0, end: 0 })
         .chain(plan.finder.find_ranges(line))
@@ -262,7 +376,7 @@ pub fn extract_fields_using_pos_indices(
 
     for i in 0..plan.positive_indices.len() {
         let desired_field = plan.positive_indices[i];
-        dbg!(desired_field, seen);
+        //dbg!(desired_field, seen);
         let f_start = delim_iterator
             .nth(desired_field - seen)
             .ok_or_else(|| {
@@ -274,10 +388,10 @@ pub fn extract_fields_using_pos_indices(
             })?
             .end;
 
-        dbg!(f_start);
-        dbg!(delim_iterator.peek());
+        //dbg!(f_start);
+        //dbg!(delim_iterator.peek());
         let f_end = delim_iterator.peek().unwrap_or(&eol_range).start;
-        dbg!(f_end);
+        //dbg!(f_end);
 
         plan.positive_fields[desired_field] = Range {
             start: f_start,
@@ -290,15 +404,19 @@ pub fn extract_fields_using_pos_indices(
     Ok(None)
 }
 
-pub fn extract_fields_using_negative_indices(
+fn extract_fields_using_negative_indices<F, R>(
     line: &[u8],
-    plan: &mut FieldPlan,
-) -> Result<Option<usize>> {
+    plan: &mut FieldPlan<F, R>,
+) -> Result<Option<usize>>
+where
+    F: DelimiterFinder,
+    R: DelimiterFinder,
+{
     if line.is_empty() {
         return Ok(None);
     }
 
-    dbg!("extract_fields_using_negative_indices");
+    //dbg!("extract_fields_using_negative_indices");
     // And now let's do the inverse.
     // We will iterate the line again, right to left,
     // looking for the fields matching negative bounds.
@@ -321,7 +439,7 @@ pub fn extract_fields_using_negative_indices(
     for i in 0..plan.negative_indices.len() {
         // negative_indices is sorted from biggest (-1) to smallest (-X)
         let desired_field = plan.negative_indices[i];
-        dbg!(desired_field, seen);
+        //dbg!(desired_field, seen);
 
         let f_end = delim_iterator
             .nth(desired_field - seen) // unwrap or bail with bail! macro if out of bounds
@@ -336,8 +454,8 @@ pub fn extract_fields_using_negative_indices(
 
         let f_start = delim_iterator.peek().unwrap_or(&start_range).end;
 
-        dbg!(f_start);
-        dbg!(f_end);
+        //dbg!(f_start);
+        //dbg!(f_end);
 
         plan.negative_fields[desired_field] = Range {
             start: f_start,
@@ -350,8 +468,12 @@ pub fn extract_fields_using_negative_indices(
     Ok(None)
 }
 
-fn extract_every_field(line: &[u8], plan: &mut FieldPlan) -> Result<(Option<usize>)> {
-    dbg!("extract_every_field");
+fn extract_every_field<F, R>(line: &[u8], plan: &mut FieldPlan<F, R>) -> Result<Option<usize>>
+where
+    F: DelimiterFinder,
+    R: DelimiterFinder,
+{
+    //dbg!("extract_every_field");
 
     let mut num_fields = 0;
 
@@ -407,12 +529,37 @@ fn extract_every_field(line: &[u8], plan: &mut FieldPlan) -> Result<(Option<usiz
     Ok(Some(num_fields))
 }
 
+// Convenience constructor functions
+impl FieldPlan<MemmemFinder, MemmemRevFinder> {
+    pub fn from_opt_memmem(opt: &Opt) -> Result<Self> {
+        let finder = MemmemFinder::new(&opt.delimiter);
+        let finder_rev = MemmemRevFinder::new(&opt.delimiter);
+        Self::from_opt_with_finders(opt, finder, finder_rev)
+    }
+}
+
+#[cfg(feature = "regex")]
+impl FieldPlan<RegexFinder, RegexFinder> {
+    pub fn from_opt_regex(opt: &Opt, regex: Regex, trim_empty: bool) -> Result<Self> {
+        let finder = RegexFinder::new(regex.clone(), trim_empty);
+        let finder_rev = RegexFinder::new(regex, trim_empty);
+        Self::from_opt_with_finders(opt, finder, finder_rev)
+    }
+}
+
+// Type aliases for common configurations
+pub type MemmemFieldPlan = FieldPlan<MemmemFinder, MemmemRevFinder>;
+
+#[cfg(feature = "regex")]
+pub type RegexFieldPlan = FieldPlan<RegexFinder, RegexFinder>;
+
 // Simple enum for delimiter strategy: Regex or Finder (owned)
 enum DelimiterStrategy<'a> {
     #[cfg(feature = "regex")]
     Regex(&'a regex::bytes::Regex, bool),
     Fixed(memchr::memmem::Finder<'a>, usize),
     FixedRev(memchr::memmem::FinderRev<'a>, usize),
+    FixedGreedy(memchr::memmem::Finder<'a>, usize),
 }
 
 impl<'a> DelimiterStrategy<'a> {
@@ -436,9 +583,53 @@ impl<'a> DelimiterStrategy<'a> {
             DelimiterStrategy::FixedRev(finder_rev, len) => {
                 DelimiterFindIter::FixedRev(finder_rev.rfind_iter(line), *len)
             }
+            DelimiterStrategy::FixedGreedy(finder, len) => {
+                // Define the mapping function
+                fn make_range_from_tuple((start, len): (usize, usize)) -> Range<usize> {
+                    Range {
+                        start,
+                        end: start + len,
+                    }
+                }
+
+                // Define the coalescing function
+                fn coalesce_ranges(
+                    prev: Range<usize>,
+                    curr: Range<usize>,
+                ) -> Result<Range<usize>, (Range<usize>, Range<usize>)> {
+                    if prev.end == curr.start {
+                        Ok(prev.start..curr.end)
+                    } else {
+                        Err((prev, curr))
+                    }
+                }
+
+                DelimiterFindIter::FixedGreedy(
+                    finder
+                        .find_iter(line)
+                        .zip(std::iter::repeat(*len))
+                        .map(make_range_from_tuple as fn((usize, usize)) -> Range<usize>) // Cast here
+                        .coalesce(
+                            coalesce_ranges
+                                as fn(
+                                    Range<usize>,
+                                    Range<usize>,
+                                )
+                                    -> Result<Range<usize>, (Range<usize>, Range<usize>)>,
+                        ), // Cast here too
+                )
+            }
         }
     }
 }
+
+type GreedyCoalesceIter<'a> = itertools::structs::Coalesce<
+    std::iter::Map<
+        std::iter::Zip<memchr::memmem::FindIter<'a, 'a>, std::iter::Repeat<usize>>,
+        fn((usize, usize)) -> Range<usize>,
+    >,
+    fn(Range<usize>, Range<usize>) -> Result<Range<usize>, (Range<usize>, Range<usize>)>,
+>;
 
 enum DelimiterFindIter<'a> {
     #[cfg(feature = "regex")]
@@ -451,6 +642,7 @@ enum DelimiterFindIter<'a> {
     ),
     Fixed(memchr::memmem::FindIter<'a, 'a>, usize),
     FixedRev(memchr::memmem::FindRevIter<'a, 'a>, usize),
+    FixedGreedy(GreedyCoalesceIter<'a>),
 }
 
 impl<'a> Iterator for DelimiterFindIter<'a> {
@@ -463,6 +655,7 @@ impl<'a> Iterator for DelimiterFindIter<'a> {
             DelimiterFindIter::RegexTrimmed(iter) => iter.next().map(|m| m.start()..m.end()),
             DelimiterFindIter::Fixed(iter, len) => iter.next().map(|idx| idx..idx + *len),
             DelimiterFindIter::FixedRev(iter, len) => iter.next().map(|idx| idx..idx + *len),
+            DelimiterFindIter::FixedGreedy(iter) => iter.next(),
         }
     }
 }
