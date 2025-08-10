@@ -349,7 +349,7 @@ fn main() -> Result<()> {
     } else if let Ok(fast_opt) = FastOpt::try_from(&opt) {
         read_and_cut_text_as_bytes(&mut reader, &mut stdout, &fast_opt)?;
     } else {
-        read_and_cut_str(&mut reader, &mut stdout, opt)?;
+        read_and_cut_str(&mut reader, &mut stdout, &opt)?;
     }
 
     stdout.flush()?;

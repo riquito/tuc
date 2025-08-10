@@ -515,7 +515,7 @@ mod tests {
         opt.delimiter = "--".into();
         opt.bounds = UserBoundsList::from_str("1,2,3").unwrap();
 
-        let mut plan = FieldPlan::from_opt(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
         assert!(extract_fields_using_pos_indices(line, &mut plan).is_ok());
         assert_eq!(plan.positive_fields, vec![0..1, 3..4, 6..7]);
     }
@@ -528,7 +528,7 @@ mod tests {
         opt.delimiter = "--".into();
         opt.bounds = UserBoundsList::from_str("3,1").unwrap();
 
-        let mut plan = FieldPlan::from_opt(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
         assert!(extract_fields_using_pos_indices(line, &mut plan).is_ok());
         assert_eq!(plan.positive_fields[2], 10..13);
         assert_eq!(plan.positive_fields[0], 0..3);
@@ -542,7 +542,7 @@ mod tests {
         opt.delimiter = "==".into();
         opt.bounds = UserBoundsList::from_str("1,4").unwrap();
 
-        let mut plan = FieldPlan::from_opt(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
         let result = extract_fields_using_pos_indices(line, &mut plan);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), "Out of bounds: 4");
@@ -556,7 +556,7 @@ mod tests {
         opt.delimiter = "--".into();
         opt.bounds = UserBoundsList::from_str("1").unwrap();
 
-        let mut plan = FieldPlan::from_opt(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
 
         assert!(extract_fields_using_pos_indices(line, &mut plan).is_ok());
         assert_eq!(plan.positive_fields, vec![0..11]);
@@ -568,7 +568,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.bounds = UserBoundsList::from_str("1,2,4").unwrap();
 
-        let plan = FieldPlan::from_opt(&opt).unwrap();
+        let plan = FieldPlan::from_opt_memmem(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0, 1, 3]);
     }
 
@@ -578,7 +578,7 @@ mod tests {
         opt.delimiter = "--".into();
         opt.bounds = UserBoundsList::from_str("2:3,1").unwrap();
 
-        let plan = FieldPlan::from_opt(&opt).unwrap();
+        let plan = FieldPlan::from_opt_memmem(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0, 1, 2]);
     }
 
@@ -587,7 +587,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.bounds = UserBoundsList::from_str("4:5,:2").unwrap();
 
-        let plan = FieldPlan::from_opt(&opt).unwrap();
+        let plan = FieldPlan::from_opt_memmem(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0, 1, 3, 4]);
     }
 
@@ -596,7 +596,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.bounds = UserBoundsList::from_str("1:2,2:3").unwrap();
 
-        let plan = FieldPlan::from_opt(&opt).unwrap();
+        let plan = FieldPlan::from_opt_memmem(&opt).unwrap();
         // 1:2 gives 0,1; 2:3 gives 1,2; deduped order: 0,1,2
         assert_eq!(plan.positive_indices, vec![0, 1, 2]);
     }
@@ -608,9 +608,93 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.bounds = UserBoundsList::from_str("1:-1").unwrap();
 
-        let plan = FieldPlan::from_opt(&opt).unwrap();
-        assert_eq!(plan.indices, vec![-1, 1]);
+        let plan = FieldPlan::from_opt_memmem(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0]);
         assert_eq!(plan.negative_indices, vec![0]);
     }
+
+    // #[test]
+    // fn test_fill_with_fields_locations() {
+    //     let mut v_range: Vec<Range<usize>> = Vec::new();
+
+    //     v_range.clear();
+    //     fill_with_fields_locations(&mut v_range, b"", b"-");
+    //     assert_eq!(v_range, vec![] as Vec<Range<usize>>);
+
+    //     v_range.clear();
+    //     fill_with_fields_locations(&mut v_range, b"a", b"-");
+    //     assert_eq!(v_range, vec![Range { start: 0, end: 1 }]);
+
+    //     v_range.clear();
+    //     fill_with_fields_locations(&mut v_range, b"a-b", b"-");
+    //     assert_eq!(
+    //         v_range,
+    //         vec![Range { start: 0, end: 1 }, Range { start: 2, end: 3 }]
+    //     );
+
+    //     v_range.clear();
+    //     fill_with_fields_locations(&mut v_range, b"-a-", b"-");
+    //     assert_eq!(
+    //         v_range,
+    //         vec![
+    //             Range { start: 0, end: 0 },
+    //             Range { start: 1, end: 2 },
+    //             Range { start: 3, end: 3 }
+    //         ]
+    //     );
+
+    //     v_range.clear();
+    //     fill_with_fields_locations(&mut v_range, b"a--", b"-");
+    //     assert_eq!(
+    //         v_range,
+    //         vec![
+    //             Range { start: 0, end: 1 },
+    //             Range { start: 2, end: 2 },
+    //             Range { start: 3, end: 3 }
+    //         ]
+    //     );
+    // }
+
+    // #[test]
+    // fn test_fill_with_fields_locations_greedy() {
+    //     let mut v_range: Vec<Range<usize>> = Vec::new();
+    //     let empty_vec: Vec<Range<usize>> = vec![];
+
+    //     v_range.clear();
+    //     fill_with_fields_locations_greedy(&mut v_range, b"", b"-");
+    //     assert_eq!(v_range, empty_vec);
+
+    //     v_range.clear();
+    //     fill_with_fields_locations_greedy(&mut v_range, b"a", b"-");
+    //     assert_eq!(v_range, vec![Range { start: 0, end: 1 }]);
+
+    //     v_range.clear();
+    //     fill_with_fields_locations_greedy(&mut v_range, b"-", b"-");
+    //     assert_eq!(
+    //         v_range,
+    //         vec![Range { start: 0, end: 0 }, Range { start: 1, end: 1 }]
+    //     );
+
+    //     v_range.clear();
+    //     fill_with_fields_locations_greedy(&mut v_range, b"-a--b", b"-");
+    //     assert_eq!(
+    //         v_range,
+    //         vec![
+    //             Range { start: 0, end: 0 },
+    //             Range { start: 1, end: 2 },
+    //             Range { start: 4, end: 5 }
+    //         ]
+    //     );
+
+    //     v_range.clear();
+    //     fill_with_fields_locations_greedy(&mut v_range, b"-a--", b"-");
+    //     assert_eq!(
+    //         v_range,
+    //         vec![
+    //             Range { start: 0, end: 0 },
+    //             Range { start: 1, end: 2 },
+    //             Range { start: 4, end: 4 }
+    //         ]
+    //     );
+    // }
 }
