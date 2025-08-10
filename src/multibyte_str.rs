@@ -1,27 +1,11 @@
-//! Efficient multibyte delimiter string field extraction for `tuc`.
-//!
-//! This module provides a fast, allocation-minimizing algorithm for extracting fields from a delimited string,
-//! given a set of user-specified bounds (possibly with ranges and out-of-order indices).
-//!
-//! The main entrypoint is `pub fn extract_fields`, which takes a line, delimiter, and a list of bounds,
-//! and yields the requested fields in user order, minimizing allocations and delimiter scans.
-
-use std::{ops::Range, usize};
+use std::ops::Range;
 
 use crate::{
     bounds::{BoundOrFiller, BoundsType, Side, UserBounds},
     options::Opt,
 };
 use anyhow::{Result, bail};
-use bstr::ByteSlice;
-use itertools::Itertools;
 use regex::bytes::Regex;
-
-// override dbg macro with a no-op to avoid debug output in release builds
-#[cfg(not(debug_assertions))]
-macro_rules! dbg {
-    ($($arg:tt)*) => {};
-}
 
 pub trait DelimiterFinder {
     type Iter<'a>: Iterator<Item = Range<usize>> + 'a
@@ -30,7 +14,6 @@ pub trait DelimiterFinder {
     fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a>;
 }
 
-// Implementations for different finder types
 pub struct MemmemFinder {
     finder: memchr::memmem::Finder<'static>,
     len: usize,
@@ -120,14 +103,11 @@ impl DelimiterFinder for RegexFinder {
     }
 }
 
-/// A compact, sorted, deduplicated list of field indices to extract, in user order.
 pub struct FieldPlan<F, R>
 where
     F: DelimiterFinder,
     R: DelimiterFinder,
 {
-    /// The user-specified order of fields/ranges (flattened to indices, 0-based).
-    indices: Vec<i32>,
     positive_indices: Vec<usize>,
     negative_indices: Vec<usize>,
     pub positive_fields: Vec<Range<usize>>,
@@ -135,19 +115,16 @@ where
     pub extract_func: fn(&[u8], &mut FieldPlan<F, R>) -> Result<Option<usize>>,
     finder: F,
     finder_rev: R,
-    need_num_fields: bool,
 }
 impl<F, R> FieldPlan<F, R>
 where
     F: DelimiterFinder,
     R: DelimiterFinder,
 {
-    /// Build a plan from a list of UserBounds, for a line with unknown field count.
     pub fn from_opt_with_finders(opt: &Opt, finder: F, finder_rev: R) -> Result<Self> {
         // Create a vector to hold the indices. At most we will have as many indices as bounds, doubled to hold both ends of ranges.
         let mut indices: Vec<i32> = Vec::with_capacity(opt.bounds.len() * 2);
 
-        let trim_empty_delimiter_at_bounds = opt.bounds_type == BoundsType::Characters;
         let need_num_fields = opt.only_delimited
             || opt.complement
             || opt.json
@@ -160,10 +137,6 @@ where
                 &x.normal
             }
         });
-
-        // XXX should we expose this to reuse it?
-        let should_compress_delimiter = opt.compress_delimiter
-            && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines);
 
         // First collect all indices from bounds, keeping duplicates and original order.
         for bof in opt.bounds.iter() {
@@ -202,8 +175,6 @@ where
             .collect();
 
         negative_indices.sort_unstable();
-
-        //dbg!(&indices, &positive_indices, &negative_indices);
 
         let max_field_to_search_pos = positive_indices.last().map(|x| x + 1).unwrap_or(0);
         let max_field_to_search_neg = negative_indices.last().map(|x| x + 1).unwrap_or(0);
@@ -276,7 +247,6 @@ where
         // };
 
         Ok(FieldPlan {
-            indices,
             positive_indices,
             negative_indices,
             // XXX maybe I can reduce the capacity here
@@ -286,14 +256,13 @@ where
             extract_func,
             finder,
             finder_rev,
-            need_num_fields,
         })
     }
 
     pub fn get_field(&self, b: &UserBounds, line_len: usize) -> Result<Range<usize>> {
         // if a side is negative, search in negative_fields, otherwise
         // in positive_fields
-        //dbg!("get field", &b);
+
         let start = match b.l {
             Side::Some(l) => {
                 (if l < 0 {
@@ -351,18 +320,7 @@ where
         return Ok(None);
     }
 
-    //dbg!("extract_fields_using_pos_indices");
-
-    //dbg!(line.to_str_lossy(), &plan.indices);
     let mut seen = 0;
-    // Define an iterator over the delimiter positions, starting with a sentinel value.
-    // This allows us to get the starting position (0) of the first field.
-
-    // let mut all: Vec<Range<usize>> = std::iter::once(std::ops::Range { start: 0, end: 0 })
-    //     .chain(plan.finder.find_ranges(line))
-    //     .collect();
-
-    // //dbg!(&all);
 
     let mut delim_iterator = std::iter::once(std::ops::Range { start: 0, end: 0 })
         .chain(plan.finder.find_ranges(line))
@@ -376,7 +334,7 @@ where
 
     for i in 0..plan.positive_indices.len() {
         let desired_field = plan.positive_indices[i];
-        //dbg!(desired_field, seen);
+
         let f_start = delim_iterator
             .nth(desired_field - seen)
             .ok_or_else(|| {
@@ -388,10 +346,7 @@ where
             })?
             .end;
 
-        //dbg!(f_start);
-        //dbg!(delim_iterator.peek());
         let f_end = delim_iterator.peek().unwrap_or(&eol_range).start;
-        //dbg!(f_end);
 
         plan.positive_fields[desired_field] = Range {
             start: f_start,
@@ -416,15 +371,6 @@ where
         return Ok(None);
     }
 
-    //dbg!("extract_fields_using_negative_indices");
-    // And now let's do the inverse.
-    // We will iterate the line again, right to left,
-    // looking for the fields matching negative bounds.
-
-    // -2  -1
-    // a..-b
-    // 0..12
-
     let mut delim_iterator = std::iter::once(std::ops::Range {
         start: line.len(),
         end: line.len(),
@@ -439,10 +385,9 @@ where
     for i in 0..plan.negative_indices.len() {
         // negative_indices is sorted from biggest (-1) to smallest (-X)
         let desired_field = plan.negative_indices[i];
-        //dbg!(desired_field, seen);
 
         let f_end = delim_iterator
-            .nth(desired_field - seen) // unwrap or bail with bail! macro if out of bounds
+            .nth(desired_field - seen)
             .ok_or_else(|| {
                 plan.negative_fields[desired_field] = Range {
                     start: usize::MAX,
@@ -453,9 +398,6 @@ where
             .start;
 
         let f_start = delim_iterator.peek().unwrap_or(&start_range).end;
-
-        //dbg!(f_start);
-        //dbg!(f_end);
 
         plan.negative_fields[desired_field] = Range {
             start: f_start,
@@ -473,8 +415,6 @@ where
     F: DelimiterFinder,
     R: DelimiterFinder,
 {
-    //dbg!("extract_every_field");
-
     let mut num_fields = 0;
 
     if line.is_empty() {
@@ -553,117 +493,10 @@ pub type MemmemFieldPlan = FieldPlan<MemmemFinder, MemmemRevFinder>;
 #[cfg(feature = "regex")]
 pub type RegexFieldPlan = FieldPlan<RegexFinder, RegexFinder>;
 
-// Simple enum for delimiter strategy: Regex or Finder (owned)
-enum DelimiterStrategy<'a> {
-    #[cfg(feature = "regex")]
-    Regex(&'a regex::bytes::Regex, bool),
-    Fixed(memchr::memmem::Finder<'a>, usize),
-    FixedRev(memchr::memmem::FinderRev<'a>, usize),
-    FixedGreedy(memchr::memmem::Finder<'a>, usize),
-}
-
-impl<'a> DelimiterStrategy<'a> {
-    fn find_ranges(&'a self, line: &'a [u8]) -> DelimiterFindIter<'a> {
-        match self {
-            #[cfg(feature = "regex")]
-            DelimiterStrategy::Regex(re, false) => DelimiterFindIter::Regex(re.find_iter(line)),
-            // This case is useful when we are cutting by characters,
-            // because we want to skip empty matches at the start and end of the line.
-            DelimiterStrategy::Regex(re, true) => {
-                // If we're cutting by characters, the delimiter is the empty strings
-                // and it will match at start and end of line, e.g. _f_o_o_. We drop those matches.
-                DelimiterFindIter::RegexTrimmed(re.find_iter(line).skip_while(Box::new(move |m| {
-                    (m.start() == 0 && m.end() == 0)
-                        || (m.start() == line.len() && m.end() == line.len())
-                })))
-            }
-            DelimiterStrategy::Fixed(finder, len) => {
-                DelimiterFindIter::Fixed(finder.find_iter(line), *len)
-            }
-            DelimiterStrategy::FixedRev(finder_rev, len) => {
-                DelimiterFindIter::FixedRev(finder_rev.rfind_iter(line), *len)
-            }
-            DelimiterStrategy::FixedGreedy(finder, len) => {
-                // Define the mapping function
-                fn make_range_from_tuple((start, len): (usize, usize)) -> Range<usize> {
-                    Range {
-                        start,
-                        end: start + len,
-                    }
-                }
-
-                // Define the coalescing function
-                fn coalesce_ranges(
-                    prev: Range<usize>,
-                    curr: Range<usize>,
-                ) -> Result<Range<usize>, (Range<usize>, Range<usize>)> {
-                    if prev.end == curr.start {
-                        Ok(prev.start..curr.end)
-                    } else {
-                        Err((prev, curr))
-                    }
-                }
-
-                DelimiterFindIter::FixedGreedy(
-                    finder
-                        .find_iter(line)
-                        .zip(std::iter::repeat(*len))
-                        .map(make_range_from_tuple as fn((usize, usize)) -> Range<usize>) // Cast here
-                        .coalesce(
-                            coalesce_ranges
-                                as fn(
-                                    Range<usize>,
-                                    Range<usize>,
-                                )
-                                    -> Result<Range<usize>, (Range<usize>, Range<usize>)>,
-                        ), // Cast here too
-                )
-            }
-        }
-    }
-}
-
-type GreedyCoalesceIter<'a> = itertools::structs::Coalesce<
-    std::iter::Map<
-        std::iter::Zip<memchr::memmem::FindIter<'a, 'a>, std::iter::Repeat<usize>>,
-        fn((usize, usize)) -> Range<usize>,
-    >,
-    fn(Range<usize>, Range<usize>) -> Result<Range<usize>, (Range<usize>, Range<usize>)>,
->;
-
-enum DelimiterFindIter<'a> {
-    #[cfg(feature = "regex")]
-    Regex(regex::bytes::Matches<'a, 'a>),
-    RegexTrimmed(
-        std::iter::SkipWhile<
-            regex::bytes::Matches<'a, 'a>,
-            Box<dyn FnMut(&regex::bytes::Match) -> bool + 'a>,
-        >,
-    ),
-    Fixed(memchr::memmem::FindIter<'a, 'a>, usize),
-    FixedRev(memchr::memmem::FindRevIter<'a, 'a>, usize),
-    FixedGreedy(GreedyCoalesceIter<'a>),
-}
-
-impl<'a> Iterator for DelimiterFindIter<'a> {
-    type Item = Range<usize>;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            #[cfg(feature = "regex")]
-            DelimiterFindIter::Regex(iter) => iter.next().map(|m| m.start()..m.end()),
-            #[cfg(feature = "regex")]
-            DelimiterFindIter::RegexTrimmed(iter) => iter.next().map(|m| m.start()..m.end()),
-            DelimiterFindIter::Fixed(iter, len) => iter.next().map(|idx| idx..idx + *len),
-            DelimiterFindIter::FixedRev(iter, len) => iter.next().map(|idx| idx..idx + *len),
-            DelimiterFindIter::FixedGreedy(iter) => iter.next(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bounds::{UserBounds, UserBoundsList};
+    use crate::bounds::UserBoundsList;
     use std::str::FromStr;
 
     fn make_fields_opt() -> Opt {

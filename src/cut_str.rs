@@ -2,112 +2,13 @@ use anyhow::{Result, bail};
 use bstr::ByteSlice;
 use bstr::io::BufReadExt;
 use std::io::{BufRead, Write};
-use std::ops::Range;
 
-use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList, UserBoundsTrait};
+use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList};
 use crate::multibyte_str::{DelimiterFinder, FieldPlan, MemmemFinder, MemmemRevFinder};
 use crate::options::{EOL, Opt, Trim};
 
 #[cfg(feature = "regex")]
 use regex::bytes::Regex;
-
-/// Split a string into parts and fill a buffer with ranges
-/// that match those parts.
-///
-/// - `buffer` - vector that will be filled with ranges
-/// - `line` - the string to split
-/// - `delimiter` - what to search to split the string
-fn fill_with_fields_locations(buffer: &mut Vec<Range<usize>>, line: &[u8], delimiter: &[u8]) {
-    buffer.clear();
-
-    if line.is_empty() {
-        return;
-    }
-
-    let delimiter_length = delimiter.len();
-    let mut prev_part_start = 0;
-
-    for idx in line.find_iter(&delimiter) {
-        buffer.push(Range {
-            start: prev_part_start,
-            end: idx,
-        });
-
-        prev_part_start = idx + delimiter_length;
-    }
-
-    buffer.push(Range {
-        start: prev_part_start,
-        end: line.len(),
-    });
-}
-
-/// Split a string into parts and fill a buffer with ranges
-/// that match those parts. The delimiter is greedy.
-///
-/// - `buffer` - vector that will be filled with ranges
-/// - `line` - the string to split
-/// - `delimiter` - what to search to split the string, greedy
-fn fill_with_fields_locations_greedy(
-    buffer: &mut Vec<Range<usize>>,
-    line: &[u8],
-    delimiter: &[u8],
-) {
-    buffer.clear();
-
-    if line.is_empty() {
-        return;
-    }
-
-    let delimiter_length = delimiter.len();
-    let mut prev_part_start = 0;
-
-    while let &Some(mut idx) = &line[prev_part_start..].find(delimiter) {
-        idx += prev_part_start;
-
-        buffer.push(Range {
-            start: prev_part_start,
-            end: idx,
-        });
-
-        prev_part_start = idx + delimiter_length;
-
-        // greedy, so we skip any next occurrence
-        while line[prev_part_start..].starts_with(delimiter) {
-            prev_part_start += delimiter_length;
-        }
-    }
-
-    buffer.push(Range {
-        start: prev_part_start,
-        end: line.len(),
-    });
-}
-
-#[cfg(feature = "regex")]
-fn fill_with_fields_locations_using_regex(buffer: &mut Vec<Range<usize>>, line: &[u8], re: &Regex) {
-    buffer.clear();
-
-    if line.is_empty() {
-        return;
-    }
-
-    let mut next_part_start = 0;
-
-    for mat in re.find_iter(line) {
-        buffer.push(Range {
-            start: next_part_start,
-            end: mat.start(),
-        });
-
-        next_part_start = mat.end();
-    }
-
-    buffer.push(Range {
-        start: next_part_start,
-        end: line.len(),
-    });
-}
 
 fn compress_delimiter(line: &[u8], delimiter: &[u8], output: &mut Vec<u8>) {
     output.clear();
@@ -286,11 +187,8 @@ where
         return Ok(());
     }
 
-    #[allow(unused_variables)]
     let line_holder: std::borrow::Cow<[u8]>;
-    #[allow(unused_mut)]
     let mut should_build_ranges_using_regex = opt.regex_bag.is_some() && cfg!(feature = "regex");
-    #[allow(unused_mut)]
     let mut delimiter = &opt.delimiter;
     let should_compress_delimiter = opt.compress_delimiter
         && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines);
@@ -315,7 +213,6 @@ where
     }
 
     let maybe_maybe_num_fields = (plan.extract_func)(line, plan);
-    let detected_out_of_bounds = maybe_maybe_num_fields.is_err();
     let maybe_num_fields = maybe_maybe_num_fields.unwrap_or(None);
 
     if opt.only_delimited
@@ -509,7 +406,7 @@ where
             let line = line.strip_suffix(&[opt.eol as u8]).unwrap_or(line);
             cut_str(
                 line,
-                &opt,
+                opt,
                 stdout,
                 compressed_line_buf,
                 &[opt.eol as u8],
