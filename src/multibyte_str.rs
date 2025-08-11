@@ -102,6 +102,77 @@ impl DelimiterFinder for RegexFinder {
         }
     }
 }
+pub struct FixedGreedyFinder {
+    finder: memchr::memmem::Finder<'static>,
+    len: usize,
+}
+
+impl FixedGreedyFinder {
+    pub fn new(pattern: &[u8]) -> Self {
+        Self {
+            finder: memchr::memmem::Finder::new(pattern).into_owned(),
+            len: pattern.len(),
+        }
+    }
+}
+
+impl DelimiterFinder for FixedGreedyFinder {
+    type Iter<'a> = FieldsLocationsGreedy<'a>;
+
+    fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a> {
+        let iter = self.finder.find_iter(line);
+        FieldsLocationsGreedy::new(iter, self.len)
+    }
+}
+
+pub struct FieldsLocationsGreedy<'a> {
+    iter: std::iter::Peekable<memchr::memmem::FindIter<'a, 'a>>,
+    delimiter_len: usize,
+    current_pos: usize,
+    finished: bool,
+}
+
+impl<'a> FieldsLocationsGreedy<'a> {
+    fn new(iter: memchr::memmem::FindIter<'a, 'a>, delimiter_len: usize) -> Self {
+        Self {
+            iter: iter.peekable(),
+            delimiter_len,
+            current_pos: 0,
+            finished: false,
+        }
+    }
+}
+
+impl<'a> Iterator for FieldsLocationsGreedy<'a> {
+    type Item = Range<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.finished {
+            return None;
+        }
+
+        // Look for the delimiter in the remaining portion
+        if let Some(idx) = self.iter.next() {
+            let start_delimiter = idx;
+            self.current_pos = start_delimiter + self.delimiter_len;
+
+            // Skip any consecutive delimiters (greedy behavior)
+            while self.iter.peek() == Some(&self.current_pos) {
+                self.iter.next();
+                self.current_pos += self.delimiter_len;
+            }
+
+            Some(Range {
+                start: start_delimiter,
+                end: self.current_pos,
+            })
+        } else {
+            // No more delimiters found
+            self.finished = true;
+            None
+        }
+    }
+}
 
 pub struct FieldPlan<F, R>
 where
@@ -198,53 +269,6 @@ where
                 },
             }
         };
-
-        // // Build the delimiter strategy once
-        // let finder = if should_compress_delimiter
-        //     && maybe_regex.is_some()
-        //     && let Some(replace_delimiter) = &opt.replace_delimiter
-        // {
-        //     // This is the scenario where we update early on the line to replace
-        //     // the delimiter, so later on we must search for the fields using
-        //     // the new delimiter.
-        //     let finder = memchr::memmem::Finder::new(replace_delimiter).into_owned();
-        //     let len = replace_delimiter.len();
-        //     DelimiterStrategy::Fixed(finder, len)
-        // } else if let Some(regex) = maybe_regex {
-        //     #[cfg(feature = "regex")]
-        //     {
-        //         DelimiterStrategy::Regex(regex, trim_empty_delimiter_at_bounds)
-        //     }
-        //     #[cfg(not(feature = "regex"))]
-        //     {
-        //         unreachable!()
-        //     }
-        // } else if opt.greedy_delimiter {
-        //     let finder = memchr::memmem::Finder::new(&opt.delimiter).into_owned();
-        //     let len = opt.delimiter.len();
-        //     DelimiterStrategy::FixedGreedy(finder, len)
-        // } else {
-        //     let finder = memchr::memmem::Finder::new(&opt.delimiter).into_owned();
-        //     let len = opt.delimiter.len();
-        //     DelimiterStrategy::Fixed(finder, len)
-        // };
-
-        // let finder_rev = if let Some(regex) = maybe_regex {
-        //     #[cfg(feature = "regex")]
-        //     {
-        //         // Storing regular regex, but we won't use it for reverse search
-        //         // (we'll fallback to retrieve every field)
-        //         DelimiterStrategy::Regex(regex, trim_empty_delimiter_at_bounds)
-        //     }
-        //     #[cfg(not(feature = "regex"))]
-        //     {
-        //         unreachable!()
-        //     }
-        // } else {
-        //     let rfinder = memchr::memmem::FinderRev::new(&opt.delimiter).into_owned();
-        //     let len = opt.delimiter.len();
-        //     DelimiterStrategy::FixedRev(rfinder, len)
-        // };
 
         Ok(FieldPlan {
             positive_indices,
@@ -483,6 +507,15 @@ impl FieldPlan<RegexFinder, RegexFinder> {
     pub fn from_opt_regex(opt: &Opt, regex: Regex, trim_empty: bool) -> Result<Self> {
         let finder = RegexFinder::new(regex.clone(), trim_empty);
         let finder_rev = RegexFinder::new(regex, trim_empty);
+        Self::from_opt_with_finders(opt, finder, finder_rev)
+    }
+}
+
+impl FieldPlan<FixedGreedyFinder, FixedGreedyFinder> {
+    pub fn from_opt_fixed_greedy(opt: &Opt) -> Result<Self> {
+        let finder = FixedGreedyFinder::new(&opt.delimiter);
+        // XXX TODO fake implementation
+        let finder_rev = FixedGreedyFinder::new(&opt.delimiter);
         Self::from_opt_with_finders(opt, finder, finder_rev)
     }
 }

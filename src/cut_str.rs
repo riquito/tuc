@@ -367,6 +367,9 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
         {
             unreachable!()
         }
+    } else if opt.greedy_delimiter {
+        let mut plan = FieldPlan::from_opt_fixed_greedy(opt)?;
+        process_lines_with_plan(stdin, stdout, opt, &mut compressed_line_buf, &mut plan)
     } else {
         // Default memmem case
         let mut plan = FieldPlan::from_opt_memmem(opt)?;
