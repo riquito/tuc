@@ -294,6 +294,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         path,
         use_mmap,
         use_multibyte_str,
+        read_to_end: false,
     };
 
     if args.version {

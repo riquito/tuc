@@ -391,8 +391,8 @@ where
     F: DelimiterFinder,
     R: DelimiterFinder,
 {
-    match opt.eol {
-        EOL::Newline => stdin.for_byte_line(|line| {
+    match (opt.read_to_end, opt.eol) {
+        (false, EOL::Newline) => stdin.for_byte_line(|line| {
             let line = line.strip_suffix(&[opt.eol as u8]).unwrap_or(line);
             cut_str(
                 line,
@@ -405,7 +405,7 @@ where
             .map_err(|x| std::io::Error::other(x.to_string()))
             .and(Ok(true))
         })?,
-        EOL::Zero => stdin.for_byte_record(opt.eol.into(), |line| {
+        (false, EOL::Zero) => stdin.for_byte_record(opt.eol.into(), |line| {
             let line = line.strip_suffix(&[opt.eol as u8]).unwrap_or(line);
             cut_str(
                 line,
@@ -419,6 +419,19 @@ where
             .map_err(|x| std::io::Error::other(x.to_string()))
             .and(Ok(true))
         })?,
+        (true, _) => {
+            let mut line: Vec<u8> = Vec::new();
+            stdin.read_to_end(&mut line)?;
+            line.strip_suffix(opt.delimiter.as_slice()).unwrap_or(&line);
+            cut_str(
+                &line,
+                opt,
+                stdout,
+                compressed_line_buf,
+                &opt.delimiter,
+                plan,
+            )?
+        }
     }
     Ok(())
 }

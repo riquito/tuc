@@ -48,6 +48,7 @@ pub struct Opt {
     pub path: Option<PathBuf>,
     pub use_mmap: bool,
     pub use_multibyte_str: bool,
+    pub read_to_end: bool,
     #[cfg(feature = "regex")]
     pub regex_bag: Option<RegexBag>,
     #[cfg(not(feature = "regex"))]
@@ -76,6 +77,7 @@ impl Default for Opt {
             regex_bag: None,
             use_mmap: false,
             use_multibyte_str: false,
+            read_to_end: false,
         }
     }
 }
