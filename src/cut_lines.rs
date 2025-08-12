@@ -87,15 +87,13 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
 }
 
 fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> Result<()> {
-    let mut buffer: Vec<u8> = Vec::with_capacity(32 * 1024);
-    stdin.read_to_end(&mut buffer)?;
-
-    let eol = opt.eol as u8;
-    let buffer = buffer.strip_suffix(&[eol]).unwrap_or(&buffer);
+    unsafe {
+        let mutable_ptr = opt as *const Opt as *mut Opt;
+        (*mutable_ptr).read_to_end = true;
+    }
 
     // Just use read_and_cut_str, we're cutting a (big) string whose delimiter is newline
-    let mut input = Cursor::new(buffer);
-    read_and_cut_str(&mut input, stdout, opt)?;
+    read_and_cut_str(stdin, stdout, opt)?;
 
     Ok(())
 }
