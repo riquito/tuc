@@ -422,15 +422,8 @@ where
         (true, _) => {
             let mut line: Vec<u8> = Vec::new();
             stdin.read_to_end(&mut line)?;
-            line.strip_suffix(opt.delimiter.as_slice()).unwrap_or(&line);
-            cut_str(
-                &line,
-                opt,
-                stdout,
-                compressed_line_buf,
-                &opt.delimiter,
-                plan,
-            )?
+            let line = line.strip_suffix(opt.delimiter.as_slice()).unwrap_or(&line);
+            cut_str(line, opt, stdout, compressed_line_buf, &opt.delimiter, plan)?
         }
     }
     Ok(())
