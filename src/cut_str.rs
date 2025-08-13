@@ -4,7 +4,7 @@ use bstr::io::BufReadExt;
 use std::io::{BufRead, Write};
 
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList};
-use crate::multibyte_str::{DelimiterFinder, FieldPlan, MemmemFinder, MemmemRevFinder};
+use crate::finders::{DelimiterFinder, FieldPlan, MemmemFinder, MemmemRevFinder};
 use crate::options::{EOL, Opt, Trim};
 
 #[cfg(feature = "regex")]
