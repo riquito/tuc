@@ -64,8 +64,6 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     let maybe_bytes: Option<UserBoundsList> = pargs.opt_value_from_str(["-b", "--bytes"])?;
     let maybe_lines: Option<UserBoundsList> = pargs.opt_value_from_str(["-l", "--lines"])?;
 
-    let use_multibyte_str = pargs.contains("--multibyte-str");
-
     let bounds_type = if maybe_fields.is_some() {
         BoundsType::Fields
     } else if maybe_bytes.is_some() {
@@ -293,7 +291,6 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         regex_bag,
         path,
         use_mmap,
-        use_multibyte_str,
         read_to_end: false,
     };
 
