@@ -188,8 +188,6 @@ where
     }
 
     let line_holder: std::borrow::Cow<[u8]>;
-    let mut should_build_ranges_using_regex = opt.regex_bag.is_some() && cfg!(feature = "regex");
-    let mut delimiter = &opt.delimiter;
     let should_compress_delimiter = opt.compress_delimiter
         && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines);
 
@@ -197,14 +195,13 @@ where
         if opt.regex_bag.is_some() && cfg!(feature = "regex") {
             #[cfg(feature = "regex")]
             {
-                delimiter = opt.replace_delimiter.as_ref().unwrap(); // we checked earlier the invariant
+                let delimiter = opt.replace_delimiter.as_ref().unwrap(); // we checked earlier the invariant
                 line_holder = compress_delimiter_with_regex(
                     line,
                     &opt.regex_bag.as_ref().unwrap().greedy,
                     delimiter,
                 );
                 line = &line_holder;
-                should_build_ranges_using_regex = false;
             }
         } else {
             compress_delimiter(line, &opt.delimiter, compressed_line_buf);
