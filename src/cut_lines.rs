@@ -1,5 +1,5 @@
 use anyhow::{Result, bail};
-use std::io::{BufRead, Cursor, Write};
+use std::io::{BufRead, Write};
 
 use crate::bounds::{BoundOrFiller, Side, UserBoundsTrait};
 use crate::cut_str::read_and_cut_str;
