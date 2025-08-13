@@ -281,8 +281,7 @@ where
         };
 
         let field = plan.get_field(b, line.len());
-        let output = if field.is_ok() {
-            let field = field.unwrap();
+        let output = if let Ok(field) = field {
             let idx_start = field.start;
             let idx_end = field.end;
             &line[idx_start..idx_end]

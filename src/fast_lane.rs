@@ -102,8 +102,7 @@ fn output_parts<W: Write>(
 ) -> Result<()> {
     let r = b.try_into_range(fields.len() - 1);
 
-    let output = if r.is_ok() {
-        let r = r.unwrap();
+    let output = if let Ok(r) = r {
         let idx_start = fields[r.start];
         let idx_end = fields[r.end] - 1;
         &line[idx_start..idx_end]
