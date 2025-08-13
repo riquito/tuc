@@ -496,7 +496,7 @@ mod tests {
     }
 
     #[test]
-    fn cut_str_echo_non_delimited_strings() {
+    fn read_and_cut_str_echo_non_delimited_strings() {
         let opt = make_fields_opt();
 
         let line = b"foo";
@@ -516,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn cut_str_skip_non_delimited_strings_when_requested() {
+    fn read_and_cut_str_skip_non_delimited_strings_when_requested() {
         let mut opt = make_fields_opt();
 
         opt.only_delimited = true;
@@ -537,7 +537,7 @@ mod tests {
     }
 
     #[test]
-    fn cut_str_it_cut_a_field() {
+    fn read_and_cut_str_it_cut_a_field() {
         let mut opt = make_fields_opt();
         let (mut output, _) = make_cut_str_buffers();
 
@@ -550,7 +550,7 @@ mod tests {
     }
 
     #[test]
-    fn cut_str_it_cut_ranges() {
+    fn read_and_cut_str_it_cut_ranges() {
         let mut opt = make_fields_opt();
         let (mut output, _) = make_cut_str_buffers();
 
@@ -564,7 +564,7 @@ mod tests {
 
     #[cfg(feature = "regex")]
     #[test]
-    fn cut_str_regex_it_cut_a_field() {
+    fn read_and_cut_str_regex_it_cut_a_field() {
         let mut opt = make_fields_opt();
         let (mut output, _) = make_cut_str_buffers();
 
