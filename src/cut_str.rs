@@ -512,7 +512,7 @@ mod tests {
         let (mut output, _) = make_cut_str_buffers();
         let mut input = Cursor::new(line);
         read_and_cut_str(&mut input, &mut output, &opt).unwrap();
-        assert_eq!(output, b"\n".as_slice());
+        assert_eq!(output, b"".as_slice());
     }
 
     #[test]
