@@ -74,11 +74,11 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
     }
 
     // Output is finished. Did we output every bound?
-    if let Some(BoundOrFiller::Bound(b)) = opt.bounds.get(bounds_idx) {
-        if b.r != Side::Continue {
-            // not good, we still have bounds to print but the input is exhausted
-            bail!("Out of bounds: {}", b);
-        }
+    if let Some(BoundOrFiller::Bound(b)) = opt.bounds.get(bounds_idx)
+        && b.r != Side::Continue
+    {
+        // not good, we still have bounds to print but the input is exhausted
+        bail!("Out of bounds: {}", b);
     }
 
     stdout.write_all(&[opt.eol as u8])?;

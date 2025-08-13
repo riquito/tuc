@@ -248,9 +248,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
         .and_then(|x| x.to_str())
         .map(PathBuf::from);
 
-    if path.is_some() {
-        let some_path = path.as_ref().unwrap();
-
+    if let Some(some_path) = path.as_ref() {
         if !some_path.exists() {
             // Last argument should be a path, but if it looks like an option
             // (e.g. starts with a dash), we print a dedicated error message.

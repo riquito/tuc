@@ -174,6 +174,8 @@ impl<'a> Iterator for FieldsLocationsGreedy<'a> {
     }
 }
 
+type ExtractFunc<F, R> = fn(&[u8], &mut FieldPlan<F, R>) -> Result<Option<usize>>;
+
 pub struct FieldPlan<F, R>
 where
     F: DelimiterFinder,
@@ -183,7 +185,7 @@ where
     negative_indices: Vec<usize>,
     pub positive_fields: Vec<Range<usize>>,
     negative_fields: Vec<Range<usize>>,
-    pub extract_func: fn(&[u8], &mut FieldPlan<F, R>) -> Result<Option<usize>>,
+    pub extract_func: ExtractFunc<F, R>,
     finder: F,
     finder_rev: R,
 }
