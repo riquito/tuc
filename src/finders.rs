@@ -544,12 +544,17 @@ where
     // let's fill the negative fields.
     num_fields = plan.positive_fields.len();
 
-    // XXX TODO we are not "zeroing" with usize::umax the unmatched negative_indices
+    // XXX We are not "zeroing" with usize::umax the unmatched negative_indices
+    // after the first one encountered, can it be an issue?
 
     for i in 0..plan.negative_indices.len() {
         let desired_field = plan.negative_indices[i];
 
         if num_fields < desired_field + 1 {
+            plan.negative_fields[desired_field] = Range {
+                start: usize::MAX,
+                end: usize::MAX,
+            };
             bail!("Out of bounds: -{}", desired_field + 1);
         }
 
@@ -749,6 +754,43 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_positive_fields_with_fields_of_different_range() {
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("2").unwrap();
+
+        let line1 = b"a-b";
+        let line2 = b"foo-bar";
+        let line3 = b"baaz-hello";
+        let expected_pos_indices = vec![1];
+
+        // from_opt_mem
+        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        assert_eq!(plan.positive_indices, expected_pos_indices);
+
+        extract_fields_using_pos_indices(line1, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 2..3]);
+
+        extract_fields_using_pos_indices(line2, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 4..7]);
+
+        extract_fields_using_pos_indices(line3, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 5..10]);
+
+        // from_opt_fixed_greedy
+        let mut plan = FieldPlan::from_opt_fixed_greedy(&opt).unwrap();
+        assert_eq!(plan.positive_indices, expected_pos_indices);
+
+        extract_fields_using_pos_indices(line1, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 2..3]);
+
+        extract_fields_using_pos_indices(line2, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 4..7]);
+
+        extract_fields_using_pos_indices(line3, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 5..10]);
+    }
+
+    #[test]
     fn test_extract_negative_fields() {
         let mut opt = make_fields_opt();
         opt.bounds = UserBoundsList::from_str("-5,-4,-2").unwrap();
@@ -813,88 +855,50 @@ mod tests {
         assert_eq!(plan.negative_fields, expected_ranges);
     }
 
-    // #[test]
-    // fn test_fill_with_fields_locations() {
-    //     let mut v_range: Vec<Range<usize>> = Vec::new();
+    #[test]
+    fn test_extract_every_field() {
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("1,3,-3,-1").unwrap();
 
-    //     v_range.clear();
-    //     fill_with_fields_locations(&mut v_range, b"", b"-");
-    //     assert_eq!(v_range, vec![] as Vec<Range<usize>>);
+        let line = b"a-b-c-d";
+        let expected_pos_indices = vec![0, 2];
+        let expected_neg_indices = vec![0, 2];
+        let expected_pos_ranges = vec![0..1, 2..3, 4..5, 6..7];
+        let expected_neg_ranges = vec![6..7, usize::MAX..usize::MAX, 2..3];
 
-    //     v_range.clear();
-    //     fill_with_fields_locations(&mut v_range, b"a", b"-");
-    //     assert_eq!(v_range, vec![Range { start: 0, end: 1 }]);
+        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        assert_eq!(plan.positive_indices, expected_pos_indices);
+        assert_eq!(plan.negative_indices, expected_neg_indices);
+        extract_every_field(line, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, expected_pos_ranges);
+        assert_eq!(plan.negative_fields, expected_neg_ranges);
+    }
 
-    //     v_range.clear();
-    //     fill_with_fields_locations(&mut v_range, b"a-b", b"-");
-    //     assert_eq!(
-    //         v_range,
-    //         vec![Range { start: 0, end: 1 }, Range { start: 2, end: 3 }]
-    //     );
+    #[test]
+    fn test_extract_positive_fields_out_of_bound() {
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("2").unwrap();
 
-    //     v_range.clear();
-    //     fill_with_fields_locations(&mut v_range, b"-a-", b"-");
-    //     assert_eq!(
-    //         v_range,
-    //         vec![
-    //             Range { start: 0, end: 0 },
-    //             Range { start: 1, end: 2 },
-    //             Range { start: 3, end: 3 }
-    //         ]
-    //     );
+        let line1 = b"a-b";
+        let line2 = b"foo";
+        let line3 = b"baaz-hello";
+        let expected_pos_indices = vec![1];
 
-    //     v_range.clear();
-    //     fill_with_fields_locations(&mut v_range, b"a--", b"-");
-    //     assert_eq!(
-    //         v_range,
-    //         vec![
-    //             Range { start: 0, end: 1 },
-    //             Range { start: 2, end: 2 },
-    //             Range { start: 3, end: 3 }
-    //         ]
-    //     );
-    // }
+        // from_opt_mem
+        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        assert_eq!(plan.positive_indices, expected_pos_indices);
 
-    // #[test]
-    // fn test_fill_with_fields_locations_greedy() {
-    //     let mut v_range: Vec<Range<usize>> = Vec::new();
-    //     let empty_vec: Vec<Range<usize>> = vec![];
+        extract_fields_using_pos_indices(line1, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 2..3]);
 
-    //     v_range.clear();
-    //     fill_with_fields_locations_greedy(&mut v_range, b"", b"-");
-    //     assert_eq!(v_range, empty_vec);
+        let res = extract_fields_using_pos_indices(line2, &mut plan);
+        assert_eq!(res.unwrap_err().to_string(), "Out of bounds: 2");
+        assert_eq!(
+            plan.positive_fields,
+            vec![usize::MAX..usize::MAX, usize::MAX..usize::MAX]
+        );
 
-    //     v_range.clear();
-    //     fill_with_fields_locations_greedy(&mut v_range, b"a", b"-");
-    //     assert_eq!(v_range, vec![Range { start: 0, end: 1 }]);
-
-    //     v_range.clear();
-    //     fill_with_fields_locations_greedy(&mut v_range, b"-", b"-");
-    //     assert_eq!(
-    //         v_range,
-    //         vec![Range { start: 0, end: 0 }, Range { start: 1, end: 1 }]
-    //     );
-
-    //     v_range.clear();
-    //     fill_with_fields_locations_greedy(&mut v_range, b"-a--b", b"-");
-    //     assert_eq!(
-    //         v_range,
-    //         vec![
-    //             Range { start: 0, end: 0 },
-    //             Range { start: 1, end: 2 },
-    //             Range { start: 4, end: 5 }
-    //         ]
-    //     );
-
-    //     v_range.clear();
-    //     fill_with_fields_locations_greedy(&mut v_range, b"-a--", b"-");
-    //     assert_eq!(
-    //         v_range,
-    //         vec![
-    //             Range { start: 0, end: 0 },
-    //             Range { start: 1, end: 2 },
-    //             Range { start: 4, end: 4 }
-    //         ]
-    //     );
-    // }
+        extract_fields_using_pos_indices(line3, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 5..10]);
+    }
 }
