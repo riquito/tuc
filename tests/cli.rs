@@ -646,3 +646,25 @@ fn it_fails_if_fixed_memory_value_is_zero() {
         .failure()
         .stderr("tuc: runtime error. --fixed-memory cannot be 0\n");
 }
+
+#[test]
+fn it_checks_possible_regression_on_negative_indices_and_fallbacks() {
+    //printf "a-b-c\nd-e" | cargo run -- -e - -f {-3=ciao}
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["-d", "-", "-f", "{-3=hello}"])
+        .write_stdin("a-b-c\nd-e")
+        .assert();
+
+    assert.success().stdout("a\nhello\n");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd
+        .args(["-e", "-", "-f", "{-3=hello}"])
+        .write_stdin("a-b-c\nd-e")
+        .assert();
+
+    assert.success().stdout("a\nhello\n");
+}
