@@ -436,10 +436,10 @@ where
         let f_start = delim_iterator
             .nth(desired_field - seen)
             .ok_or_else(|| {
-                plan.positive_fields[desired_field] = Range {
+                plan.positive_fields[desired_field..].fill(Range {
                     start: usize::MAX,
                     end: usize::MAX,
-                };
+                });
                 anyhow::anyhow!("Out of bounds: {}", desired_field + 1)
             })?
             .end;
@@ -487,10 +487,10 @@ where
         let f_end = delim_iterator
             .nth(desired_field - seen)
             .ok_or_else(|| {
-                plan.negative_fields[desired_field] = Range {
+                plan.negative_fields[desired_field..].fill(Range {
                     start: usize::MAX,
                     end: usize::MAX,
-                };
+                });
                 anyhow::anyhow!("Out of bounds: -{}", desired_field + 1)
             })?
             .start;
@@ -544,18 +544,25 @@ where
     // let's fill the negative fields.
     num_fields = plan.positive_fields.len();
 
-    // XXX We are not "zeroing" with usize::umax the unmatched negative_indices
-    // after the first one encountered, can it be an issue?
+    let mut out_of_bound_pos_idx = None;
+    // Do we have any positive out of bounds?
+    if plan.positive_indices.last() > Some(&(num_fields - 1)) {
+        // need to find out which one is the first index out of bound
+        out_of_bound_pos_idx = plan.positive_indices.iter().find(|x| **x > num_fields - 1);
+    }
+
+    let mut out_of_bound_neg_idx = None;
 
     for i in 0..plan.negative_indices.len() {
         let desired_field = plan.negative_indices[i];
 
         if num_fields < desired_field + 1 {
-            plan.negative_fields[desired_field] = Range {
+            plan.negative_fields[desired_field..].fill(Range {
                 start: usize::MAX,
                 end: usize::MAX,
-            };
-            bail!("Out of bounds: -{}", desired_field + 1);
+            });
+            out_of_bound_neg_idx = Some(desired_field);
+            break;
         }
 
         let field = &plan.positive_fields[num_fields - desired_field - 1];
@@ -567,6 +574,14 @@ where
             start: f_start,
             end: f_end,
         };
+    }
+
+    if let Some(idx) = out_of_bound_pos_idx {
+        bail!("Out of bounds: {}", idx + 1);
+    }
+
+    if let Some(idx) = out_of_bound_neg_idx {
+        bail!("Out of bounds: -{}", idx + 1);
     }
 
     Ok(Some(num_fields))
@@ -869,7 +884,8 @@ mod tests {
         let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_pos_indices);
         assert_eq!(plan.negative_indices, expected_neg_indices);
-        extract_every_field(line, &mut plan).unwrap();
+        let num_fields = extract_every_field(line, &mut plan).unwrap();
+        assert_eq!(num_fields, Some(4));
         assert_eq!(plan.positive_fields, expected_pos_ranges);
         assert_eq!(plan.negative_fields, expected_neg_ranges);
     }
@@ -877,28 +893,159 @@ mod tests {
     #[test]
     fn test_extract_positive_fields_out_of_bound() {
         let mut opt = make_fields_opt();
-        opt.bounds = UserBoundsList::from_str("2").unwrap();
+        opt.bounds = UserBoundsList::from_str("2,3").unwrap();
 
-        let line1 = b"a-b";
+        let line1 = b"a-b-c";
         let line2 = b"foo";
-        let line3 = b"baaz-hello";
-        let expected_pos_indices = vec![1];
+        let line3 = b"baaz-hello-world";
+        let expected_pos_indices = vec![1, 2];
 
         // from_opt_mem
         let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_pos_indices);
 
         extract_fields_using_pos_indices(line1, &mut plan).unwrap();
-        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 2..3]);
+        assert_eq!(
+            plan.positive_fields,
+            vec![usize::MAX..usize::MAX, 2..3, 4..5]
+        );
 
         let res = extract_fields_using_pos_indices(line2, &mut plan);
         assert_eq!(res.unwrap_err().to_string(), "Out of bounds: 2");
         assert_eq!(
             plan.positive_fields,
-            vec![usize::MAX..usize::MAX, usize::MAX..usize::MAX]
+            vec![
+                usize::MAX..usize::MAX,
+                usize::MAX..usize::MAX,
+                usize::MAX..usize::MAX
+            ]
         );
 
         extract_fields_using_pos_indices(line3, &mut plan).unwrap();
-        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 5..10]);
+        assert_eq!(
+            plan.positive_fields,
+            vec![usize::MAX..usize::MAX, 5..10, 11..16]
+        );
+    }
+
+    #[test]
+    fn test_extract_negative_fields_out_of_bound() {
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("-2,-3").unwrap();
+
+        let line1 = b"a-b-c";
+        let line2 = b"foo";
+        let line3 = b"baaz-hello-world";
+        let expected_neg_indices = vec![1, 2];
+
+        // from_opt_mem
+        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        assert_eq!(plan.negative_indices, expected_neg_indices);
+
+        extract_fields_using_negative_indices(line1, &mut plan).unwrap();
+        assert_eq!(
+            plan.negative_fields,
+            vec![usize::MAX..usize::MAX, 2..3, 0..1]
+        );
+
+        let res = extract_fields_using_negative_indices(line2, &mut plan);
+        assert_eq!(res.unwrap_err().to_string(), "Out of bounds: -2");
+        assert_eq!(
+            plan.negative_fields,
+            vec![
+                usize::MAX..usize::MAX,
+                usize::MAX..usize::MAX,
+                usize::MAX..usize::MAX
+            ]
+        );
+
+        extract_fields_using_negative_indices(line3, &mut plan).unwrap();
+        assert_eq!(
+            plan.negative_fields,
+            vec![usize::MAX..usize::MAX, 5..10, 0..4]
+        );
+    }
+
+    #[test]
+    fn test_extract_every_field_out_of_bound_positive() {
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("2,3,-1").unwrap();
+
+        let line1 = b"a-b-c";
+        let line2 = b"foo";
+        let line3 = b"baaz-hello-world";
+        let expected_pos_indices = vec![1, 2];
+        let expected_neg_indices = vec![0];
+
+        // from_opt_mem
+        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        assert_eq!(plan.positive_indices, expected_pos_indices);
+        assert_eq!(plan.negative_indices, expected_neg_indices);
+
+        extract_every_field(line1, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![0..1, 2..3, 4..5]);
+        assert_eq!(plan.negative_fields, vec![4..5]);
+
+        let res = extract_every_field(line2, &mut plan);
+        assert_eq!(res.unwrap_err().to_string(), "Out of bounds: 2");
+        // Even if it was out of bounds, we expect extract_every_field
+        // to have filled all positive and negative fields anyway
+        // (because we may have fallbacks for the positive fields
+        // and later move to print the negatives).
+        assert_eq!(plan.positive_fields, vec![0..3]);
+        assert_eq!(plan.negative_fields, vec![0..3]);
+
+        extract_every_field(line3, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![0..4, 5..10, 11..16]);
+        // extract_every_field extract every positive field, but
+        // it keep only the necessary negative_fields around.
+        assert_eq!(plan.negative_fields, vec![11..16]);
+    }
+
+    #[test]
+    fn test_extract_every_field_out_of_bound_negative() {
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("-2,-3").unwrap();
+
+        let line1 = b"a-b-c";
+        let line2 = b"foo";
+        let line3 = b"baaz-hello-world";
+        let expected_pos_indices = Vec::<usize>::new();
+        let expected_neg_indices = vec![1, 2];
+
+        // from_opt_mem
+        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        assert_eq!(plan.positive_indices, expected_pos_indices);
+        assert_eq!(plan.negative_indices, expected_neg_indices);
+
+        extract_every_field(line1, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![0..1, 2..3, 4..5]);
+        assert_eq!(
+            plan.negative_fields,
+            vec![usize::MAX..usize::MAX, 2..3, 0..1]
+        );
+
+        let res = extract_every_field(line2, &mut plan);
+        assert_eq!(res.unwrap_err().to_string(), "Out of bounds: -2");
+        // Even if it was out of bounds, we expect extract_every_field
+        // to have filled all positive fields anyway
+        // (because we may have fallbacks for the positive fields
+        // and later move to print the negatives).
+        assert_eq!(plan.positive_fields, vec![0..3]);
+        assert_eq!(
+            plan.negative_fields,
+            vec![
+                usize::MAX..usize::MAX,
+                usize::MAX..usize::MAX,
+                usize::MAX..usize::MAX
+            ]
+        );
+
+        extract_every_field(line3, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, vec![0..4, 5..10, 11..16]);
+        assert_eq!(
+            plan.negative_fields,
+            vec![usize::MAX..usize::MAX, 5..10, 0..4]
+        );
     }
 }
