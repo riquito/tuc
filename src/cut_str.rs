@@ -4,8 +4,9 @@ use bstr::io::BufReadExt;
 use std::io::{BufRead, Write};
 
 use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList};
-use crate::finders::{DelimiterFinder, FieldPlan, MemmemFinder, MemmemRevFinder};
+use crate::finders::common::DelimiterFinder;
 use crate::options::{EOL, Opt, Trim};
+use crate::plan::FieldPlan;
 
 #[cfg(feature = "regex")]
 use regex::bytes::Regex;
@@ -342,14 +343,11 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
     });
 
     if should_compress_delimiter && maybe_regex.is_some() && opt.replace_delimiter.is_some() {
-        // Special case: compressed delimiter with regex and replacement
-        // This would need a custom plan type for the replacement delimiter
+        // Special case: compressed delimiter with regex and replacement.
+        // We setup now a plan to search later for the new delimiter. Before we
+        // search we will have used the regex to replace the delimiter.
         let replace_delimiter = opt.replace_delimiter.as_ref().unwrap();
-        let mut plan = FieldPlan::from_opt_with_finders(
-            opt,
-            MemmemFinder::new(replace_delimiter),
-            MemmemRevFinder::new(replace_delimiter),
-        )?;
+        let mut plan = FieldPlan::from_opt_fixed_with_custom_delimiter(opt, replace_delimiter)?;
 
         process_lines_with_plan(stdin, stdout, opt, &mut compressed_line_buf, &mut plan)
     } else if let Some(regex) = maybe_regex {
@@ -368,7 +366,7 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
         process_lines_with_plan(stdin, stdout, opt, &mut compressed_line_buf, &mut plan)
     } else {
         // Default memmem case
-        let mut plan = FieldPlan::from_opt_memmem(opt)?;
+        let mut plan = FieldPlan::from_opt_fixed(opt)?;
         process_lines_with_plan(stdin, stdout, opt, &mut compressed_line_buf, &mut plan)
     }
 }

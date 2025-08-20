@@ -1,250 +1,18 @@
 use std::ops::Range;
 
+#[cfg(feature = "regex")]
+use crate::finders::regex::RegexFinder;
 use crate::{
     bounds::{BoundOrFiller, BoundsType, Side, UserBounds},
+    finders::{
+        common::DelimiterFinder,
+        fixed::{FixedFinder, FixedFinderRev},
+        fixed_greedy::{FixedGreedyFinder, FixedGreedyFinderRev},
+    },
     options::Opt,
 };
 use anyhow::{Result, bail};
 use regex::bytes::Regex;
-
-pub trait DelimiterFinder {
-    type Iter<'a>: Iterator<Item = Range<usize>> + 'a
-    where
-        Self: 'a;
-    fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a>;
-}
-
-pub struct MemmemFinder {
-    finder: memchr::memmem::Finder<'static>,
-    len: usize,
-}
-
-impl MemmemFinder {
-    pub fn new(pattern: &[u8]) -> Self {
-        Self {
-            finder: memchr::memmem::Finder::new(pattern).into_owned(),
-            len: pattern.len(),
-        }
-    }
-}
-
-impl DelimiterFinder for MemmemFinder {
-    type Iter<'a> =
-        std::iter::Map<memchr::memmem::FindIter<'a, 'a>, Box<dyn Fn(usize) -> Range<usize> + 'a>>;
-
-    fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a> {
-        let len = self.len;
-        self.finder
-            .find_iter(line)
-            .map(Box::new(move |idx| idx..idx + len))
-    }
-}
-
-pub struct MemmemRevFinder {
-    finder: memchr::memmem::FinderRev<'static>,
-    len: usize,
-}
-
-impl MemmemRevFinder {
-    pub fn new(pattern: &[u8]) -> Self {
-        Self {
-            finder: memchr::memmem::FinderRev::new(pattern).into_owned(),
-            len: pattern.len(),
-        }
-    }
-}
-
-impl DelimiterFinder for MemmemRevFinder {
-    type Iter<'a> = std::iter::Map<
-        memchr::memmem::FindRevIter<'a, 'a>,
-        Box<dyn Fn(usize) -> Range<usize> + 'a>,
-    >;
-
-    fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a> {
-        let len = self.len;
-        self.finder
-            .rfind_iter(line)
-            .map(Box::new(move |idx| idx..idx + len))
-    }
-}
-
-#[cfg(feature = "regex")]
-pub struct RegexFinder {
-    regex: Regex,
-    trim_empty: bool,
-}
-
-#[cfg(feature = "regex")]
-impl RegexFinder {
-    pub fn new(regex: Regex, trim_empty: bool) -> Self {
-        Self { regex, trim_empty }
-    }
-}
-
-#[cfg(feature = "regex")]
-impl DelimiterFinder for RegexFinder {
-    type Iter<'a> = Box<dyn Iterator<Item = Range<usize>> + 'a>;
-
-    fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a> {
-        if self.trim_empty {
-            let line_len = line.len();
-            Box::new(
-                self.regex
-                    .find_iter(line)
-                    .filter(move |m| {
-                        !((m.start() == 0 && m.end() == 0)
-                            || (m.start() == line_len && m.end() == line_len))
-                    })
-                    .map(|m| m.start()..m.end()),
-            )
-        } else {
-            Box::new(self.regex.find_iter(line).map(|m| m.start()..m.end()))
-        }
-    }
-}
-
-pub struct FixedGreedyFinder {
-    finder: memchr::memmem::Finder<'static>,
-    len: usize,
-}
-
-impl FixedGreedyFinder {
-    pub fn new(pattern: &[u8]) -> Self {
-        Self {
-            finder: memchr::memmem::Finder::new(pattern).into_owned(),
-            len: pattern.len(),
-        }
-    }
-}
-
-impl DelimiterFinder for FixedGreedyFinder {
-    type Iter<'a> = FieldsLocationsGreedy<'a>;
-
-    fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a> {
-        let iter = self.finder.find_iter(line);
-        FieldsLocationsGreedy::new(iter, self.len)
-    }
-}
-
-pub struct FieldsLocationsGreedy<'a> {
-    iter: std::iter::Peekable<memchr::memmem::FindIter<'a, 'a>>,
-    delimiter_len: usize,
-    current_pos: usize,
-    finished: bool,
-}
-
-impl<'a> FieldsLocationsGreedy<'a> {
-    fn new(iter: memchr::memmem::FindIter<'a, 'a>, delimiter_len: usize) -> Self {
-        Self {
-            iter: iter.peekable(),
-            delimiter_len,
-            current_pos: 0,
-            finished: false,
-        }
-    }
-}
-
-impl<'a> Iterator for FieldsLocationsGreedy<'a> {
-    type Item = Range<usize>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.finished {
-            return None;
-        }
-
-        // Look for the delimiter in the remaining portion
-        if let Some(idx) = self.iter.next() {
-            let start_delimiter = idx;
-            self.current_pos = start_delimiter + self.delimiter_len;
-
-            // Skip any consecutive delimiters (greedy behavior)
-            while self.iter.peek() == Some(&self.current_pos) {
-                self.iter.next();
-                self.current_pos += self.delimiter_len;
-            }
-
-            Some(Range {
-                start: start_delimiter,
-                end: self.current_pos,
-            })
-        } else {
-            // No more delimiters found
-            self.finished = true;
-            None
-        }
-    }
-}
-
-pub struct FixedGreedyRevFinder {
-    finder: memchr::memmem::FinderRev<'static>,
-    len: usize,
-}
-
-impl FixedGreedyRevFinder {
-    pub fn new(pattern: &[u8]) -> Self {
-        Self {
-            finder: memchr::memmem::FinderRev::new(pattern).into_owned(),
-            len: pattern.len(),
-        }
-    }
-}
-
-impl DelimiterFinder for FixedGreedyRevFinder {
-    type Iter<'a> = FieldsLocationsGreedyRev<'a>;
-
-    fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a> {
-        let iter = self.finder.rfind_iter(line);
-        FieldsLocationsGreedyRev::new(iter, self.len)
-    }
-}
-
-pub struct FieldsLocationsGreedyRev<'a> {
-    iter: std::iter::Peekable<memchr::memmem::FindRevIter<'a, 'a>>,
-    delimiter_len: usize,
-    current_pos: usize,
-    finished: bool,
-}
-
-impl<'a> FieldsLocationsGreedyRev<'a> {
-    fn new(iter: memchr::memmem::FindRevIter<'a, 'a>, delimiter_len: usize) -> Self {
-        Self {
-            iter: iter.peekable(),
-            delimiter_len,
-            current_pos: 0,
-            finished: false,
-        }
-    }
-}
-
-impl<'a> Iterator for FieldsLocationsGreedyRev<'a> {
-    type Item = Range<usize>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.finished {
-            return None;
-        }
-
-        // Look for the delimiter in the remaining portion
-        if let Some(idx) = self.iter.next() {
-            let end_delimiter = idx + self.delimiter_len;
-            self.current_pos = idx;
-
-            // Skip any consecutive delimiters (greedy behavior)
-            while self.iter.peek() == Some(&(self.current_pos - self.delimiter_len)) {
-                self.current_pos = self.iter.next().unwrap();
-            }
-
-            Some(Range {
-                start: self.current_pos,
-                end: end_delimiter,
-            })
-        } else {
-            // No more delimiters found
-            self.finished = true;
-            None
-        }
-    }
-}
 
 type ExtractFunc<F, R> = fn(&[u8], &mut FieldPlan<F, R>) -> Result<Option<usize>>;
 
@@ -406,7 +174,7 @@ where
     }
 }
 
-pub fn extract_fields_using_pos_indices<F, R>(
+fn extract_fields_using_pos_indices<F, R>(
     line: &[u8],
     plan: &mut FieldPlan<F, R>,
 ) -> Result<Option<usize>>
@@ -588,10 +356,22 @@ where
 }
 
 // Convenience constructor functions
-impl FieldPlan<MemmemFinder, MemmemRevFinder> {
-    pub fn from_opt_memmem(opt: &Opt) -> Result<Self> {
-        let finder = MemmemFinder::new(&opt.delimiter);
-        let finder_rev = MemmemRevFinder::new(&opt.delimiter);
+impl FieldPlan<FixedFinder, FixedFinderRev> {
+    pub fn from_opt_fixed(opt: &Opt) -> Result<Self> {
+        Self::from_opt_fixed_with_custom_delimiter(opt, &opt.delimiter)
+    }
+
+    pub fn from_opt_fixed_with_custom_delimiter(opt: &Opt, delimiter: &[u8]) -> Result<Self> {
+        let finder = FixedFinder::new(delimiter);
+        let finder_rev = FixedFinderRev::new(delimiter);
+        Self::from_opt_with_finders(opt, finder, finder_rev)
+    }
+}
+
+impl FieldPlan<FixedGreedyFinder, FixedGreedyFinderRev> {
+    pub fn from_opt_fixed_greedy(opt: &Opt) -> Result<Self> {
+        let finder = FixedGreedyFinder::new(&opt.delimiter);
+        let finder_rev = FixedGreedyFinderRev::new(&opt.delimiter);
         Self::from_opt_with_finders(opt, finder, finder_rev)
     }
 }
@@ -600,24 +380,16 @@ impl FieldPlan<MemmemFinder, MemmemRevFinder> {
 impl FieldPlan<RegexFinder, RegexFinder> {
     pub fn from_opt_regex(opt: &Opt, regex: Regex, trim_empty: bool) -> Result<Self> {
         let finder = RegexFinder::new(regex.clone(), trim_empty);
-        // XXX TBD we are not going to actually use it,
-        // because it's always used alongside extract_every_field?
-        // (can we make it more obvious?)
+        // XXX TBD We are not actually going to use "finder_rev"
+        // because regexes can't search backwards (I'm simplifying).
+        // Is there a way to avoid the fake finder?
         let finder_rev = RegexFinder::new(regex, trim_empty);
         Self::from_opt_with_finders(opt, finder, finder_rev)
     }
 }
 
-impl FieldPlan<FixedGreedyFinder, FixedGreedyRevFinder> {
-    pub fn from_opt_fixed_greedy(opt: &Opt) -> Result<Self> {
-        let finder = FixedGreedyFinder::new(&opt.delimiter);
-        let finder_rev = FixedGreedyRevFinder::new(&opt.delimiter);
-        Self::from_opt_with_finders(opt, finder, finder_rev)
-    }
-}
-
 // Type aliases for common configurations
-pub type MemmemFieldPlan = FieldPlan<MemmemFinder, MemmemRevFinder>;
+pub type FixedFieldPlan = FieldPlan<FixedFinder, FixedFinderRev>;
 
 #[cfg(feature = "regex")]
 pub type RegexFieldPlan = FieldPlan<RegexFinder, RegexFinder>;
@@ -644,7 +416,7 @@ mod tests {
         opt.delimiter = "--".into();
         opt.bounds = UserBoundsList::from_str("1,2,3").unwrap();
 
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert!(extract_fields_using_pos_indices(line, &mut plan).is_ok());
         assert_eq!(plan.positive_fields, vec![0..1, 3..4, 6..7]);
     }
@@ -657,7 +429,7 @@ mod tests {
         opt.delimiter = "--".into();
         opt.bounds = UserBoundsList::from_str("3,1").unwrap();
 
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert!(extract_fields_using_pos_indices(line, &mut plan).is_ok());
         assert_eq!(plan.positive_fields[2], 10..13);
         assert_eq!(plan.positive_fields[0], 0..3);
@@ -671,7 +443,7 @@ mod tests {
         opt.delimiter = "==".into();
         opt.bounds = UserBoundsList::from_str("1,4").unwrap();
 
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         let result = extract_fields_using_pos_indices(line, &mut plan);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), "Out of bounds: 4");
@@ -685,7 +457,7 @@ mod tests {
         opt.delimiter = "--".into();
         opt.bounds = UserBoundsList::from_str("1").unwrap();
 
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
 
         assert!(extract_fields_using_pos_indices(line, &mut plan).is_ok());
         assert_eq!(plan.positive_fields, vec![0..11]);
@@ -697,7 +469,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.bounds = UserBoundsList::from_str("1,2,4").unwrap();
 
-        let plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0, 1, 3]);
     }
 
@@ -707,7 +479,7 @@ mod tests {
         opt.delimiter = "--".into();
         opt.bounds = UserBoundsList::from_str("2:3,1").unwrap();
 
-        let plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0, 1, 2]);
     }
 
@@ -716,7 +488,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.bounds = UserBoundsList::from_str("4:5,:2").unwrap();
 
-        let plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0, 1, 3, 4]);
     }
 
@@ -725,7 +497,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.bounds = UserBoundsList::from_str("1:2,2:3").unwrap();
 
-        let plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         // 1:2 gives 0,1; 2:3 gives 1,2; deduped order: 0,1,2
         assert_eq!(plan.positive_indices, vec![0, 1, 2]);
     }
@@ -737,7 +509,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.bounds = UserBoundsList::from_str("1:-1").unwrap();
 
-        let plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0]);
         assert_eq!(plan.negative_indices, vec![0]);
     }
@@ -751,7 +523,7 @@ mod tests {
         let expected_indices = vec![0, 1, 3];
         let expected_ranges = vec![0..1, 2..3, usize::MAX..usize::MAX, 6..7];
 
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_indices);
         extract_fields_using_pos_indices(line, &mut plan).unwrap();
         assert_eq!(plan.positive_fields, expected_ranges);
@@ -779,7 +551,7 @@ mod tests {
         let expected_pos_indices = vec![1];
 
         // from_opt_mem
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_pos_indices);
 
         extract_fields_using_pos_indices(line1, &mut plan).unwrap();
@@ -820,7 +592,7 @@ mod tests {
             0..1,
         ];
 
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.negative_indices, expected_indices);
         extract_fields_using_negative_indices(line, &mut plan).unwrap();
         assert_eq!(plan.negative_fields, expected_ranges);
@@ -881,7 +653,7 @@ mod tests {
         let expected_pos_ranges = vec![0..1, 2..3, 4..5, 6..7];
         let expected_neg_ranges = vec![6..7, usize::MAX..usize::MAX, 2..3];
 
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_pos_indices);
         assert_eq!(plan.negative_indices, expected_neg_indices);
         let num_fields = extract_every_field(line, &mut plan).unwrap();
@@ -901,7 +673,7 @@ mod tests {
         let expected_pos_indices = vec![1, 2];
 
         // from_opt_mem
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_pos_indices);
 
         extract_fields_using_pos_indices(line1, &mut plan).unwrap();
@@ -939,7 +711,7 @@ mod tests {
         let expected_neg_indices = vec![1, 2];
 
         // from_opt_mem
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.negative_indices, expected_neg_indices);
 
         extract_fields_using_negative_indices(line1, &mut plan).unwrap();
@@ -978,7 +750,7 @@ mod tests {
         let expected_neg_indices = vec![0];
 
         // from_opt_mem
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_pos_indices);
         assert_eq!(plan.negative_indices, expected_neg_indices);
 
@@ -1014,7 +786,7 @@ mod tests {
         let expected_neg_indices = vec![1, 2];
 
         // from_opt_mem
-        let mut plan = FieldPlan::from_opt_memmem(&opt).unwrap();
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_pos_indices);
         assert_eq!(plan.negative_indices, expected_neg_indices);
 
