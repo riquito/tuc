@@ -16,6 +16,7 @@ use regex::bytes::Regex;
 
 type ExtractFunc<F, R> = fn(&[u8], &mut FieldPlan<F, R>) -> Result<Option<usize>>;
 
+#[derive(Debug)]
 pub struct FieldPlan<F, R>
 where
     F: DelimiterFinder,
@@ -409,6 +410,22 @@ mod tests {
     }
 
     #[test]
+    fn extract_fields_should_fail_if_without_bounds() {
+        let mut opt = make_fields_opt();
+        opt.delimiter = "--".into();
+        opt.bounds = UserBoundsList {
+            list: Vec::new(),
+            last_interesting_field: Side::Continue,
+        };
+
+        let maybe_plan = FieldPlan::from_opt_fixed(&opt);
+        assert_eq!(
+            maybe_plan.unwrap_err().to_string(),
+            "No indices found in bounds"
+        );
+    }
+
+    #[test]
     fn extract_fields_basic() {
         let line = b"a--b--c";
 
@@ -512,6 +529,37 @@ mod tests {
         let plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, vec![0]);
         assert_eq!(plan.negative_indices, vec![0]);
+    }
+
+    #[test]
+    fn extract_empty_line() {
+        let mut opt = make_fields_opt();
+        opt.bounds = UserBoundsList::from_str("1,-1").unwrap();
+
+        let line = b"";
+        let expected_pos_indices = vec![0];
+        let expected_neg_indices = vec![0];
+        #[allow(clippy::single_range_in_vec_init)]
+        let expected_ranges = vec![usize::MAX..usize::MAX];
+
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
+        assert_eq!(plan.positive_indices, expected_pos_indices);
+        assert_eq!(plan.negative_indices, expected_neg_indices);
+        extract_fields_using_pos_indices(line, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, expected_ranges);
+
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
+        assert_eq!(plan.positive_indices, expected_neg_indices);
+        assert_eq!(plan.negative_indices, expected_neg_indices);
+        extract_fields_using_negative_indices(line, &mut plan).unwrap();
+        assert_eq!(plan.positive_fields, expected_ranges);
+
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
+        assert_eq!(plan.positive_indices, expected_pos_indices);
+        assert_eq!(plan.negative_indices, expected_neg_indices);
+        let res = extract_every_field(line, &mut plan).unwrap();
+        assert_eq!(res, Some(0));
+        assert_eq!(plan.positive_fields, expected_ranges);
     }
 
     #[test]
@@ -819,5 +867,35 @@ mod tests {
             plan.negative_fields,
             vec![usize::MAX..usize::MAX, 5..10, 0..4]
         );
+    }
+
+    #[test]
+    fn test_get_field() {
+        let opt = make_fields_opt();
+
+        let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
+
+        let line = "foo-bar-baz";
+        // simulate search, we're not testing that here
+        plan.positive_fields = vec![0..3, 4..7, 8..11];
+        plan.negative_fields = vec![8..11, 4..7, 0..3];
+
+        let b = UserBounds::from_str("1").unwrap();
+        assert_eq!(plan.get_field(&b, line.len()).unwrap(), 0..3);
+
+        let b = UserBounds::from_str(":2").unwrap();
+        assert_eq!(plan.get_field(&b, line.len()).unwrap(), 0..7);
+
+        let b = UserBounds::from_str("2:").unwrap();
+        assert_eq!(plan.get_field(&b, line.len()).unwrap(), 4..11);
+
+        let b = UserBounds::from_str("-1").unwrap();
+        assert_eq!(plan.get_field(&b, line.len()).unwrap(), 8..11);
+
+        let b = UserBounds::from_str(":-2").unwrap();
+        assert_eq!(plan.get_field(&b, line.len()).unwrap(), 0..7);
+
+        let b = UserBounds::from_str("-2:").unwrap();
+        assert_eq!(plan.get_field(&b, line.len()).unwrap(), 4..11);
     }
 }
