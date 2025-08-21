@@ -1,6 +1,7 @@
 use crate::finders::common::DelimiterFinder;
 use std::ops::Range;
 
+#[derive(Debug)]
 pub struct FixedFinder {
     finder: memchr::memmem::Finder<'static>,
     len: usize,
@@ -27,6 +28,7 @@ impl DelimiterFinder for FixedFinder {
     }
 }
 
+#[derive(Debug)]
 pub struct FixedFinderRev {
     finder: memchr::memmem::FinderRev<'static>,
     len: usize,
