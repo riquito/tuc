@@ -128,7 +128,9 @@ impl<'a> Iterator for FieldsLocationsGreedyRev<'a> {
             self.current_pos = idx;
 
             // Skip any consecutive delimiters (greedy behavior)
-            while self.iter.peek() == Some(&(self.current_pos - self.delimiter_len)) {
+            while self.current_pos >= self.delimiter_len
+                && self.iter.peek() == Some(&(self.current_pos - self.delimiter_len))
+            {
                 self.current_pos = self.iter.next().unwrap();
             }
 
@@ -141,5 +143,204 @@ impl<'a> Iterator for FieldsLocationsGreedyRev<'a> {
             self.finished = true;
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn forward_small_delimiter_empty_line() {
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"").collect();
+        assert_eq!(Vec::<Range<usize>>::new(), result);
+    }
+
+    #[test]
+    fn forward_small_delimiter_only_delimiter() {
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"-").collect();
+        assert_eq!(vec![0..1], result);
+    }
+
+    #[test]
+    fn forward_small_delimiter_regular_scenarios() {
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a").collect();
+        assert_eq!(Vec::<Range<usize>>::new(), result);
+
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a-b").collect();
+        assert_eq!(vec![1..2], result);
+
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a-b-c").collect();
+        assert_eq!(vec![1..2, 3..4], result);
+
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a-b-c-").collect();
+        assert_eq!(vec![1..2, 3..4, 5..6], result);
+
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"-a-b-c").collect();
+        assert_eq!(vec![0..1, 2..3, 4..5], result);
+    }
+
+    #[test]
+    fn forward_small_delimiter_only_delimiter_greedy() {
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"--").collect();
+        assert_eq!(vec![0..2], result);
+    }
+
+    #[test]
+    fn forward_small_delimiter_regular_scenarios_greedy() {
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a").collect();
+        assert_eq!(Vec::<Range<usize>>::new(), result);
+
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a--b").collect();
+        assert_eq!(vec![1..3], result);
+
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a--b--c").collect();
+        assert_eq!(vec![1..3, 4..6], result);
+
+        let finder = FixedGreedyFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a--b--c--").collect();
+        assert_eq!(vec![1..3, 4..6, 7..9], result);
+        let finder = FixedGreedyFinder::new(b"-");
+
+        let result: Vec<Range<usize>> = finder.find_ranges(b"--a--b--c").collect();
+        assert_eq!(vec![0..2, 3..5, 6..8], result);
+    }
+
+    #[test]
+    fn forward_big_delimiter_only_delimiter_greedy() {
+        let finder = FixedGreedyFinder::new(b"--");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"----").collect();
+        assert_eq!(vec![0..4], result);
+    }
+
+    #[test]
+    fn forward_big_delimiter_regular_scenarios_greedy() {
+        let finder = FixedGreedyFinder::new(b"--");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a").collect();
+        assert_eq!(Vec::<Range<usize>>::new(), result);
+
+        let finder = FixedGreedyFinder::new(b"--");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a----b").collect();
+        assert_eq!(vec![1..5], result);
+
+        let finder = FixedGreedyFinder::new(b"--");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a----b----c").collect();
+        assert_eq!(vec![1..5, 6..10], result);
+
+        let finder = FixedGreedyFinder::new(b"--");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a----b----c----").collect();
+        assert_eq!(vec![1..5, 6..10, 11..15], result);
+        let finder = FixedGreedyFinder::new(b"--");
+
+        let result: Vec<Range<usize>> = finder.find_ranges(b"----a----b----c").collect();
+        assert_eq!(vec![0..4, 5..9, 10..14], result);
+    }
+
+    #[test]
+    fn backward_small_delimiter_empty_line() {
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"").collect();
+        assert_eq!(Vec::<Range<usize>>::new(), result);
+    }
+
+    #[test]
+    fn backward_small_delimiter_only_delimiter() {
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"-").collect();
+        assert_eq!(vec![0..1], result);
+    }
+
+    #[test]
+    fn backward_small_delimiter_regular_scenarios() {
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a").collect();
+        assert_eq!(Vec::<Range<usize>>::new(), result);
+
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a-b").collect();
+        assert_eq!(vec![1..2], result);
+
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a-b-c").collect();
+        assert_eq!(vec![3..4, 1..2], result);
+
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a-b-c-").collect();
+        assert_eq!(vec![5..6, 3..4, 1..2], result);
+
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"-a-b-c").collect();
+        assert_eq!(vec![4..5, 2..3, 0..1], result);
+    }
+
+    #[test]
+    fn backward_small_delimiter_only_delimiter_greedy() {
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"--").collect();
+        assert_eq!(vec![0..2], result);
+    }
+
+    #[test]
+    fn backward_small_delimiter_regular_scenarios_greedy() {
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a").collect();
+        assert_eq!(Vec::<Range<usize>>::new(), result);
+
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a--b").collect();
+        assert_eq!(vec![1..3], result);
+
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a--b--c").collect();
+        assert_eq!(vec![4..6, 1..3], result);
+
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a--b--c--").collect();
+        assert_eq!(vec![7..9, 4..6, 1..3], result);
+
+        let finder = FixedGreedyFinderRev::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"--a--b--c").collect();
+        assert_eq!(vec![6..8, 3..5, 0..2], result);
+    }
+
+    #[test]
+    fn backward_big_delimiter_only_delimiter_greedy() {
+        let finder = FixedGreedyFinderRev::new(b"--");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"----").collect();
+        assert_eq!(vec![0..4], result);
+    }
+
+    #[test]
+    fn backward_big_delimiter_regular_scenarios_greedy() {
+        let finder = FixedGreedyFinderRev::new(b"--");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a").collect();
+        assert_eq!(Vec::<Range<usize>>::new(), result);
+
+        let finder = FixedGreedyFinderRev::new(b"--");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a----b").collect();
+        assert_eq!(vec![1..5], result);
+
+        let finder = FixedGreedyFinderRev::new(b"--");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a----b----c").collect();
+        assert_eq!(vec![6..10, 1..5], result);
+
+        let finder = FixedGreedyFinderRev::new(b"--");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a----b----c----").collect();
+        assert_eq!(vec![11..15, 6..10, 1..5], result);
+
+        let finder = FixedGreedyFinderRev::new(b"--");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"----a----b----c").collect();
+        assert_eq!(vec![10..14, 5..9, 0..4], result);
     }
 }
