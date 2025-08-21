@@ -379,11 +379,11 @@ impl FieldPlan<FixedGreedyFinder, FixedGreedyFinderRev> {
 #[cfg(feature = "regex")]
 impl FieldPlan<RegexFinder, RegexFinder> {
     pub fn from_opt_regex(opt: &Opt, regex: Regex, trim_empty: bool) -> Result<Self> {
-        let finder = RegexFinder::new(regex.clone(), trim_empty);
+        let finder = RegexFinder::new_with_trim(regex.clone(), trim_empty);
         // XXX TBD We are not actually going to use "finder_rev"
         // because regexes can't search backwards (I'm simplifying).
         // Is there a way to avoid the fake finder?
-        let finder_rev = RegexFinder::new(regex, trim_empty);
+        let finder_rev = RegexFinder::new_with_trim(regex, trim_empty);
         Self::from_opt_with_finders(opt, finder, finder_rev)
     }
 }
