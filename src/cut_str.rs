@@ -334,6 +334,7 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
     let should_compress_delimiter = opt.compress_delimiter
         && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines);
 
+    #[cfg(feature = "regex")]
     let maybe_regex = opt.regex_bag.as_ref().map(|x| {
         if opt.greedy_delimiter {
             &x.greedy
@@ -341,6 +342,8 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
             &x.normal
         }
     });
+    #[cfg(not(feature = "regex"))]
+    let maybe_regex: Option<()> = None;
 
     if should_compress_delimiter && maybe_regex.is_some() && opt.replace_delimiter.is_some() {
         // Special case: compressed delimiter with regex and replacement.

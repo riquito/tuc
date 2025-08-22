@@ -2,6 +2,9 @@ use std::ops::Range;
 
 #[cfg(feature = "regex")]
 use crate::finders::regex::RegexFinder;
+#[cfg(feature = "regex")]
+use regex::bytes::Regex;
+
 use crate::{
     bounds::{BoundOrFiller, BoundsType, Side, UserBounds},
     finders::{
@@ -12,7 +15,6 @@ use crate::{
     options::Opt,
 };
 use anyhow::{Result, bail};
-use regex::bytes::Regex;
 
 type ExtractFunc<F, R> = fn(&[u8], &mut FieldPlan<F, R>) -> Result<Option<usize>>;
 
@@ -44,6 +46,7 @@ where
             || opt.json
             || (opt.bounds_type == BoundsType::Characters && opt.replace_delimiter.is_some());
 
+        #[cfg(feature = "regex")]
         let maybe_regex: Option<&Regex> = opt.regex_bag.as_ref().map(|x| {
             if opt.greedy_delimiter {
                 &x.greedy
@@ -99,6 +102,7 @@ where
             match (!positive_indices.is_empty(), !negative_indices.is_empty()) {
                 (false, false) => bail!("No indices found in bounds"), // invariant, shouldn't occur
                 (true, false) => extract_fields_using_pos_indices,
+                #[cfg(feature = "regex")]
                 (_, true) if maybe_regex.is_some() => {
                     // I can't reverse search a regex, so if there are negative indices,
                     // I'll have to search for every field.
@@ -581,11 +585,14 @@ mod tests {
         extract_fields_using_pos_indices(line, &mut plan).unwrap();
         assert_eq!(plan.positive_fields, expected_ranges);
 
-        let re = Regex::new("-").unwrap();
-        let mut plan = FieldPlan::from_opt_regex(&opt, re, false).unwrap();
-        assert_eq!(plan.positive_indices, expected_indices);
-        extract_fields_using_pos_indices(line, &mut plan).unwrap();
-        assert_eq!(plan.positive_fields, expected_ranges);
+        #[cfg(feature = "regex")]
+        {
+            let re = Regex::new("-").unwrap();
+            let mut plan = FieldPlan::from_opt_regex(&opt, re, false).unwrap();
+            assert_eq!(plan.positive_indices, expected_indices);
+            extract_fields_using_pos_indices(line, &mut plan).unwrap();
+            assert_eq!(plan.positive_fields, expected_ranges);
+        }
     }
 
     #[test]
