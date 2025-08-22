@@ -300,7 +300,7 @@ fn parse_args() -> Result<Opt, pico_args::Error> {
     Ok(args)
 }
 
-fn main() -> Result<()> {
+fn run() -> Result<()> {
     let opt: Opt = parse_args()?;
 
     let mut stdout = std::io::BufWriter::with_capacity(64 * 1024, std::io::stdout().lock());
@@ -350,4 +350,18 @@ fn main() -> Result<()> {
 
     stdout.flush()?;
     Ok(())
+}
+
+fn main() -> Result<()> {
+    if let Err(e) = run() {
+        if let Some(io_error) = e.downcast_ref::<std::io::Error>()
+            && io_error.kind() == std::io::ErrorKind::BrokenPipe
+        {
+            std::process::exit(0);
+        }
+
+        Err(e)
+    } else {
+        Ok(())
+    }
 }

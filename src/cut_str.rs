@@ -399,7 +399,10 @@ where
                 &[opt.eol as u8],
                 plan,
             )
-            .map_err(|x| std::io::Error::other(x.to_string()))
+            .map_err(|x| {
+                x.downcast::<std::io::Error>()
+                    .unwrap_or_else(|e| std::io::Error::other(e.to_string()))
+            })
             .and(Ok(true))
         })?,
         (false, EOL::Zero) => stdin.for_byte_record(opt.eol.into(), |line| {
@@ -412,8 +415,10 @@ where
                 &[opt.eol as u8],
                 plan,
             )
-            // XXX Should map properly the error
-            .map_err(|x| std::io::Error::other(x.to_string()))
+            .map_err(|x| {
+                x.downcast::<std::io::Error>()
+                    .unwrap_or_else(|e| std::io::Error::other(e.to_string()))
+            })
             .and(Ok(true))
         })?,
         (true, _) => {

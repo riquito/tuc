@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - feat: new argument --fixed-memory (-M) to cut lines in chunks of
   a fixed size (in kilobytes), to allow cutting arbitrary long lines
 - feat: --characters now depends on the (default) regex feature
+- feat: ignore broken pipe when feeding output to tools such as `head`
 - feat: display short help when run without arguments
 - feat: help and short help are colored, as long as output is a tty and
   unless env var TERM=dumb or NO_COLOR (any value) is set
