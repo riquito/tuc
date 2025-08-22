@@ -6,26 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-- perf: much faster (from 2x up to 3x) implementation:
-  - there is now a fast lane used when conditions apply (more or less
-    it triggers when you cut fields on 1-byte characters)
-  - fields cut is now done on bytes, not strings (as long as your
-    delimiter is proper utf-8 you'll be fine)
-  - files can be opened directly with mmap
-- feat: display short help when run without arguments
+- perf: much faster (2x to 5x depending on the workload)
+  - detect and apply better algorithms before starting
+  - mmap support
+- feat: you can now pass a file path as argument to tuc
 - feat: add the ability to display fallback output when a field is out of bound
   (you can set it per-field using `-f <range>=somefallback` or by providing
-  a generic fallback using `--fallback-oob somefallback`)
+  a default fallback with `--fallback-oob somefallback`)
+  (it will be opened with mmap if available and as long as --no-mmap is not set)
 - feat: it is now possible to type \t while formatting fields and
   output a TAB (as we already do for \n) e.g. `-f '{1}\t{2}'`
-- feat: you can now pass a file path as argument to tuc
-  (it will be opened with mmap if available and as long as --no-mmap is not set)
 - feat: new argument --fixed-memory (-M) to cut lines in chunks of
   a fixed size (in kilobytes), to allow cutting arbitrary long lines
 - feat: --characters now depends on the (default) regex feature
+- feat: display short help when run without arguments
 - feat: help and short help are colored, as long as output is a tty and
   unless env var TERM=dumb or NO_COLOR (any value) is set
-- refactor: --json internally uses serde_json, faster and more precise
+- chore: --json internally uses serde_json, faster and more precise
 - chore: improved test coverage
 
 ## [1.2.0] - 2024-01-01
