@@ -657,7 +657,11 @@ fn it_checks_possible_regression_on_negative_indices_and_fallbacks() {
         .assert();
 
     assert.success().stdout("a\nhello\n");
+}
 
+#[cfg(feature = "regex")]
+#[test]
+fn it_checks_possible_regression_on_negative_indices_and_fallbacks_with_regex() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
     let assert = cmd
