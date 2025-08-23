@@ -3,6 +3,7 @@ use crate::{
     bounds::{BoundOrFiller, BoundsType, UserBoundsList},
 };
 use anyhow::Result;
+use bstr::ByteSlice;
 use std::{path::PathBuf, str::FromStr};
 
 #[cfg(feature = "regex")]
@@ -31,6 +32,8 @@ impl From<EOL> for u8 {
     }
 }
 
+pub type ReplaceDelimiterFn = for<'a> fn(text: &'a [u8], opt: &Opt) -> std::borrow::Cow<'a, [u8]>;
+
 #[derive(Debug)]
 pub struct Opt {
     pub delimiter: Vec<u8>,
@@ -41,6 +44,7 @@ pub struct Opt {
     pub greedy_delimiter: bool,
     pub compress_delimiter: bool,
     pub replace_delimiter: Option<Vec<u8>>,
+    pub replace_delimiter_fn: Option<ReplaceDelimiterFn>,
     pub trim: Option<Trim>,
     pub complement: bool,
     pub join: bool,
@@ -67,6 +71,7 @@ impl Default for Opt {
             greedy_delimiter: false,
             compress_delimiter: false,
             replace_delimiter: None,
+            replace_delimiter_fn: None,
             trim: None,
             complement: false,
             join: false,
@@ -304,6 +309,26 @@ impl TryFrom<args::Args> for Opt {
 
         let use_mmap = value.path.is_some() && !value.mmap_no && !cfg!(target_os = "macos");
 
+        let mut replace_delimiter_fn: Option<ReplaceDelimiterFn> = None;
+
+        if bounds_type != BoundsType::Characters && value.replace_delimiter.is_some() {
+            if regex_bag.is_some() {
+                replace_delimiter_fn = Some(|text: &[u8], opt: &Opt| {
+                    opt.regex_bag
+                        .as_ref()
+                        .expect("the regex should still be there")
+                        .normal
+                        .replace_all(text, opt.replace_delimiter.as_ref().unwrap())
+                });
+            } else {
+                replace_delimiter_fn = Some(|text: &[u8], opt: &Opt| {
+                    std::borrow::Cow::Owned(
+                        text.replace(&opt.delimiter, opt.replace_delimiter.as_ref().unwrap()),
+                    )
+                })
+            }
+        }
+
         Ok(Opt {
             // derived
             bounds_type,
@@ -314,6 +339,7 @@ impl TryFrom<args::Args> for Opt {
             regex_bag,
             eol,
             use_mmap,
+            replace_delimiter_fn,
 
             // direct
             replace_delimiter: value.replace_delimiter,
