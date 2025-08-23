@@ -60,7 +60,10 @@ fn run() -> Result<()> {
                 println!("tuc {}", env!("CARGO_PKG_VERSION"));
                 std::process::exit(0);
             }
-            args::ArgsParseError::PicoArgs(e) => return Err(e.into()),
+            args::ArgsParseError::PicoArgs(e) => {
+                eprintln!("{}", e);
+                std::process::exit(1);
+            }
         }
     }
 
