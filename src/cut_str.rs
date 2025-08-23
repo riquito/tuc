@@ -42,32 +42,6 @@ fn compress_delimiter_with_regex<'a>(
     re.replace_all(line, new_delimiter)
 }
 
-#[cfg(feature = "regex")]
-fn maybe_replace_delimiter<'a>(text: &'a [u8], opt: &Opt) -> std::borrow::Cow<'a, [u8]> {
-    if opt.bounds_type == BoundsType::Characters {
-        std::borrow::Cow::Borrowed(text)
-    } else if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
-        if let Some(re_bag) = &opt.regex_bag {
-            re_bag.normal.replace_all(text, new_delimiter)
-        } else {
-            std::borrow::Cow::Owned(text.replace(&opt.delimiter, new_delimiter))
-        }
-    } else {
-        std::borrow::Cow::Borrowed(text)
-    }
-}
-
-#[cfg(not(feature = "regex"))]
-fn maybe_replace_delimiter<'a>(text: &'a [u8], opt: &Opt) -> std::borrow::Cow<'a, [u8]> {
-    if opt.bounds_type == BoundsType::Characters {
-        std::borrow::Cow::Borrowed(text)
-    } else if let Some(new_delimiter) = opt.replace_delimiter.as_ref() {
-        std::borrow::Cow::Owned(text.replace(&opt.delimiter, new_delimiter))
-    } else {
-        std::borrow::Cow::Borrowed(text)
-    }
-}
-
 fn trim<'a>(buffer: &'a [u8], trim_kind: &Trim, delimiter: &[u8]) -> &'a [u8] {
     match trim_kind {
         Trim::Both => {
@@ -296,7 +270,14 @@ where
             return Err(field.unwrap_err());
         };
 
-        let field_to_print = maybe_replace_delimiter(output, opt);
+        let mut field_to_print = output;
+        let output_with_delimiter_replaced;
+
+        if let Some(replace_func) = opt.replace_delimiter_fn {
+            output_with_delimiter_replaced = replace_func(output, opt);
+            field_to_print = &output_with_delimiter_replaced;
+        }
+
         write_maybe_as_json!(stdout, field_to_print, opt.json);
 
         if opt.join && !b.is_last {
