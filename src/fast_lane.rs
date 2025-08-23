@@ -3,8 +3,8 @@ use crate::options::{EOL, Opt, Trim};
 use anyhow::Result;
 use bstr::ByteSlice;
 use std::convert::TryFrom;
+use std::io::BufRead;
 use std::io::Write;
-use std::io::{self, BufRead};
 
 use bstr::io::BufReadExt;
 
@@ -181,14 +181,18 @@ pub fn read_and_cut_text_as_bytes<R: BufRead, W: Write>(
     match opt.eol {
         EOL::Newline => stdin.for_byte_line(|line| {
             cut_str_fast_lane(line, opt, stdout, &mut fields, last_interesting_field)
-                // XXX Should map properly the error
-                .map_err(|x| io::Error::other(x.to_string()))
+                .map_err(|x| {
+                    x.downcast::<std::io::Error>()
+                        .unwrap_or_else(|e| std::io::Error::other(e.to_string()))
+                })
                 .and(Ok(true))
         })?,
         EOL::Zero => stdin.for_byte_record(opt.eol.into(), |line| {
             cut_str_fast_lane(line, opt, stdout, &mut fields, last_interesting_field)
-                // XXX Should map properly the error
-                .map_err(|x| io::Error::other(x.to_string()))
+                .map_err(|x| {
+                    x.downcast::<std::io::Error>()
+                        .unwrap_or_else(|e| std::io::Error::other(e.to_string()))
+                })
                 .and(Ok(true))
         })?,
     }
