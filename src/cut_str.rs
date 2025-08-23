@@ -348,9 +348,11 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
     let maybe_regex: Option<()> = None;
 
     if should_compress_delimiter && maybe_regex.is_some() && opt.replace_delimiter.is_some() {
-        // Special case: compressed delimiter with regex and replacement.
-        // We setup now a plan to search later for the new delimiter. Before we
-        // search we will have used the regex to replace the delimiter.
+        // Special case: compressed delimiter + regex + delimiter replacement.
+        // We setup now the search plan, taking into account that when we start searching
+        // for the delimiter it will have been already replaced (so we won't use
+        // the regex to search for the original delimiter, we will do a fixed-string search
+        // for the new delimiter).
         let replace_delimiter = opt.replace_delimiter.as_ref().unwrap();
         let mut plan = FieldPlan::from_opt_fixed_with_custom_delimiter(opt, replace_delimiter)?;
 
