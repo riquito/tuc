@@ -122,6 +122,8 @@ pub enum OptError {
     MalformedRegex(regex::Error),
     #[cfg(feature = "regex")]
     RegexJoinNoReplace,
+    #[cfg(feature = "regex")]
+    RegexCompressNoReplace,
 }
 
 impl std::fmt::Display for OptError {
@@ -194,6 +196,13 @@ impl std::fmt::Display for OptError {
                 write!(
                     f,
                     "tuc: runtime error. Cannot use --regex and --join without --replace-delimiter"
+                )
+            }
+            #[cfg(feature = "regex")]
+            OptError::RegexCompressNoReplace => {
+                write!(
+                    f,
+                    "tuc: runtime error. Cannot use --regex and --compress-delimiter without --replace-delimiter"
                 )
             }
         }
@@ -338,8 +347,14 @@ impl TryFrom<args::Args> for Opt {
             }
         }
 
-        if join && regex_bag.is_some() && value.replace_delimiter.is_none() {
-            return Err(OptError::RegexJoinNoReplace);
+        if regex_bag.is_some() && value.replace_delimiter.is_none() {
+            if join {
+                return Err(OptError::RegexJoinNoReplace);
+            }
+
+            if value.compress_delimiter {
+                return Err(OptError::RegexCompressNoReplace);
+            }
         }
 
         Ok(Opt {
@@ -415,6 +430,18 @@ mod tests {
         assert_eq!(
             maybe_opt.err(),
             Some(OptParseError::OptError(OptError::RegexJoinNoReplace))
+        );
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn it_cannot_compress_fields_with_regex_without_replace_delimiter() {
+        use crate::options::OptError;
+
+        let maybe_opt: Result<Opt, OptParseError> = "-e [,.] -f 1,3 -p".parse();
+        assert_eq!(
+            maybe_opt.err(),
+            Some(OptParseError::OptError(OptError::RegexCompressNoReplace))
         );
     }
 }
