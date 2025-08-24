@@ -135,11 +135,6 @@ where
             // TODO return a proper error; do not tie cli options to errors at this level
             bail!("Cannot use --regex and --compress-delimiter without --replace-delimiter");
         }
-
-        if opt.join && opt.replace_delimiter.is_none() {
-            // TODO return a proper error; do not tie cli options to errors at this level
-            bail!("Cannot use --regex and --join without --replace-delimiter");
-        }
     }
 
     let mut line = line;
@@ -898,28 +893,6 @@ mod tests {
         let mut input = Cursor::new(line);
         read_and_cut_str(&mut input, &mut output, &opt).unwrap();
         assert_eq!(output, b"a*b*c\n".as_slice());
-    }
-
-    #[cfg(feature = "regex")]
-    #[test]
-    fn cut_str_regex_it_cannot_join_fields_without_replace_delimiter() {
-        let mut opt = make_fields_opt();
-        let (mut output, _) = make_cut_str_buffers();
-
-        let line = b"a,,b..c";
-        opt.bounds = UserBoundsList::from_str("1,3").unwrap();
-        opt.delimiter = "[.,]".into();
-        opt.regex_bag = Some(make_regex_bag());
-        opt.join = true;
-
-        let mut input = Cursor::new(line);
-
-        assert_eq!(
-            read_and_cut_str(&mut input, &mut output, &opt)
-                .err()
-                .map(|x| x.to_string()),
-            Some("Cannot use --regex and --join without --replace-delimiter".to_owned())
-        );
     }
 
     #[cfg(feature = "regex")]
