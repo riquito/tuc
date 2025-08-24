@@ -1,5 +1,5 @@
 use crate::{
-    args,
+    args::{self, ArgsParseError},
     bounds::{BoundOrFiller, BoundsType, UserBoundsList},
 };
 use anyhow::Result;
@@ -106,7 +106,7 @@ impl FromStr for Trim {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum OptError {
     NoFieldBound,
     FixedMemoryZero,
@@ -358,12 +358,33 @@ impl TryFrom<args::Args> for Opt {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum OptParseError {
+    OptError(OptError),
+    ArgsError(ArgsParseError),
+}
+
+impl std::fmt::Display for OptParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                OptParseError::OptError(e) => e.to_string(),
+                OptParseError::ArgsError(e) => e.to_string(),
+            }
+        )
+    }
+}
+
+impl std::error::Error for OptParseError {}
+
 #[cfg(test)]
 impl std::str::FromStr for Opt {
-    type Err = anyhow::Error;
+    type Err = OptParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let args: crate::args::Args = s.parse()?;
-        args.try_into().map_err(|e: OptError| e.into())
+        let args: crate::args::Args = s.parse().map_err(OptParseError::ArgsError)?;
+        args.try_into().map_err(OptParseError::OptError)
     }
 }
