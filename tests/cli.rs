@@ -479,6 +479,7 @@ fn it_fails_when_the_regex_is_malformed() {
         "tuc: runtime error. The regular expression is malformed.",
     ));
 
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     let assert = cmd.args(["-e", "[", "-g"]).write_stdin("foobar").assert();
 
     assert.failure().stderr(predicates::str::starts_with(
