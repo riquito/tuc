@@ -188,7 +188,9 @@ where
         return Ok(());
     }
 
+    #[cfg(feature = "regex")]
     let line_holder: std::borrow::Cow<[u8]>;
+
     let should_compress_delimiter = opt.compress_delimiter
         && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines);
 
@@ -353,9 +355,10 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
         let mut plan = FieldPlan::from_opt_fixed_with_custom_delimiter(opt, replace_delimiter)?;
 
         process_lines_with_plan(stdin, stdout, opt, &mut compressed_line_buf, &mut plan)
-    } else if let Some(regex) = maybe_regex {
+    } else if maybe_regex.is_some() {
         #[cfg(feature = "regex")]
         {
+            let regex = maybe_regex.unwrap();
             let trim_empty = opt.bounds_type == BoundsType::Characters;
             let mut plan = FieldPlan::from_opt_regex(opt, regex.clone(), trim_empty)?;
             process_lines_with_plan(stdin, stdout, opt, &mut compressed_line_buf, &mut plan)

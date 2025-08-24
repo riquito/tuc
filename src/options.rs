@@ -112,8 +112,9 @@ pub enum OptError {
     NoJoinReplace,
     JsonReplace,
     JsonPartialSupport,
-    MalformedRegex(regex::Error),
     FormatFieldJson,
+    #[cfg(feature = "regex")]
+    MalformedRegex(regex::Error),
 }
 
 impl std::fmt::Display for OptError {
@@ -168,6 +169,7 @@ impl std::fmt::Display for OptError {
                     "tuc: runtime error. --json support is available only for --fields and --characters"
                 )
             }
+            #[cfg(feature = "regex")]
             OptError::MalformedRegex(e) => {
                 write!(
                     f,
@@ -271,6 +273,9 @@ impl TryFrom<args::Args> for Opt {
         {
             return Err(OptError::JsonPartialSupport);
         }
+
+        #[cfg(not(feature = "regex"))]
+        let regex_bag: Option<()> = None;
 
         #[cfg(feature = "regex")]
         let regex_bag: Option<RegexBag> = (if bounds_type == BoundsType::Characters {
