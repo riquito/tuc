@@ -331,13 +331,16 @@ impl TryFrom<args::Args> for Opt {
 
         if bounds_type != BoundsType::Characters && value.replace_delimiter.is_some() {
             if regex_bag.is_some() {
-                replace_delimiter_fn = Some(|text: &[u8], opt: &Opt| {
-                    opt.regex_bag
-                        .as_ref()
-                        .expect("the regex should still be there")
-                        .normal
-                        .replace_all(text, opt.replace_delimiter.as_ref().unwrap())
-                });
+                #[cfg(feature = "regex")]
+                {
+                    replace_delimiter_fn = Some(|text: &[u8], opt: &Opt| {
+                        opt.regex_bag
+                            .as_ref()
+                            .expect("the regex should still be there")
+                            .normal
+                            .replace_all(text, opt.replace_delimiter.as_ref().unwrap())
+                    });
+                }
             } else {
                 replace_delimiter_fn = Some(|text: &[u8], opt: &Opt| {
                     std::borrow::Cow::Owned(
@@ -347,6 +350,7 @@ impl TryFrom<args::Args> for Opt {
             }
         }
 
+        #[cfg(feature = "regex")]
         if regex_bag.is_some() && value.replace_delimiter.is_none() {
             if join {
                 return Err(OptError::RegexJoinNoReplace);
