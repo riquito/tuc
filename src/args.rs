@@ -171,6 +171,20 @@ impl std::fmt::Display for ArgsParseError {
 
 impl std::error::Error for ArgsParseError {}
 
+impl PartialEq for ArgsParseError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ArgsParseError::HelpRequested, ArgsParseError::HelpRequested) => true,
+            (ArgsParseError::VersionRequested, ArgsParseError::VersionRequested) => true,
+            (ArgsParseError::PicoArgs(_), ArgsParseError::PicoArgs(_)) => {
+                // pico_args::Error doesn't implement PartialEq, so...
+                self.to_string() == other.to_string()
+            }
+            _ => false,
+        }
+    }
+}
+
 // Automatic conversion from pico_args::Error
 impl From<pico_args::Error> for ArgsParseError {
     fn from(error: pico_args::Error) -> Self {
