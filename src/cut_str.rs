@@ -803,64 +803,52 @@ mod tests {
 
     #[test]
     fn cut_str_it_replace_delimiter() {
-        let mut opt = make_fields_opt();
+        let opt: Opt = "-d - -f 1:3 -r _".parse().unwrap();
         let (mut output, _) = make_cut_str_buffers();
 
         let line = b"a-b-c";
-        opt.bounds = UserBoundsList::from_str("1:3").unwrap();
-        opt.replace_delimiter = Some("*".into());
 
         let mut input = Cursor::new(line);
         read_and_cut_str(&mut input, &mut output, &opt).unwrap();
-        assert_eq!(output, b"a*b*c\n".as_slice());
+        assert_eq!(output, b"a_b_c\n".as_slice());
     }
 
     #[cfg(feature = "regex")]
     #[test]
     fn cut_str_regex_it_replace_delimiter() {
-        let mut opt = make_fields_opt();
+        let opt: Opt = "-e [,] -f 1:3 -r _".parse().unwrap();
         let (mut output, _) = make_cut_str_buffers();
 
         let line = b"a,b,c";
-        opt.bounds = UserBoundsList::from_str("1:3").unwrap();
-        opt.regex_bag = Some(make_regex_bag());
-        opt.replace_delimiter = Some("*".into());
 
         let mut input = Cursor::new(line);
         read_and_cut_str(&mut input, &mut output, &opt).unwrap();
-        assert_eq!(output, b"a*b*c\n".as_slice());
+        assert_eq!(output, b"a_b_c\n".as_slice());
     }
 
     #[test]
     fn cut_str_it_compress_and_replace_delimiter() {
-        let mut opt = make_fields_opt();
+        let opt: Opt = "-d - -f 1:3 -r _ -p".parse().unwrap();
         let (mut output, _) = make_cut_str_buffers();
 
         let line = b"a--b--c";
-        opt.bounds = UserBoundsList::from_str("1:3").unwrap();
-        opt.replace_delimiter = Some("*".into());
-        opt.compress_delimiter = true;
 
         let mut input = Cursor::new(line);
         read_and_cut_str(&mut input, &mut output, &opt).unwrap();
-        assert_eq!(output, b"a*b*c\n".as_slice());
+        assert_eq!(output, b"a_b_c\n".as_slice());
     }
 
     #[cfg(feature = "regex")]
     #[test]
     fn cut_str_regex_it_compress_and_replace_delimiter() {
-        let mut opt = make_fields_opt();
+        let opt: Opt = "-e [,] -f 1:3 -r _ -p".parse().unwrap();
         let (mut output, _) = make_cut_str_buffers();
 
         let line = b"a,,b,,c";
-        opt.bounds = UserBoundsList::from_str("1:3").unwrap();
-        opt.regex_bag = Some(make_regex_bag());
-        opt.replace_delimiter = Some("*".into());
-        opt.compress_delimiter = true;
 
         let mut input = Cursor::new(line);
         read_and_cut_str(&mut input, &mut output, &opt).unwrap();
-        assert_eq!(output, b"a*b*c\n".as_slice());
+        assert_eq!(output, b"a_b_c\n".as_slice());
     }
 
     #[cfg(feature = "regex")]
