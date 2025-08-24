@@ -120,6 +120,8 @@ pub enum OptError {
     FormatFieldJson,
     #[cfg(feature = "regex")]
     MalformedRegex(regex::Error),
+    #[cfg(feature = "regex")]
+    RegexJoinNoReplace,
 }
 
 impl std::fmt::Display for OptError {
@@ -174,6 +176,12 @@ impl std::fmt::Display for OptError {
                     "tuc: runtime error. --json support is available only for --fields and --characters"
                 )
             }
+            OptError::FormatFieldJson => {
+                write!(
+                    f,
+                    "tuc: runtime error. Cannot format fields when using --json"
+                )
+            }
             #[cfg(feature = "regex")]
             OptError::MalformedRegex(e) => {
                 write!(
@@ -181,10 +189,11 @@ impl std::fmt::Display for OptError {
                     "tuc: runtime error. The regular expression is malformed. {e}"
                 )
             }
-            OptError::FormatFieldJson => {
+            #[cfg(feature = "regex")]
+            OptError::RegexJoinNoReplace => {
                 write!(
                     f,
-                    "tuc: runtime error. Cannot format fields when using --json"
+                    "tuc: runtime error. Cannot use --regex and --join without --replace-delimiter"
                 )
             }
         }
@@ -329,6 +338,10 @@ impl TryFrom<args::Args> for Opt {
             }
         }
 
+        if join && regex_bag.is_some() && value.replace_delimiter.is_none() {
+            return Err(OptError::RegexJoinNoReplace);
+        }
+
         Ok(Opt {
             // derived
             bounds_type,
@@ -386,5 +399,22 @@ impl std::str::FromStr for Opt {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let args: crate::args::Args = s.parse().map_err(OptParseError::ArgsError)?;
         args.try_into().map_err(OptParseError::OptError)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn it_cannot_join_fields_with_regex_without_replace_delimiter() {
+        use crate::options::OptError;
+
+        let maybe_opt: Result<Opt, OptParseError> = "-e [,.] -f 1,3 -j".parse();
+        assert_eq!(
+            maybe_opt.err(),
+            Some(OptParseError::OptError(OptError::RegexJoinNoReplace))
+        );
     }
 }
