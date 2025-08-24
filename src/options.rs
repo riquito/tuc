@@ -326,3 +326,13 @@ impl TryFrom<args::Args> for Opt {
         })
     }
 }
+
+#[cfg(test)]
+impl std::str::FromStr for Opt {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let args: crate::args::Args = s.parse()?;
+        args.try_into().map_err(|e: OptError| e.into())
+    }
+}

@@ -177,3 +177,18 @@ impl From<pico_args::Error> for ArgsParseError {
         ArgsParseError::PicoArgs(error)
     }
 }
+
+#[cfg(test)]
+impl std::str::FromStr for Args {
+    type Err = ArgsParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let args_os = shlex::split(s)
+            .unwrap_or_else(|| panic!("Malformed input: {}", s))
+            .into_iter()
+            .map(std::ffi::OsString::from)
+            .collect();
+
+        parse_args(args_os)
+    }
+}
