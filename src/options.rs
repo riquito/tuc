@@ -428,8 +428,6 @@ mod tests {
     #[cfg(feature = "regex")]
     #[test]
     fn it_cannot_join_fields_with_regex_without_replace_delimiter() {
-        use crate::options::OptError;
-
         let maybe_opt: Result<Opt, OptParseError> = "-e [,.] -f 1,3 -j".parse();
         assert_eq!(
             maybe_opt.err(),
@@ -440,12 +438,20 @@ mod tests {
     #[cfg(feature = "regex")]
     #[test]
     fn it_cannot_compress_fields_with_regex_without_replace_delimiter() {
-        use crate::options::OptError;
-
         let maybe_opt: Result<Opt, OptParseError> = "-e [,.] -f 1,3 -p".parse();
         assert_eq!(
             maybe_opt.err(),
             Some(OptParseError::OptError(OptError::RegexCompressNoReplace))
+        );
+    }
+
+    #[test]
+    fn it_cannot_contain_both_join_and_no_join() {
+        let maybe_opt: Result<Opt, OptParseError> = "-f 1,3 --join --no-join".parse();
+
+        assert_eq!(
+            maybe_opt.err(),
+            Some(OptParseError::OptError(OptError::JoinNoJoin))
         );
     }
 }
