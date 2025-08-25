@@ -296,4 +296,18 @@ mod tests {
         cut_lines(&mut input, &mut output, &opt).unwrap();
         assert_eq!(output, b"a\0");
     }
+
+    #[test]
+    fn cut_lines_and_compress_delimiter() {
+        // compress is similar to greedy, but while greedy
+        // preserve the original delimiters in its output
+        // (in particular when outputting a range), instead
+        // "compress" first merge the delimiters, then cut.
+        let opt: Opt = "-l 1:2 -p".parse().unwrap();
+
+        let mut input = b"a\n\nb".as_slice();
+        let mut output = Vec::with_capacity(100);
+        cut_lines(&mut input, &mut output, &opt).unwrap();
+        assert_eq!(output, b"a\nb\n");
+    }
 }

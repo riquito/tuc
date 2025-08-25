@@ -42,7 +42,7 @@ USAGE:
 
 FLAGS:
     -g, --greedy-delimiter        Match consecutive delimiters as if it was one
-    -p, --compress-delimiter      Print only the first delimiter of a sequence
+    -p, --compress-delimiter      Merge consecutive delimiters, then cut
     -s, --only-delimited          Print only lines containing the delimiter
     -V, --version                 Print version information
     -z, --zero-terminated         Line delimiter is NUL (\0), not LF (\n)
@@ -201,7 +201,7 @@ ab
 ```
 
 ```sh
-# Compress delimiters after cut
+# Compress delimiters before cut
 ❯ echo "foo    bar   baz" | tuc -d ' ' -f 2: -p
 bar baz
 ```

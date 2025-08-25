@@ -118,6 +118,7 @@ pub enum OptError {
     JsonReplace,
     JsonPartialSupport,
     FormatFieldJson,
+    NothingToCompress,
     #[cfg(feature = "regex")]
     MalformedRegex(regex::Error),
     #[cfg(feature = "regex")]
@@ -182,6 +183,12 @@ impl std::fmt::Display for OptError {
                 write!(
                     f,
                     "tuc: runtime error. Cannot format fields when using --json"
+                )
+            }
+            OptError::NothingToCompress => {
+                write!(
+                    f,
+                    "tuc: runtime error. Delimiters can be compressed only with --fields and --lines"
                 )
             }
             #[cfg(feature = "regex")]
@@ -361,6 +368,16 @@ impl TryFrom<args::Args> for Opt {
             }
         }
 
+        let compress_delimiter = if value.compress_delimiter {
+            match bounds_type {
+                BoundsType::Fields => true,
+                BoundsType::Lines => true,
+                _ => return Err(OptError::NothingToCompress),
+            }
+        } else {
+            false
+        };
+
         Ok(Opt {
             // derived
             bounds_type,
@@ -372,11 +389,11 @@ impl TryFrom<args::Args> for Opt {
             eol,
             use_mmap,
             replace_delimiter_fn,
+            compress_delimiter,
 
             // direct
             replace_delimiter: value.replace_delimiter,
             complement: value.complement,
-            compress_delimiter: value.compress_delimiter,
             fallback_oob: value.fallback_oob,
             only_delimited: value.only_delimited,
             greedy_delimiter: value.greedy_delimiter,
@@ -452,6 +469,28 @@ mod tests {
         assert_eq!(
             maybe_opt.err(),
             Some(OptParseError::OptError(OptError::JoinNoJoin))
+        );
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn it_can_compress_delimiter_only_with_fields_and_lines() {
+        let maybe_opt: Result<Opt, OptParseError> = "-f 1,3 -p".parse();
+        assert!(maybe_opt.is_ok());
+
+        let maybe_opt: Result<Opt, OptParseError> = "-l 1,3 -p".parse();
+        assert!(maybe_opt.is_ok());
+
+        let maybe_opt: Result<Opt, OptParseError> = "-c 1,3 -p".parse();
+        assert_eq!(
+            maybe_opt.err(),
+            Some(OptParseError::OptError(OptError::NothingToCompress))
+        );
+
+        let maybe_opt: Result<Opt, OptParseError> = "-b 1,3 -p".parse();
+        assert_eq!(
+            maybe_opt.err(),
+            Some(OptParseError::OptError(OptError::NothingToCompress))
         );
     }
 }

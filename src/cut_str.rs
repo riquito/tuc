@@ -153,10 +153,7 @@ where
     #[cfg(feature = "regex")]
     let line_holder: std::borrow::Cow<[u8]>;
 
-    let should_compress_delimiter = opt.compress_delimiter
-        && (opt.bounds_type == BoundsType::Fields || opt.bounds_type == BoundsType::Lines);
-
-    if should_compress_delimiter {
+    if opt.compress_delimiter {
         if opt.regex_bag.is_some() && cfg!(feature = "regex") {
             #[cfg(feature = "regex")]
             {
