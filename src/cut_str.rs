@@ -208,12 +208,13 @@ where
         }
     }
 
-    if opt.json || (opt.bounds_type == BoundsType::Characters && opt.replace_delimiter.is_some()) {
+    if opt.unpack {
         // Unpack bounds such as 1:3 or 2: into single-field bounds
         // such as 1:1,2:2,3:3 etc...
 
-        // Start by checking if we actually need to rewrite the bounds, since
-        // it's an expensive operation.
+        // Start by checking if we actually need to rewrite the bounds
+        // (are there ranges in the first place?), since it's an
+        // expensive operation.
         if bounds.iter().any(|b| {
             matches!(
                 b,
