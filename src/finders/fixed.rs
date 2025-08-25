@@ -99,6 +99,13 @@ mod tests {
     }
 
     #[test]
+    fn forward_small_delimiter_line_with_empty_fields() {
+        let finder = FixedFinder::new(b"-");
+        let result: Vec<Range<usize>> = finder.find_ranges(b"a--b-c").collect();
+        assert_eq!(vec![1..2, 2..3, 4..5], result);
+    }
+
+    #[test]
     fn forward_big_delimiter_empty_line() {
         let finder = FixedFinder::new(b"--");
         let result: Vec<Range<usize>> = finder.find_ranges(b"").collect();
