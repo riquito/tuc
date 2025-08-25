@@ -54,6 +54,7 @@ pub struct Opt {
     pub path: Option<PathBuf>,
     pub use_mmap: bool,
     pub read_to_end: bool,
+    pub unpack: bool,
     #[cfg(feature = "regex")]
     pub regex_bag: Option<RegexBag>,
     #[cfg(not(feature = "regex"))]
@@ -82,6 +83,7 @@ impl Default for Opt {
             regex_bag: None,
             use_mmap: false,
             read_to_end: false,
+            unpack: false,
         }
     }
 }
@@ -378,6 +380,9 @@ impl TryFrom<args::Args> for Opt {
             false
         };
 
+        let unpack = value.json
+            || (bounds_type == BoundsType::Characters && value.replace_delimiter.is_some());
+
         Ok(Opt {
             // derived
             bounds_type,
@@ -390,6 +395,7 @@ impl TryFrom<args::Args> for Opt {
             use_mmap,
             replace_delimiter_fn,
             compress_delimiter,
+            unpack,
 
             // direct
             replace_delimiter: value.replace_delimiter,
