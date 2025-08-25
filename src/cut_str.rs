@@ -727,15 +727,10 @@ mod tests {
     #[cfg(feature = "regex")]
     #[test]
     fn cut_str_it_cut_characters_and_replace_the_delimiter() {
-        let mut opt = make_fields_opt();
+        let opt: Opt = "-c 1,2,3:4 -r - ".parse().unwrap();
         let (mut output, _) = make_cut_str_buffers();
 
         let line = "😁🤩😝😎".as_bytes();
-        opt.bounds = UserBoundsList::from_str("1,2,3:4").unwrap();
-        opt.bounds_type = BoundsType::Characters;
-        opt.regex_bag = Some(make_cut_characters_regex_bag());
-        opt.replace_delimiter = Some("-".into());
-        opt.join = true; // implied when using BoundsType::Characters
 
         let mut input = Cursor::new(line);
         read_and_cut_str(&mut input, &mut output, &opt).unwrap();
@@ -1039,15 +1034,10 @@ mod tests {
 
     #[test]
     fn cut_str_complement_works_with_json() {
-        let mut opt = make_fields_opt();
-        opt.json = true;
-        opt.replace_delimiter = Some(",".into());
-        opt.complement = true;
+        let opt: Opt = "-d - -f 2,2:3,-1 -j --json --complement".parse().unwrap();
         let (mut output, _) = make_cut_str_buffers();
 
         let line = b"a-b-c";
-        opt.bounds = UserBoundsList::from_str("2,2:3,-1").unwrap();
-        opt.join = true;
 
         let mut input = Cursor::new(line);
         read_and_cut_str(&mut input, &mut output, &opt).unwrap();
