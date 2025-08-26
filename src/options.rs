@@ -381,8 +381,7 @@ impl TryFrom<args::Args> for Opt {
             false
         };
 
-        let unpack = value.json
-            || (bounds_type == BoundsType::Characters && value.replace_delimiter.is_some());
+        let unpack = value.json || bounds_type == BoundsType::Characters;
 
         Ok(Opt {
             // derived
