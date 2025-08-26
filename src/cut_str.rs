@@ -1052,16 +1052,10 @@ mod tests {
     #[cfg(feature = "regex")]
     #[test]
     fn cut_str_json_on_characters_works() {
-        let mut opt = make_fields_opt();
+        let opt: Opt = "-c 1,2,3:4 --json".parse().unwrap();
         let (mut output, _) = make_cut_str_buffers();
 
         let line = "😁🤩😝😎".as_bytes();
-        opt.bounds = UserBoundsList::from_str("1,2,3:4").unwrap();
-        opt.bounds_type = BoundsType::Characters;
-        opt.join = true;
-        opt.json = true;
-        opt.replace_delimiter = Some(",".into());
-        opt.regex_bag = Some(make_cut_characters_regex_bag());
 
         let mut input = Cursor::new(line);
         read_and_cut_str(&mut input, &mut output, &opt).unwrap();
