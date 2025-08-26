@@ -287,7 +287,8 @@ impl TryFrom<args::Args> for Opt {
             return Err(OptError::CharactersRequireRegexSupport);
         }
 
-        if bounds_type == BoundsType::Characters {
+        if bounds_type == BoundsType::Characters && value.replace_delimiter.is_none() {
+            // characters implies join and regex, and those two together require replace_delimiter
             value.replace_delimiter = Some("".into());
         }
 
