@@ -132,11 +132,13 @@ where
     #[inline(always)]
     fn get_field_bound(&self, side_val: i32) -> Result<&Range<usize>> {
         let is_negative = side_val < 0;
+
         let fields = if is_negative {
             &self.negative_fields
         } else {
             &self.positive_fields
         };
+
         let index = if is_negative {
             side_val.unsigned_abs() as usize - 1
         } else {
@@ -157,13 +159,21 @@ where
     }
 
     pub fn get_field(&self, b: &UserBounds, line_len: usize) -> Result<Range<usize>> {
-        let start = match b.l {
-            Side::Some(l) => self.get_field_bound(l)?.start,
-            Side::Continue => 0,
-        };
-        let end = match b.r {
-            Side::Some(r) => self.get_field_bound(r)?.end,
-            Side::Continue => line_len,
+        let (start, end) = match (b.l, b.r) {
+            (Side::Some(l), Side::Some(r)) => {
+                // Process both at once to potentially reuse field array access
+                let start_field = self.get_field_bound(l)?;
+                let end_field = if l == r {
+                    // Same field, no need to calculate again!
+                    start_field
+                } else {
+                    self.get_field_bound(r)?
+                };
+                (start_field.start, end_field.end)
+            }
+            (Side::Some(l), Side::Continue) => (self.get_field_bound(l)?.start, line_len),
+            (Side::Continue, Side::Some(r)) => (0, self.get_field_bound(r)?.end),
+            (Side::Continue, Side::Continue) => (0, line_len),
         };
 
         if end < start {
