@@ -129,56 +129,51 @@ where
             finder_rev,
         })
     }
-
-    pub fn get_field(&self, b: &UserBounds, line_len: usize) -> Result<Range<usize>> {
-        // if a side is negative, search in negative_fields, otherwise
-        // in positive_fields
-
-        let start = match b.l {
-            Side::Some(l) => {
-                (if l < 0 {
-                    self.negative_fields
-                        .get(l.unsigned_abs() as usize - 1)
-                        .and_then(|x| if x.start == usize::MAX { None } else { Some(x) })
-                        .ok_or_else(|| anyhow::anyhow!("Out of bounds: {}", l))?
-                } else {
-                    self.positive_fields
-                        .get(l as usize - 1)
-                        .and_then(|x| if x.start == usize::MAX { None } else { Some(x) })
-                        .ok_or_else(|| anyhow::anyhow!("Out of bounds: {}", l,))?
-                })
-                .start
-            }
-            Side::Continue => 0,
+    #[inline(always)]
+    fn get_field_bound(&self, side_val: i32) -> Result<&Range<usize>> {
+        let is_negative = side_val < 0;
+        let fields = if is_negative {
+            &self.negative_fields
+        } else {
+            &self.positive_fields
+        };
+        let index = if is_negative {
+            side_val.unsigned_abs() as usize - 1
+        } else {
+            side_val as usize - 1
         };
 
+        if index >= fields.len() {
+            return Err(anyhow::anyhow!("Out of bounds: {}", side_val));
+        }
+
+        if let Some(field) = fields.get(index)
+            && field.start != usize::MAX
+        {
+            Ok(field)
+        } else {
+            Err(anyhow::anyhow!("Out of bounds: {}", side_val))
+        }
+    }
+
+    pub fn get_field(&self, b: &UserBounds, line_len: usize) -> Result<Range<usize>> {
+        let start = match b.l {
+            Side::Some(l) => self.get_field_bound(l)?.start,
+            Side::Continue => 0,
+        };
         let end = match b.r {
-            Side::Some(r) => {
-                (if r < 0 {
-                    self.negative_fields
-                        .get(r.unsigned_abs() as usize - 1)
-                        .and_then(|x| if x.start == usize::MAX { None } else { Some(x) })
-                        .ok_or_else(|| anyhow::anyhow!("Out of bounds: {}", r))?
-                } else {
-                    self.positive_fields
-                        .get(r as usize - 1)
-                        .and_then(|x| if x.start == usize::MAX { None } else { Some(x) })
-                        .ok_or_else(|| anyhow::anyhow!("Out of bounds: {}", r,))?
-                })
-                .end
-            }
+            Side::Some(r) => self.get_field_bound(r)?.end,
             Side::Continue => line_len,
         };
 
         if end < start {
-            // `start` can't ever be greater than end
             bail!("Field left value cannot be greater than right value");
         }
-
         Ok(start..end)
     }
 }
 
+#[inline(always)]
 fn extract_fields_using_pos_indices<F, R>(
     line: &[u8],
     plan: &mut FieldPlan<F, R>,
@@ -230,6 +225,7 @@ where
     Ok(None)
 }
 
+#[inline(always)]
 fn extract_fields_using_negative_indices<F, R>(
     line: &[u8],
     plan: &mut FieldPlan<F, R>,
@@ -281,6 +277,7 @@ where
     Ok(None)
 }
 
+#[inline(always)]
 fn extract_every_field<F, R>(line: &[u8], plan: &mut FieldPlan<F, R>) -> Result<Option<usize>>
 where
     F: DelimiterFinder,
