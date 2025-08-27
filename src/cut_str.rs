@@ -245,9 +245,7 @@ where
 
         let field = plan.get_field(b, line.len());
         let output = if let Ok(field) = field {
-            let idx_start = field.start;
-            let idx_end = field.end;
-            &line[idx_start..idx_end]
+            &line[field.start..field.end]
         } else if b.fallback_oob.is_some() {
             b.fallback_oob.as_ref().unwrap()
         } else if let Some(generic_fallback) = &opt.fallback_oob {
