@@ -9,10 +9,46 @@ use crate::bounds::Side;
 
 #[derive(Debug, Eq, Clone)]
 pub struct UserBounds {
-    pub l: Side,
-    pub r: Side,
-    pub is_last: bool,
-    pub fallback_oob: Option<Vec<u8>>,
+    l: Side,
+    r: Side,
+    is_last: bool,
+    fallback_oob: Option<Vec<u8>>,
+}
+
+impl UserBounds {
+    pub fn new(l: Side, r: Side) -> Self {
+        Self {
+            l,
+            r,
+            is_last: false,
+            fallback_oob: None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn l(&self) -> &Side {
+        &self.l
+    }
+
+    #[inline(always)]
+    pub fn r(&self) -> &Side {
+        &self.r
+    }
+
+    #[inline(always)]
+    pub fn is_last(&self) -> bool {
+        self.is_last
+    }
+
+    #[inline(always)]
+    pub fn set_is_last(&mut self, is_last: bool) {
+        self.is_last = is_last;
+    }
+
+    #[inline(always)]
+    pub fn fallback_oob(&self) -> &Option<Vec<u8>> {
+        &self.fallback_oob
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

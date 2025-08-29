@@ -26,10 +26,10 @@ impl TryFrom<&UserBoundsList> for ForwardBounds {
             let mut prev_bound_idx = Side::Some(0);
             value.iter().try_for_each(|bof| {
                 if let BoundOrFiller::Bound(b) = bof {
-                    if b.l == prev_bound_idx {
+                    if *b.l() == prev_bound_idx {
                         return Err("Bounds are sorted, but can't be repeated");
                     }
-                    prev_bound_idx = b.l;
+                    prev_bound_idx = *b.l();
                 }
                 Ok(())
             })?;
@@ -156,7 +156,7 @@ pub fn read_and_cut_bytes_stream<R: BufRead, W: Write>(
     stdout: &mut W,
     opt: &StreamOpt,
 ) -> Result<()> {
-    let last_interesting_field = opt.bounds.get_last_bound().r;
+    let last_interesting_field = *opt.bounds.get_last_bound().r();
     cut_bytes_stream(stdin, stdout, opt, last_interesting_field)?;
     Ok(())
 }
@@ -200,7 +200,7 @@ fn print_bof<W: Write>(
         if b.matches(curr_field).unwrap() {
             let prepend_delimiter = !prev_chunk_may_be_truncated
                 && curr_field > 1
-                && (opt.join || (b.l != Side::Some(curr_field)));
+                && (opt.join || (*b.l() != Side::Some(curr_field)));
 
             let delimiter = opt.replace_delimiter.unwrap_or(opt.delimiter);
 
@@ -211,7 +211,7 @@ fn print_bof<W: Write>(
                 prepend_delimiter,
             )?;
 
-            if b.r == Side::Some(curr_field) {
+            if *b.r() == Side::Some(curr_field) {
                 bof_idx += 1;
             }
         }
@@ -239,16 +239,16 @@ fn print_filler_or_fallbacks<W: Write>(
             BoundOrFiller::Bound(b) => b,
         };
 
-        if b.r == Side::Continue {
+        if *b.r() == Side::Continue {
             break;
         }
 
-        let output = if b.fallback_oob.is_some() {
-            b.fallback_oob.as_ref().unwrap()
+        let output = if b.fallback_oob().is_some() {
+            b.fallback_oob().as_ref().unwrap()
         } else if let Some(generic_fallback) = &opt.fallback_oob {
             generic_fallback
         } else {
-            bail!("Out of bounds: {}", b.l);
+            bail!("Out of bounds: {}", b.l());
         };
 
         stdout.write_all(output)?;
@@ -430,7 +430,7 @@ mod tests {
         let mut stdin = b"a".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("1").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -443,7 +443,7 @@ mod tests {
         let mut stdin = b"a\n".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("1").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -457,7 +457,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.fallback_oob = Some(b"generic fallback".to_vec());
         opt.bounds = ForwardBounds::from_str("{1}-fill-{2}-more fill-{3=last fill}").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -475,7 +475,7 @@ mod tests {
         let mut stdin = b"a\n".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("2").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         let res = cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field);
         let error = res.unwrap_err();
@@ -489,7 +489,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.fallback_oob = Some(b"generic fallback".to_vec());
         opt.bounds = ForwardBounds::from_str("{1}-fill-{2}-more fill-{3=last fill}").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -507,7 +507,7 @@ mod tests {
         let mut stdin = b"a".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("2").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         let res = cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field);
         let error = res.unwrap_err();
@@ -520,7 +520,7 @@ mod tests {
         let mut stdin = b"a".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("foo-{2=waitforit}-bar").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -536,7 +536,7 @@ mod tests {
         let mut stdin = b"a-b-c".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("1:").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -549,7 +549,7 @@ mod tests {
         let mut stdin = b"a-b-c".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("2:").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -562,7 +562,7 @@ mod tests {
         let mut stdin = b"a-b-c".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str(":1").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -575,7 +575,7 @@ mod tests {
         let mut stdin = b"a-b-c".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str(":2").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -588,7 +588,7 @@ mod tests {
         let mut stdin = b"a-b-c".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("2:").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -601,7 +601,7 @@ mod tests {
         let mut stdin = b"a-b".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("1,2").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -614,7 +614,7 @@ mod tests {
         let mut stdin = b"a-b\n".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("1,2").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -627,7 +627,7 @@ mod tests {
         let mut stdin = b"a-b-c".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("1,2").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -640,7 +640,7 @@ mod tests {
         let mut stdin = b"a-b-c\n".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("1,2").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -654,7 +654,7 @@ mod tests {
         let mut stdin = BufReader::with_capacity(3, stdin_content);
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("1,2").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -668,7 +668,7 @@ mod tests {
         let mut stdin = BufReader::with_capacity(2, stdin_content);
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("{9=fallback}").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -685,7 +685,7 @@ mod tests {
         let mut stdin = BufReader::with_capacity(2, stdin_content);
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("{9=fallback}").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -701,7 +701,7 @@ mod tests {
         let mut stdin = b"a\nb\n".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("1").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -714,7 +714,7 @@ mod tests {
         let mut stdin = b"a-b\nc-d\n".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("1,2").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -728,7 +728,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.join = true;
         opt.bounds = ForwardBounds::from_str("1,2").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -742,7 +742,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.join = true;
         opt.bounds = ForwardBounds::from_str("1,2").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         let mut stdout = Vec::new();
         let mut stdin = BufReader::with_capacity(1, stdin_content);
@@ -771,7 +771,7 @@ mod tests {
         let mut stdin = b"a-b-c".as_slice();
         let mut opt = make_fields_opt();
         opt.bounds = ForwardBounds::from_str("1:2,3").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -785,7 +785,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.join = true;
         opt.bounds = ForwardBounds::from_str("1:2,3").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -799,7 +799,7 @@ mod tests {
         let mut opt = make_fields_opt();
         opt.join = true;
         opt.bounds = ForwardBounds::from_str("1,2:3").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -814,7 +814,7 @@ mod tests {
         opt.join = true;
         opt.replace_delimiter = Some(b'/');
         opt.bounds = ForwardBounds::from_str("1,2:3").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 
@@ -828,7 +828,7 @@ mod tests {
         opt.join = true;
         opt.replace_delimiter = Some(b'/');
         opt.bounds = ForwardBounds::from_str("1,2:").unwrap();
-        let last_interesting_field = opt.bounds.get_last_bound().r;
+        let last_interesting_field = *opt.bounds.get_last_bound().r();
 
         cut_bytes_stream(&mut stdin, &mut stdout, &opt, last_interesting_field).unwrap();
 

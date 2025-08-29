@@ -58,12 +58,12 @@ where
         // First collect all indices from bounds, keeping duplicates and original order.
         for bof in opt.bounds.iter() {
             if let BoundOrFiller::Bound(b) = bof {
-                indices.push(match b.l {
+                indices.push(match *b.l() {
                     Side::Some(l) => l,
                     Side::Continue => 1,
                 });
 
-                if let Side::Some(r) = b.r {
+                if let Side::Some(r) = *b.r() {
                     indices.push(r);
                 } // else ignore "continue" as right bound
             }
@@ -159,7 +159,7 @@ where
     }
 
     pub fn get_field(&self, b: &UserBounds, line_len: usize) -> Result<Range<usize>> {
-        let (start, end) = match (b.l, b.r) {
+        let (start, end) = match (*b.l(), *b.r()) {
             (Side::Some(l), Side::Some(r)) => {
                 // Process both at once to potentially reuse field array access
                 let start_field = self.get_field_bound(l)?;
