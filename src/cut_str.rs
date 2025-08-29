@@ -3,7 +3,7 @@ use bstr::ByteSlice;
 use bstr::io::BufReadExt;
 use std::io::{BufRead, Write};
 
-use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBounds, UserBoundsList};
+use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBoundsList};
 use crate::finders::common::DelimiterFinder;
 use crate::options::{EOL, Opt, Trim};
 use crate::plan::FieldPlan;
@@ -215,16 +215,9 @@ where
         // Start by checking if we actually need to rewrite the bounds
         // (are there ranges in the first place?), since it's an
         // expensive operation.
-        if bounds.iter().any(|b| {
-            matches!(
-                b,
-                BoundOrFiller::Bound(UserBounds {
-                    l: x,
-                    r: y,
-                    is_last: _,
-                    fallback_oob: _,
-                }) if x != y || x == &Side::Continue
-            )
+        if bounds.iter().any(|bof| match bof {
+            BoundOrFiller::Bound(b) => b.l() != b.r() || *b.l() == Side::Continue,
+            BoundOrFiller::Filler(_) => false,
         }) {
             _bounds = bounds.unpack(
                 maybe_num_fields
@@ -246,8 +239,8 @@ where
         let field = plan.get_field(b, line.len());
         let output = if let Ok(field) = field {
             &line[field.start..field.end]
-        } else if b.fallback_oob.is_some() {
-            b.fallback_oob.as_ref().unwrap()
+        } else if b.fallback_oob().is_some() {
+            b.fallback_oob().as_ref().unwrap()
         } else if let Some(generic_fallback) = &opt.fallback_oob {
             generic_fallback
         } else {
@@ -264,7 +257,7 @@ where
 
         write_maybe_as_json!(stdout, field_to_print, opt.json);
 
-        if opt.join && !b.is_last {
+        if opt.join && !b.is_last() {
             stdout.write_all(
                 opt.replace_delimiter
                     .as_ref()

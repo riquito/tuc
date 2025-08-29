@@ -34,8 +34,8 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
 
         ubl.list.iter_mut().for_each(|bof| {
             if let BoundOrFiller::Bound(b) = bof {
-                if rightmost_bound.is_none() || b.r > rightmost_bound.unwrap() {
-                    rightmost_bound = Some(b.r);
+                if rightmost_bound.is_none() || *b.r() > rightmost_bound.unwrap() {
+                    rightmost_bound = Some(*b.r());
                 }
 
                 last_bound = Some(b);
@@ -48,7 +48,7 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
 
         last_bound
             .expect("UserBoundsList must contain at least one UserBounds")
-            .is_last = true;
+            .set_is_last(true);
 
         ubl.last_interesting_field = rightmost_bound.unwrap_or(Side::Continue);
         ubl
@@ -73,7 +73,7 @@ impl UserBoundsList {
         let mut has_positive_idx = false;
         let mut has_negative_idx = false;
         self.get_userbounds_only().for_each(|b| {
-            if let Side::Some(left) = b.l {
+            if let Side::Some(left) = b.l() {
                 if left.is_positive() {
                     has_positive_idx = true;
                 } else {
@@ -81,7 +81,7 @@ impl UserBoundsList {
                 }
             }
 
-            if let Side::Some(right) = b.r {
+            if let Side::Some(right) = b.r() {
                 if right.is_positive() {
                     has_positive_idx = true;
                 } else {
@@ -115,11 +115,11 @@ impl UserBoundsList {
 
     fn has_negative_indices(&self) -> bool {
         self.get_userbounds_only().any(|b| {
-            if let Side::Some(left) = b.l
+            if let Side::Some(left) = b.l()
                 && left.is_negative()
             {
                 true
-            } else if let Side::Some(right) = b.r
+            } else if let Side::Some(right) = b.r()
                 && right.is_negative()
             {
                 true
