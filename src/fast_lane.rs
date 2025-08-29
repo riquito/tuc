@@ -106,8 +106,8 @@ fn output_parts<W: Write>(
         let idx_start = fields[r.start];
         let idx_end = fields[r.end] - 1;
         &line[idx_start..idx_end]
-    } else if b.fallback_oob.is_some() {
-        b.fallback_oob.as_ref().unwrap()
+    } else if b.fallback_oob().is_some() {
+        b.fallback_oob().as_ref().unwrap()
     } else if let Some(generic_fallback) = opt.fallback_oob {
         generic_fallback
     } else {
@@ -117,7 +117,7 @@ fn output_parts<W: Write>(
     let field_to_print = output;
     stdout.write_all(field_to_print)?;
 
-    if opt.join && !b.is_last {
+    if opt.join && !b.is_last() {
         stdout.write_all(&[opt.delimiter])?;
     }
 
