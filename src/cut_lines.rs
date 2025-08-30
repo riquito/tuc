@@ -50,7 +50,8 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
                 stdout.write_all(line.as_bytes())?;
                 add_newline_next = true;
 
-                if *b.r() == Side::Some(line_idx) {
+                //tbd check neg
+                if b.r().abs_value() == line_idx {
                     // we exhausted the use of that bound, move on
                     bounds_idx += 1;
                     add_newline_next = false;
@@ -75,7 +76,8 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
 
     // Output is finished. Did we output every bound?
     if let Some(BoundOrFiller::Bound(b)) = opt.bounds.get(bounds_idx)
-        && *b.r() != Side::Continue
+    // we can ignore the sign because this is forward only
+        && b.r().abs_value() != Side::max_right()
     {
         // not good, we still have bounds to print but the input is exhausted
         bail!("Out of bounds: {}", b);

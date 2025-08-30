@@ -3,7 +3,7 @@ use bstr::ByteSlice;
 use bstr::io::BufReadExt;
 use std::io::{BufRead, Write};
 
-use crate::bounds::{BoundOrFiller, BoundsType, Side, UserBoundsList};
+use crate::bounds::{BoundOrFiller, BoundsType, UserBoundsList};
 use crate::finders::common::DelimiterFinder;
 use crate::options::{EOL, Opt, Trim};
 use crate::plan::FieldPlan;
@@ -216,7 +216,7 @@ where
         // (are there ranges in the first place?), since it's an
         // expensive operation.
         if bounds.iter().any(|bof| match bof {
-            BoundOrFiller::Bound(b) => b.l() != b.r() || *b.l() == Side::Continue,
+            BoundOrFiller::Bound(b) => b.l() != b.r(),
             BoundOrFiller::Filler(_) => false,
         }) {
             _bounds = bounds.unpack(
