@@ -24,7 +24,7 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
     fn from(list: Vec<BoundOrFiller>) -> Self {
         let mut ubl = UserBoundsList {
             list,
-            last_interesting_field: Side::Continue,
+            last_interesting_field: Side::new_inf_right(),
         };
 
         let mut rightmost_bound: Option<Side> = None;
@@ -50,7 +50,7 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
             .expect("UserBoundsList must contain at least one UserBounds")
             .set_is_last(true);
 
-        ubl.last_interesting_field = rightmost_bound.unwrap_or(Side::Continue);
+        ubl.last_interesting_field = rightmost_bound.unwrap_or(Side::new_inf_right());
         ubl
     }
 }
@@ -73,20 +73,16 @@ impl UserBoundsList {
         let mut has_positive_idx = false;
         let mut has_negative_idx = false;
         self.get_userbounds_only().for_each(|b| {
-            if let Side::Some(left) = b.l() {
-                if left.is_positive() {
-                    has_positive_idx = true;
-                } else {
-                    has_negative_idx = true;
-                }
+            if b.l().is_negative() {
+                has_negative_idx = true;
+            } else {
+                has_positive_idx = true;
             }
 
-            if let Side::Some(right) = b.r() {
-                if right.is_positive() {
-                    has_positive_idx = true;
-                } else {
-                    has_negative_idx = true;
-                }
+            if b.r().is_negative() {
+                has_negative_idx = true;
+            } else {
+                has_positive_idx = true;
             }
         });
 
@@ -114,19 +110,8 @@ impl UserBoundsList {
     }
 
     fn has_negative_indices(&self) -> bool {
-        self.get_userbounds_only().any(|b| {
-            if let Side::Some(left) = b.l()
-                && left.is_negative()
-            {
-                true
-            } else if let Side::Some(right) = b.r()
-                && right.is_negative()
-            {
-                true
-            } else {
-                false
-            }
-        })
+        self.get_userbounds_only()
+            .any(|b| b.l().is_negative() || b.r().is_negative())
     }
 
     /// Check if the bounds in the list match the following conditions:
@@ -318,10 +303,7 @@ mod tests {
 
         assert_eq!(
             parse_bounds_list("1").unwrap(),
-            vec![BoundOrFiller::Bound(UserBounds::new(
-                Side::Some(1),
-                Side::Some(1)
-            ))],
+            vec![BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into()))],
         );
 
         assert_eq!(
@@ -332,40 +314,34 @@ mod tests {
         assert_eq!(
             parse_bounds_list("1,2").unwrap(),
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into())),
+                BoundOrFiller::Bound(UserBounds::new(2.into(), 2.into())),
             ],
         );
 
         assert_eq!(
             parse_bounds_list("-1,1").unwrap(),
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(-1), Side::Some(-1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new((-1).into(), (-1).into())),
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into())),
             ],
         );
 
         assert_eq!(
             parse_bounds_list("{1}").unwrap(),
-            vec![BoundOrFiller::Bound(UserBounds::new(
-                Side::Some(1),
-                Side::Some(1)
-            ))],
+            vec![BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into()))],
         );
 
         assert_eq!(
             parse_bounds_list("{1:2}").unwrap(),
-            vec![BoundOrFiller::Bound(UserBounds::new(
-                Side::Some(1),
-                Side::Some(2)
-            ))],
+            vec![BoundOrFiller::Bound(UserBounds::new(1.into(), 2.into()))],
         );
 
         assert_eq!(
             parse_bounds_list("{1,2}").unwrap(),
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2)))
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into())),
+                BoundOrFiller::Bound(UserBounds::new(2.into(), 2.into()))
             ],
         );
 
@@ -373,8 +349,8 @@ mod tests {
             parse_bounds_list("hello {1,2} {{world}}").unwrap(),
             vec![
                 BoundOrFiller::Filler("hello ".into()),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into())),
+                BoundOrFiller::Bound(UserBounds::new(2.into(), 2.into())),
                 BoundOrFiller::Filler(" {world}".into()),
             ],
         );
@@ -382,9 +358,9 @@ mod tests {
         assert_eq!(
             parse_bounds_list("{1}😎{2}").unwrap(),
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into())),
                 BoundOrFiller::Filler("😎".into()),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2)))
+                BoundOrFiller::Bound(UserBounds::new(2.into(), 2.into()))
             ],
         );
 
@@ -392,8 +368,8 @@ mod tests {
             parse_bounds_list("\\n\\t{{}}{1,2}\\n\\t{{}}").unwrap(),
             vec![
                 BoundOrFiller::Filler("\n\t{}".into()),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into())),
+                BoundOrFiller::Bound(UserBounds::new(2.into(), 2.into())),
                 BoundOrFiller::Filler("\n\t{}".into()),
             ],
         );
@@ -459,11 +435,11 @@ mod tests {
                 .unpack(4)
                 .list,
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(3), Side::Some(3))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(4), Side::Some(4))),
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into())),
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into())),
+                BoundOrFiller::Bound(UserBounds::new(2.into(), 2.into())),
+                BoundOrFiller::Bound(UserBounds::new(3.into(), 3.into())),
+                BoundOrFiller::Bound(UserBounds::new(4.into(), 4.into())),
             ]
         );
 
@@ -471,8 +447,8 @@ mod tests {
             UserBoundsList::from_str("a{1:2}b").unwrap().unpack(4).list,
             vec![
                 BoundOrFiller::Filler("a".into()),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into())),
+                BoundOrFiller::Bound(UserBounds::new(2.into(), 2.into())),
                 BoundOrFiller::Filler("b".into()),
             ]
         );
@@ -487,13 +463,13 @@ mod tests {
                 .unwrap()
                 .list,
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(3), Side::Some(6))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(4), Side::Some(6))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(4))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(6), Side::Some(6))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(4))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(6), Side::Some(6))),
+                BoundOrFiller::Bound(UserBounds::new(3.into(), 6.into())),
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 1.into())),
+                BoundOrFiller::Bound(UserBounds::new(4.into(), 6.into())),
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 4.into())),
+                BoundOrFiller::Bound(UserBounds::new(6.into(), 6.into())),
+                BoundOrFiller::Bound(UserBounds::new(1.into(), 4.into())),
+                BoundOrFiller::Bound(UserBounds::new(6.into(), 6.into())),
             ]
         );
 
