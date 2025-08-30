@@ -50,7 +50,9 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
             .expect("UserBoundsList must contain at least one UserBounds")
             .set_is_last(true);
 
-        ubl.last_interesting_field = rightmost_bound.unwrap_or(Side::new_inf_right());
+        ubl.last_interesting_field = rightmost_bound
+            .and_then(|x| if x.is_negative() { None } else { Some(x) })
+            .unwrap_or(Side::new_inf_right());
         ubl
     }
 }
