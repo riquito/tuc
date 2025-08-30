@@ -53,7 +53,7 @@ fn cut_str_fast_lane<W: Write>(
 
         fields.push(i + 1);
 
-        if Side::Some(curr_field) == last_interesting_field {
+        if curr_field == last_interesting_field.abs_value() {
             // We have no use for any other fields in this line
             break;
         }
@@ -64,7 +64,7 @@ fn cut_str_fast_lane<W: Write>(
         return Ok(());
     }
 
-    if Side::Some(curr_field) != last_interesting_field {
+    if curr_field != last_interesting_field.abs_value() {
         // We reached the end of the line. Who knows, maybe
         // the user is interested in this field too.
 

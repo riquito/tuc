@@ -38,9 +38,6 @@ where
     R: DelimiterFinder,
 {
     pub fn from_opt_with_finders(opt: &Opt, finder: F, finder_rev: R) -> Result<Self> {
-        // Create a vector to hold the indices. At most we will have as many indices as bounds, doubled to hold both ends of ranges.
-        let mut indices: Vec<i32> = Vec::with_capacity(opt.bounds.len() * 2);
-
         let need_num_fields = opt.only_delimited
             || opt.complement
             || opt.json
@@ -55,43 +52,36 @@ where
             }
         });
 
+        let mut positive_indices = Vec::with_capacity(opt.bounds.len());
+        let mut negative_indices = Vec::with_capacity(opt.bounds.len());
+
         // First collect all indices from bounds, keeping duplicates and original order.
         for bof in opt.bounds.iter() {
             if let BoundOrFiller::Bound(b) = bof {
-                indices.push(match *b.l() {
-                    Side::Some(l) => l,
-                    Side::Continue => 1,
-                });
+                let left_value_0idx = b.l().abs_value() - 1;
 
-                if let Side::Some(r) = *b.r() {
-                    indices.push(r);
-                } // else ignore "continue" as right bound
+                if b.l().is_negative() {
+                    negative_indices.push(left_value_0idx);
+                } else {
+                    positive_indices.push(left_value_0idx);
+                }
+
+                if b.r().is_negative() {
+                    // XXX can negative ever be max_right?
+                    if b.r().abs_value() != Side::max_right() {
+                        negative_indices.push(b.r().abs_value() - 1);
+                    } // else ignore "continue" as right bound
+                } else if b.r().abs_value() != Side::max_right() {
+                    positive_indices.push(b.r().abs_value() - 1);
+                }
             }
         }
 
         // Then sort and deduplicate the indices.
-        indices.sort_unstable();
-        indices.dedup();
-
-        // XXX these two can perhaps be two mutable slices?
-
-        // Collect positive indices as usize
-        let mut positive_indices: Vec<usize> = indices
-            .iter()
-            .filter(|x| **x >= 0)
-            .map(|&x| x as usize - 1) // convert to 0-indexed
-            .collect();
         positive_indices.sort_unstable();
-
-        // Collect negative indices, sorted from largest to smallest
-        let mut negative_indices: Vec<usize> = indices
-            .iter()
-            .filter(|x| **x < 0)
-            .rev()
-            .map(|x| x.unsigned_abs() as usize - 1) // convert to 0-indexed
-            .collect();
-
+        positive_indices.dedup();
         negative_indices.sort_unstable();
+        negative_indices.dedup();
 
         let max_field_to_search_pos = positive_indices.last().map(|x| x + 1).unwrap_or(0);
         let max_field_to_search_neg = negative_indices.last().map(|x| x + 1).unwrap_or(0);
@@ -130,8 +120,8 @@ where
         })
     }
     #[inline(always)]
-    fn get_field_bound(&self, side_val: i32) -> Result<&Range<usize>> {
-        let is_negative = side_val < 0;
+    fn get_field_bound(&self, side_val: &Side) -> Result<&Range<usize>> {
+        let is_negative = side_val.is_negative();
 
         let fields = if is_negative {
             &self.negative_fields
@@ -139,18 +129,15 @@ where
             &self.positive_fields
         };
 
-        let index = if is_negative {
-            side_val.unsigned_abs() as usize - 1
-        } else {
-            side_val as usize - 1
-        };
+        let index = side_val.abs_value() - 1;
 
         if index >= fields.len() {
             return Err(anyhow::anyhow!("Out of bounds: {}", side_val));
         }
 
         if let Some(field) = fields.get(index)
-            && field.start != usize::MAX
+            && field.start != Side::max_right()
+        // WIP can field start every be eq max_right?
         {
             Ok(field)
         } else {
@@ -159,21 +146,19 @@ where
     }
 
     pub fn get_field(&self, b: &UserBounds, line_len: usize) -> Result<Range<usize>> {
-        let (start, end) = match (*b.l(), *b.r()) {
-            (Side::Some(l), Side::Some(r)) => {
-                // Process both at once to potentially reuse field array access
-                let start_field = self.get_field_bound(l)?;
-                let end_field = if l == r {
-                    // Same field, no need to calculate again!
-                    start_field
-                } else {
-                    self.get_field_bound(r)?
-                };
-                (start_field.start, end_field.end)
-            }
-            (Side::Some(l), Side::Continue) => (self.get_field_bound(l)?.start, line_len),
-            (Side::Continue, Side::Some(r)) => (0, self.get_field_bound(r)?.end),
-            (Side::Continue, Side::Continue) => (0, line_len),
+        let l = b.l();
+        let r = b.r();
+
+        let l_bound = self.get_field_bound(l)?;
+
+        let start = l_bound.start;
+
+        let end = if l == r {
+            l_bound.end
+        } else if r.abs_value() == Side::max_right() {
+            line_len
+        } else {
+            self.get_field_bound(r)?.end
         };
 
         if end < start {
@@ -426,7 +411,7 @@ mod tests {
         opt.delimiter = "--".into();
         opt.bounds = UserBoundsList {
             list: Vec::new(),
-            last_interesting_field: Side::Continue,
+            last_interesting_field: Side::new_inf_right(),
         };
 
         let maybe_plan = FieldPlan::from_opt_fixed(&opt);
