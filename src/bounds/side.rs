@@ -10,9 +10,9 @@ pub struct Side {
 impl std::fmt::Display for Side {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if self.is_negative {
-            write!(f, "-{}", self.value)
+            write!(f, "-{}", self.value + 1)
         } else {
-            write!(f, "{}", self.value)
+            write!(f, "{}", self.value + 1)
         }
     }
 }
@@ -21,12 +21,12 @@ impl From<i32> for Side {
     fn from(value: i32) -> Self {
         if value >= 0 {
             Side {
-                value: usize::try_from(value).unwrap(),
+                value: usize::try_from(value).unwrap() - 1,
                 is_negative: false,
             }
         } else {
             Side {
-                value: usize::try_from(value.abs()).unwrap(),
+                value: usize::try_from(value.abs()).unwrap() - 1,
                 is_negative: true,
             }
         }
@@ -62,7 +62,7 @@ impl Side {
     }
 
     pub const fn min_left() -> usize {
-        1
+        0
     }
 
     pub const fn max_right() -> usize {
@@ -81,6 +81,17 @@ impl Side {
         Self::from_str(s, false)
     }
 
+    /**
+     * Create a new Side, using the provided
+     * value as-is. The value must be 0-indexed.
+     */
+    pub fn with_pos_value(value0idx: usize) -> Self {
+        Self {
+            value: value0idx,
+            is_negative: false,
+        }
+    }
+
     fn from_str(s: &str, is_left_bound: bool) -> Result<Self, anyhow::Error> {
         Ok(match s {
             "" => Side {
@@ -96,14 +107,18 @@ impl Side {
                     .parse::<isize>()
                     .or_else(|_| bail!("Not a number `{}`", s))?;
 
-                if v >= 0 {
+                if v == 0 {
+                    bail!("Zero is not a valid field");
+                }
+
+                if v > 0 {
                     Side {
-                        value: usize::try_from(v.abs()).unwrap(),
+                        value: usize::try_from(v.abs()).unwrap() - 1,
                         is_negative: false,
                     }
                 } else {
                     Side {
-                        value: usize::try_from(v.abs()).unwrap(),
+                        value: usize::try_from(v.abs()).unwrap() - 1,
                         is_negative: true,
                     }
                 }
@@ -116,8 +131,6 @@ impl Side {
      * It errors out if the index has different sign than the bounds
      * (we can't verify if e.g. -1 idx is between 3:5 without knowing the number
      * of matching bounds).
-     *
-     * Fields are 1-indexed.
      */
     #[inline(always)]
     pub fn between(&self, other: &Self, idx: usize) -> Result<bool> {
@@ -125,12 +138,12 @@ impl Side {
             // We can't compare two sides with different sign
             bail!(
                 "sign mismatch. Can't verify if index {} is between bounds {}",
-                idx,
+                idx + 1,
                 self
             )
         }
 
-        Ok((self.value..=other.value).contains(&idx))
+        Ok((self.value..=other.value).contains(&(idx)))
     }
 }
 
@@ -152,7 +165,7 @@ impl PartialOrd for Side {
 impl From<usize> for Side {
     fn from(value: usize) -> Self {
         Side {
-            value,
+            value: value - 1,
             is_negative: false,
         }
     }
@@ -162,12 +175,12 @@ impl From<isize> for Side {
     fn from(value: isize) -> Self {
         if value >= 0 {
             Side {
-                value: usize::try_from(value).unwrap(),
+                value: usize::try_from(value).unwrap() - 1,
                 is_negative: false,
             }
         } else {
             Side {
-                value: usize::try_from(value.abs()).unwrap(),
+                value: usize::try_from(value.abs()).unwrap() - 1,
                 is_negative: true,
             }
         }
@@ -183,14 +196,14 @@ mod tests {
         assert_eq!(
             Side::from_str_left_bound("42").unwrap(),
             Side {
-                value: 42,
+                value: 41,
                 is_negative: false
             }
         );
         assert_eq!(
             Side::from_str_left_bound("-7").unwrap(),
             Side {
-                value: 7,
+                value: 6,
                 is_negative: true
             }
         );
@@ -201,7 +214,7 @@ mod tests {
         assert_eq!(
             Side::from_str_left_bound("").unwrap(),
             Side {
-                value: 1,
+                value: 0,
                 is_negative: false
             }
         );
@@ -216,13 +229,7 @@ mod tests {
 
     #[test]
     fn test_from_str_zero() {
-        assert_eq!(
-            Side::from_str_left_bound("0").unwrap(),
-            Side {
-                value: 0,
-                is_negative: false
-            }
-        );
+        assert!(Side::from_str_left_bound("0").is_err());
     }
 
     #[test]
@@ -271,43 +278,6 @@ mod tests {
             Side::from_str_left_bound("-5")
                 .unwrap()
                 .partial_cmp(&Side::from_str_left_bound("3").unwrap()),
-            None
-        );
-    }
-
-    #[test]
-    fn test_partial_ord_zero() {
-        // Zero compared to positive
-        assert_eq!(
-            Side::from_str_left_bound("")
-                .unwrap()
-                .partial_cmp(&Side::from_str_left_bound("5").unwrap()),
-            Some(Ordering::Less)
-        );
-        assert_eq!(
-            Side::from_str_left_bound("5")
-                .unwrap()
-                .partial_cmp(&Side::from_str_left_bound("0").unwrap()),
-            Some(Ordering::Greater)
-        );
-        assert_eq!(
-            Side::from_str_left_bound("0")
-                .unwrap()
-                .partial_cmp(&Side::from_str_left_bound("0").unwrap()),
-            Some(Ordering::Equal)
-        );
-
-        // Zero compared to negative
-        assert_eq!(
-            Side::from_str_left_bound("0")
-                .unwrap()
-                .partial_cmp(&Side::from_str_left_bound("-5").unwrap()),
-            None
-        );
-        assert_eq!(
-            Side::from_str_left_bound("-5")
-                .unwrap()
-                .partial_cmp(&Side::from_str_left_bound("0").unwrap()),
             None
         );
     }

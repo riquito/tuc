@@ -23,7 +23,7 @@ impl TryFrom<&UserBoundsList> for ForwardBounds {
         if value.is_empty() {
             Err("Cannot create ForwardBounds from an empty UserBoundsList")
         } else if value.is_forward_only() {
-            let mut prev_bound_idx = 0;
+            let mut prev_bound_idx = usize::MAX;
             value.iter().try_for_each(|bof| {
                 if let BoundOrFiller::Bound(b) = bof {
                     if b.l().abs_value() == prev_bound_idx {
@@ -199,7 +199,7 @@ fn print_bof<W: Write>(
         // field 4 but we are at field 2.
         if b.matches(curr_field).unwrap() {
             let prepend_delimiter = !prev_chunk_may_be_truncated
-                && curr_field > 1
+                && curr_field > 0
                 && (opt.join || (b.l().abs_value() != curr_field));
 
             let delimiter = opt.replace_delimiter.unwrap_or(opt.delimiter);
@@ -268,7 +268,7 @@ fn cut_bytes_stream<R: BufRead, W: Write>(
 
     'new_line: loop {
         let mut bof_idx = 0;
-        let mut curr_field = 1;
+        let mut curr_field = 0;
         let mut prev_chunk_may_be_truncated = false;
         let mut eol_reached = false;
         let mut empty_line = true;
