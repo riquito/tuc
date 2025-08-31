@@ -101,10 +101,6 @@ impl FromStr for UserBounds {
             ),
         };
 
-        if l.abs_value() == 0 || r.abs_value() == 0 {
-            bail!("Field value 0 is not allowed (fields are 1-indexed)");
-        }
-
         if l != r {
             if !l.is_negative() && !r.is_negative() && r.abs_value() < l.abs_value() {
                 // both positive
@@ -183,8 +179,6 @@ impl UserBoundsTrait<i32> for UserBounds {
      * It errors out if the index has different sign than the bounds
      * (we can't verify if e.g. -1 idx is between 3:5 without knowing the number
      * of matching bounds).
-     *
-     * Fields are 1-indexed.
      */
     #[inline(always)]
     fn matches(&self, idx: usize) -> Result<bool> {
@@ -218,24 +212,24 @@ impl UserBoundsTrait<i32> for UserBounds {
     /// );
     /// ```
     fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>> {
-        let r_value = std::cmp::min(self.r.abs_value(), parts_length);
+        let r_value = std::cmp::min(self.r.abs_value(), parts_length - 1);
 
-        if self.l.abs_value() > parts_length {
+        if self.l.abs_value() >= parts_length {
             bail!("Out of bounds: {}", self.l);
-        } else if r_value > parts_length {
+        } else if r_value >= parts_length {
             bail!("Out of bounds: {}", self.r);
         };
 
         let start = if self.l.is_negative() {
-            parts_length - self.l.abs_value()
+            parts_length - self.l.abs_value() - 1
         } else {
-            self.l.abs_value() - 1
+            self.l.abs_value()
         };
 
         let end = if self.r.is_negative() {
-            parts_length - r_value + 1
+            parts_length - r_value
         } else {
-            r_value
+            r_value + 1
         };
 
         if end <= start {
@@ -256,20 +250,20 @@ impl UserBoundsTrait<i32> for UserBounds {
         let (start, end): (usize, usize) = match (self.l.value(), self.r.value()) {
             ((l_is_negative, l_value), (_, RIGHT_MAX)) => (
                 if l_is_negative {
-                    num_fields + 1 - l_value
+                    num_fields - l_value - 1
                 } else {
                     l_value
                 },
-                num_fields,
+                num_fields - 1,
             ),
             ((l_is_negative, l_value), (r_is_negative, r_value)) => (
                 if l_is_negative {
-                    num_fields + 1 - l_value
+                    num_fields - l_value - 1
                 } else {
                     l_value
                 },
                 if r_is_negative {
-                    num_fields + 1 - r_value
+                    num_fields - r_value - 1
                 } else {
                     r_value
                 },
@@ -277,7 +271,10 @@ impl UserBoundsTrait<i32> for UserBounds {
         };
 
         for i in start..=end {
-            bounds.push(UserBounds::new(i.into(), i.into()))
+            bounds.push(UserBounds::new(
+                Side::with_pos_value(i),
+                Side::with_pos_value(i),
+            ))
         }
 
         bounds

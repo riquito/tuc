@@ -58,7 +58,7 @@ where
         // First collect all indices from bounds, keeping duplicates and original order.
         for bof in opt.bounds.iter() {
             if let BoundOrFiller::Bound(b) = bof {
-                let left_value_0idx = b.l().abs_value() - 1;
+                let left_value_0idx = b.l().abs_value();
 
                 if b.l().is_negative() {
                     negative_indices.push(left_value_0idx);
@@ -69,10 +69,10 @@ where
                 if b.r().is_negative() {
                     // XXX can negative ever be max_right?
                     if b.r().abs_value() != Side::max_right() {
-                        negative_indices.push(b.r().abs_value() - 1);
+                        negative_indices.push(b.r().abs_value());
                     } // else ignore "continue" as right bound
                 } else if b.r().abs_value() != Side::max_right() {
-                    positive_indices.push(b.r().abs_value() - 1);
+                    positive_indices.push(b.r().abs_value());
                 }
             }
         }
@@ -129,7 +129,7 @@ where
             &self.positive_fields
         };
 
-        let index = side_val.abs_value() - 1;
+        let index = side_val.abs_value();
 
         if index >= fields.len() {
             return Err(anyhow::anyhow!("Out of bounds: {}", side_val));
