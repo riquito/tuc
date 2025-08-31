@@ -12,11 +12,11 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
     opt: &Opt,
 ) -> Result<()> {
     let mut line_buf = String::with_capacity(1024);
-    let mut line_idx = 0;
+    let mut line_idx = usize::MAX;
     let mut bounds_idx = 0; // keep track of which bounds have been used
     let mut add_newline_next = false;
     while let Some(line) = read_line_with_eol(stdin, &mut line_buf, opt.eol) {
-        line_idx += 1;
+        line_idx = line_idx.wrapping_add(1); // use wrapping add so we can start at 0
 
         let line = line?;
         let line: &str = line.as_ref();

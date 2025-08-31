@@ -41,7 +41,7 @@ fn cut_str_fast_lane<W: Write>(
 
     let bounds = &opt.bounds;
 
-    let mut curr_field = 0;
+    let mut curr_field = usize::MAX;
 
     fields.clear();
 
@@ -49,7 +49,7 @@ fn cut_str_fast_lane<W: Write>(
     fields.push(0);
 
     for i in memchr::memchr_iter(opt.delimiter, buffer) {
-        curr_field += 1;
+        curr_field = curr_field.wrapping_add(1);
 
         fields.push(i + 1);
 
@@ -59,17 +59,21 @@ fn cut_str_fast_lane<W: Write>(
         }
     }
 
-    if curr_field == 0 && opt.only_delimited {
+    if curr_field == usize::MAX && opt.only_delimited {
         // The delimiter was not found
         return Ok(());
     }
 
-    if curr_field != last_interesting_field.abs_value() {
-        // We reached the end of the line. Who knows, maybe
-        // the user is interested in this field too.
+    if last_interesting_field.abs_value() == usize::MAX
+        || curr_field != last_interesting_field.abs_value()
+    {
+        // We reached the end of the line but didn't find
+        // every field the user wanted. Maybe they want
+        // this one too.
 
-        // We add a fake start (+1 because we account for the fake delimiter)
-        // This allows us to avoid one if/else in the output loop
+        // We add the start of a fake extra field
+        // (a field that start right after the end of the line)
+        // to simplify our loop later
         fields.push(buffer.len() + 1);
     }
 
