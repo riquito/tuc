@@ -17,22 +17,6 @@ impl std::fmt::Display for Side {
     }
 }
 
-impl From<i32> for Side {
-    fn from(value: i32) -> Self {
-        if value >= 0 {
-            Side {
-                value: usize::try_from(value).unwrap() - 1,
-                is_negative: false,
-            }
-        } else {
-            Side {
-                value: usize::try_from(value.abs()).unwrap() - 1,
-                is_negative: true,
-            }
-        }
-    }
-}
-
 impl Side {
     pub fn abs_value(&self) -> usize {
         self.value
@@ -89,6 +73,17 @@ impl Side {
         Self {
             value: value0idx,
             is_negative: false,
+        }
+    }
+
+    /**
+     * Create a new Side, using the provided
+     * value as-is. The value must be 0-indexed.
+     */
+    pub fn with_neg_value(value0idx: usize) -> Self {
+        Self {
+            value: value0idx,
+            is_negative: true,
         }
     }
 
@@ -158,31 +153,6 @@ impl PartialOrd for Side {
             Some(other.value.cmp(&self.value))
         } else {
             Some(self.value.cmp(&other.value))
-        }
-    }
-}
-
-impl From<usize> for Side {
-    fn from(value: usize) -> Self {
-        Side {
-            value: value - 1,
-            is_negative: false,
-        }
-    }
-}
-
-impl From<isize> for Side {
-    fn from(value: isize) -> Self {
-        if value >= 0 {
-            Side {
-                value: usize::try_from(value).unwrap() - 1,
-                is_negative: false,
-            }
-        } else {
-            Side {
-                value: usize::try_from(value.abs()).unwrap() - 1,
-                is_negative: true,
-            }
         }
     }
 }
