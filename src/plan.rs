@@ -113,8 +113,8 @@ where
             negative_indices,
             // XXX maybe I can reduce the capacity here
             // by storing fields by original index position?
-            positive_fields: vec![usize::MAX..usize::MAX; max_field_to_search_pos], // initialize with empty ranges
-            negative_fields: vec![usize::MAX..usize::MAX; max_field_to_search_neg], // initialize with empty ranges,
+            positive_fields: vec![Side::max_right()..Side::max_right(); max_field_to_search_pos], // initialize with empty ranges
+            negative_fields: vec![Side::max_right()..Side::max_right(); max_field_to_search_neg], // initialize with empty ranges,
             extract_func,
             finder,
             finder_rev,
@@ -204,8 +204,8 @@ where
             .nth(desired_field - seen)
             .ok_or_else(|| {
                 plan.positive_fields[desired_field..].fill(Range {
-                    start: usize::MAX,
-                    end: usize::MAX,
+                    start: Side::max_right(),
+                    end: Side::max_right(),
                 });
                 anyhow::anyhow!("Out of bounds: {}", desired_field + 1)
             })?
@@ -256,8 +256,8 @@ where
             .nth(desired_field - seen)
             .ok_or_else(|| {
                 plan.negative_fields[desired_field..].fill(Range {
-                    start: usize::MAX,
-                    end: usize::MAX,
+                    start: Side::max_right(),
+                    end: Side::max_right(),
                 });
                 anyhow::anyhow!("Out of bounds: -{}", desired_field + 1)
             })?
@@ -327,8 +327,8 @@ where
 
         if num_fields < desired_field + 1 {
             plan.negative_fields[desired_field..].fill(Range {
-                start: usize::MAX,
-                end: usize::MAX,
+                start: Side::max_right(),
+                end: Side::max_right(),
             });
             out_of_bound_neg_idx = Some(desired_field);
             break;
@@ -540,7 +540,7 @@ mod tests {
         let expected_pos_indices = vec![0];
         let expected_neg_indices = vec![0];
         #[allow(clippy::single_range_in_vec_init)]
-        let expected_ranges = vec![usize::MAX..usize::MAX];
+        let expected_ranges = vec![Side::max_right()..Side::max_right()];
 
         let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_pos_indices);
@@ -569,7 +569,7 @@ mod tests {
 
         let line = b"a-b-c-d-e";
         let expected_indices = vec![0, 1, 3];
-        let expected_ranges = vec![0..1, 2..3, usize::MAX..usize::MAX, 6..7];
+        let expected_ranges = vec![0..1, 2..3, Side::max_right()..Side::max_right(), 6..7];
 
         let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_indices);
@@ -606,26 +606,44 @@ mod tests {
         assert_eq!(plan.positive_indices, expected_pos_indices);
 
         extract_fields_using_pos_indices(line1, &mut plan).unwrap();
-        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 2..3]);
+        assert_eq!(
+            plan.positive_fields,
+            vec![Side::max_right()..Side::max_right(), 2..3]
+        );
 
         extract_fields_using_pos_indices(line2, &mut plan).unwrap();
-        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 4..7]);
+        assert_eq!(
+            plan.positive_fields,
+            vec![Side::max_right()..Side::max_right(), 4..7]
+        );
 
         extract_fields_using_pos_indices(line3, &mut plan).unwrap();
-        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 5..10]);
+        assert_eq!(
+            plan.positive_fields,
+            vec![Side::max_right()..Side::max_right(), 5..10]
+        );
 
         // from_opt_fixed_greedy
         let mut plan = FieldPlan::from_opt_fixed_greedy(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_pos_indices);
 
         extract_fields_using_pos_indices(line1, &mut plan).unwrap();
-        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 2..3]);
+        assert_eq!(
+            plan.positive_fields,
+            vec![Side::max_right()..Side::max_right(), 2..3]
+        );
 
         extract_fields_using_pos_indices(line2, &mut plan).unwrap();
-        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 4..7]);
+        assert_eq!(
+            plan.positive_fields,
+            vec![Side::max_right()..Side::max_right(), 4..7]
+        );
 
         extract_fields_using_pos_indices(line3, &mut plan).unwrap();
-        assert_eq!(plan.positive_fields, vec![usize::MAX..usize::MAX, 5..10]);
+        assert_eq!(
+            plan.positive_fields,
+            vec![Side::max_right()..Side::max_right(), 5..10]
+        );
     }
 
     #[test]
@@ -636,9 +654,9 @@ mod tests {
         let line = b"a-b-c-d-e";
         let expected_indices = vec![1, 3, 4];
         let expected_ranges = vec![
-            usize::MAX..usize::MAX,
+            Side::max_right()..Side::max_right(),
             6..7,
-            usize::MAX..usize::MAX,
+            Side::max_right()..Side::max_right(),
             2..3,
             0..1,
         ];
@@ -670,7 +688,7 @@ mod tests {
 
         let line = b"a--b--c";
         let expected_indices = vec![0, 2];
-        let expected_ranges = vec![0..1, usize::MAX..usize::MAX, 6..7];
+        let expected_ranges = vec![0..1, Side::max_right()..Side::max_right(), 6..7];
 
         let mut plan = FieldPlan::from_opt_fixed_greedy(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_indices);
@@ -685,7 +703,7 @@ mod tests {
 
         let line = b"a--b--c";
         let expected_indices = vec![0, 2];
-        let expected_ranges = vec![6..7, usize::MAX..usize::MAX, 0..1];
+        let expected_ranges = vec![6..7, Side::max_right()..Side::max_right(), 0..1];
 
         let mut plan = FieldPlan::from_opt_fixed_greedy(&opt).unwrap();
         assert_eq!(plan.negative_indices, expected_indices);
@@ -702,7 +720,7 @@ mod tests {
         let expected_pos_indices = vec![0, 2];
         let expected_neg_indices = vec![0, 2];
         let expected_pos_ranges = vec![0..1, 2..3, 4..5, 6..7];
-        let expected_neg_ranges = vec![6..7, usize::MAX..usize::MAX, 2..3];
+        let expected_neg_ranges = vec![6..7, Side::max_right()..Side::max_right(), 2..3];
 
         let mut plan = FieldPlan::from_opt_fixed(&opt).unwrap();
         assert_eq!(plan.positive_indices, expected_pos_indices);
@@ -730,7 +748,7 @@ mod tests {
         extract_fields_using_pos_indices(line1, &mut plan).unwrap();
         assert_eq!(
             plan.positive_fields,
-            vec![usize::MAX..usize::MAX, 2..3, 4..5]
+            vec![Side::max_right()..Side::max_right(), 2..3, 4..5]
         );
 
         let res = extract_fields_using_pos_indices(line2, &mut plan);
@@ -738,16 +756,16 @@ mod tests {
         assert_eq!(
             plan.positive_fields,
             vec![
-                usize::MAX..usize::MAX,
-                usize::MAX..usize::MAX,
-                usize::MAX..usize::MAX
+                Side::max_right()..Side::max_right(),
+                Side::max_right()..Side::max_right(),
+                Side::max_right()..Side::max_right()
             ]
         );
 
         extract_fields_using_pos_indices(line3, &mut plan).unwrap();
         assert_eq!(
             plan.positive_fields,
-            vec![usize::MAX..usize::MAX, 5..10, 11..16]
+            vec![Side::max_right()..Side::max_right(), 5..10, 11..16]
         );
     }
 
@@ -768,7 +786,7 @@ mod tests {
         extract_fields_using_negative_indices(line1, &mut plan).unwrap();
         assert_eq!(
             plan.negative_fields,
-            vec![usize::MAX..usize::MAX, 2..3, 0..1]
+            vec![Side::max_right()..Side::max_right(), 2..3, 0..1]
         );
 
         let res = extract_fields_using_negative_indices(line2, &mut plan);
@@ -776,16 +794,16 @@ mod tests {
         assert_eq!(
             plan.negative_fields,
             vec![
-                usize::MAX..usize::MAX,
-                usize::MAX..usize::MAX,
-                usize::MAX..usize::MAX
+                Side::max_right()..Side::max_right(),
+                Side::max_right()..Side::max_right(),
+                Side::max_right()..Side::max_right()
             ]
         );
 
         extract_fields_using_negative_indices(line3, &mut plan).unwrap();
         assert_eq!(
             plan.negative_fields,
-            vec![usize::MAX..usize::MAX, 5..10, 0..4]
+            vec![Side::max_right()..Side::max_right(), 5..10, 0..4]
         );
     }
 
@@ -845,7 +863,7 @@ mod tests {
         assert_eq!(plan.positive_fields, vec![0..1, 2..3, 4..5]);
         assert_eq!(
             plan.negative_fields,
-            vec![usize::MAX..usize::MAX, 2..3, 0..1]
+            vec![Side::max_right()..Side::max_right(), 2..3, 0..1]
         );
 
         let res = extract_every_field(line2, &mut plan);
@@ -858,9 +876,9 @@ mod tests {
         assert_eq!(
             plan.negative_fields,
             vec![
-                usize::MAX..usize::MAX,
-                usize::MAX..usize::MAX,
-                usize::MAX..usize::MAX
+                Side::max_right()..Side::max_right(),
+                Side::max_right()..Side::max_right(),
+                Side::max_right()..Side::max_right()
             ]
         );
 
@@ -868,7 +886,7 @@ mod tests {
         assert_eq!(plan.positive_fields, vec![0..4, 5..10, 11..16]);
         assert_eq!(
             plan.negative_fields,
-            vec![usize::MAX..usize::MAX, 5..10, 0..4]
+            vec![Side::max_right()..Side::max_right(), 5..10, 0..4]
         );
     }
 
