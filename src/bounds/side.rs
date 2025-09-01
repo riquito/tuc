@@ -18,42 +18,6 @@ impl std::fmt::Display for Side {
 }
 
 impl Side {
-    pub fn abs_value(&self) -> usize {
-        self.value
-    }
-
-    pub fn abs_value_unchecked(&self) -> usize {
-        self.value
-    }
-
-    #[must_use]
-    pub fn value(&self) -> (bool, usize) {
-        (self.is_negative, self.value)
-    }
-
-    pub fn new_inf_right() -> Self {
-        Self {
-            value: Self::max_right(),
-            is_negative: false,
-        }
-    }
-
-    pub const fn max_right() -> usize {
-        usize::MAX
-    }
-
-    pub fn is_negative(&self) -> bool {
-        self.is_negative
-    }
-
-    pub fn from_str_left_bound(s: &str) -> Result<Self, anyhow::Error> {
-        Self::from_str(s, true)
-    }
-
-    pub fn from_str_right_bound(s: &str) -> Result<Self, anyhow::Error> {
-        Self::from_str(s, false)
-    }
-
     /**
      * Create a new Side, using the provided
      * value as-is. The value must be 0-indexed.
@@ -74,6 +38,46 @@ impl Side {
             value: value0idx,
             is_negative: true,
         }
+    }
+
+    /**
+     * Create a new Side, positive, with
+     * value set to Self::max_right()
+     */
+    pub fn with_pos_inf() -> Self {
+        Self {
+            value: Self::max_right(),
+            is_negative: false,
+        }
+    }
+
+    pub fn abs_value(&self) -> usize {
+        self.value
+    }
+
+    pub fn abs_value_unchecked(&self) -> usize {
+        self.value
+    }
+
+    #[must_use]
+    pub fn value(&self) -> (bool, usize) {
+        (self.is_negative, self.value)
+    }
+
+    pub const fn max_right() -> usize {
+        usize::MAX
+    }
+
+    pub fn is_negative(&self) -> bool {
+        self.is_negative
+    }
+
+    pub fn from_str_left_bound(s: &str) -> Result<Self, anyhow::Error> {
+        Self::from_str(s, true)
+    }
+
+    pub fn from_str_right_bound(s: &str) -> Result<Self, anyhow::Error> {
+        Self::from_str(s, false)
     }
 
     fn from_str(s: &str, is_left_bound: bool) -> Result<Self, anyhow::Error> {

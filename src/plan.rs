@@ -411,7 +411,7 @@ mod tests {
         opt.delimiter = "--".into();
         opt.bounds = UserBoundsList {
             list: Vec::new(),
-            last_interesting_field: Side::new_inf_right(),
+            last_interesting_field: Side::with_pos_inf(),
         };
 
         let maybe_plan = FieldPlan::from_opt_fixed(&opt);
