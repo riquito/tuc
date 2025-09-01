@@ -23,9 +23,9 @@ impl Side {
      * value as-is. The value must be 0-indexed.
      */
     #[inline(always)]
-    pub fn with_pos_value(value0idx: usize) -> Self {
+    pub fn with_pos_value(value: usize) -> Self {
         Self {
-            value: value0idx,
+            value,
             is_negative: false,
         }
     }
@@ -35,9 +35,9 @@ impl Side {
      * value as-is. The value must be 0-indexed.
      */
     #[inline(always)]
-    pub fn with_neg_value(value0idx: usize) -> Self {
+    pub fn with_neg_value(value: usize) -> Self {
         Self {
-            value: value0idx,
+            value,
             is_negative: true,
         }
     }
