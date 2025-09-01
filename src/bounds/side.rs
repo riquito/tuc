@@ -55,10 +55,6 @@ impl Side {
         self.value
     }
 
-    pub fn abs_value_unchecked(&self) -> usize {
-        self.value
-    }
-
     #[must_use]
     pub fn value(&self) -> (bool, usize) {
         (self.is_negative, self.value)
