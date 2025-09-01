@@ -58,21 +58,22 @@ where
         // First collect all indices from bounds, keeping duplicates and original order.
         for bof in opt.bounds.iter() {
             if let BoundOrFiller::Bound(b) = bof {
-                let left_value_0idx = b.l().value_unchecked();
+                let (l_is_negative, l_value) = b.l().value();
+                let (r_is_negative, r_value) = b.r().value();
 
-                if b.l().is_negative() {
-                    negative_indices.push(left_value_0idx);
+                if l_is_negative {
+                    negative_indices.push(l_value);
                 } else {
-                    positive_indices.push(left_value_0idx);
+                    positive_indices.push(l_value);
                 }
 
-                if b.r().is_negative() {
+                if r_is_negative {
                     // XXX can negative ever be max_right?
-                    if b.r().value_unchecked() != Side::max_right() {
-                        negative_indices.push(b.r().value_unchecked());
+                    if r_value != Side::max_right() {
+                        negative_indices.push(r_value);
                     } // else ignore "continue" as right bound
-                } else if b.r().value_unchecked() != Side::max_right() {
-                    positive_indices.push(b.r().value_unchecked());
+                } else if r_value != Side::max_right() {
+                    positive_indices.push(r_value);
                 }
             }
         }
