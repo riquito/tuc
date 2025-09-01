@@ -317,7 +317,12 @@ where
     // Do we have any positive out of bounds?
     if plan.positive_indices.last() > Some(&(num_fields - 1)) {
         // need to find out which one is the first index out of bound
-        out_of_bound_pos_idx = plan.positive_indices.iter().find(|x| **x > num_fields - 1);
+        out_of_bound_pos_idx = Some(
+            plan.positive_indices
+                .binary_search(&(num_fields))
+                .unwrap_or_else(|idx| idx)
+                + 1, // wouldn't work for empty positive indices but here's ok
+        );
     }
 
     let mut out_of_bound_neg_idx = None;
