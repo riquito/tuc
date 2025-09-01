@@ -162,10 +162,11 @@ where
             self.get_field_bound(r)?.end
         };
 
-        if end < start {
+        if end >= start {
+            Ok(start..end)
+        } else {
             bail!("Field left value cannot be greater than right value");
         }
-        Ok(start..end)
     }
 }
 
