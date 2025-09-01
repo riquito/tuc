@@ -3,30 +3,36 @@ use std::cmp::Ordering;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Side {
-    value: usize,
-    is_negative: bool,
+    // Pack positive and negative fields into a single u64:
+    // - bit 63: is_negative flag
+    // - bits 0-62: value (supports values up to 2^62)
+    packed: u64,
 }
 
 impl std::fmt::Display for Side {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if self.is_negative {
-            write!(f, "-{}", self.value + 1)
+        if self.is_negative() {
+            write!(f, "-{}", self.value_unchecked() + 1)
         } else {
-            write!(f, "{}", self.value + 1)
+            write!(f, "{}", self.value_unchecked() + 1)
         }
     }
 }
 
 impl Side {
+    const NEGATIVE_FLAG: u64 = 1u64 << 63;
+    const VALUE_MASK: u64 = !Self::NEGATIVE_FLAG;
+    const MAX_VALUE: usize = (Self::VALUE_MASK) as usize; // 2^63 - 1
+
     /**
      * Create a new Side, using the provided
      * value as-is. The value must be 0-indexed.
      */
     #[inline(always)]
-    pub fn with_pos_value(value0idx: usize) -> Self {
+    pub fn with_pos_value(value: usize) -> Self {
+        debug_assert!(value <= (Self::MAX_VALUE), "Value too large");
         Self {
-            value: value0idx,
-            is_negative: false,
+            packed: (value as u64),
         }
     }
 
@@ -35,10 +41,10 @@ impl Side {
      * value as-is. The value must be 0-indexed.
      */
     #[inline(always)]
-    pub fn with_neg_value(value0idx: usize) -> Self {
+    pub fn with_neg_value(value: usize) -> Self {
+        debug_assert!(value <= (Self::MAX_VALUE), "Value too large");
         Self {
-            value: value0idx,
-            is_negative: true,
+            packed: (value as u64) | Self::NEGATIVE_FLAG,
         }
     }
 
@@ -49,30 +55,29 @@ impl Side {
     #[inline(always)]
     pub fn with_pos_inf() -> Self {
         Self {
-            value: Self::max_right(),
-            is_negative: false,
+            packed: Self::MAX_VALUE as u64,
         }
     }
 
     #[inline(always)]
     pub fn value_unchecked(&self) -> usize {
-        self.value
+        (self.packed & Self::VALUE_MASK) as usize
     }
 
     #[inline(always)]
     #[must_use]
     pub fn value(&self) -> (bool, usize) {
-        (self.is_negative, self.value)
+        (self.is_negative(), self.value_unchecked())
     }
 
     #[inline(always)]
     pub const fn max_right() -> usize {
-        usize::MAX
+        Self::MAX_VALUE
     }
 
     #[inline(always)]
     pub fn is_negative(&self) -> bool {
-        self.is_negative
+        self.packed & Self::NEGATIVE_FLAG != 0
     }
 
     pub fn from_str_left_bound(s: &str) -> Result<Self, anyhow::Error> {
@@ -85,10 +90,7 @@ impl Side {
 
     fn from_str(s: &str, is_left_bound: bool) -> Result<Self, anyhow::Error> {
         Ok(match s {
-            "" => Side {
-                value: if is_left_bound { 0 } else { Self::max_right() },
-                is_negative: false,
-            },
+            "" => Side::with_pos_value(if is_left_bound { 0 } else { Self::max_right() }),
             _ => {
                 let v = s
                     .parse::<isize>()
@@ -99,15 +101,9 @@ impl Side {
                 }
 
                 if v > 0 {
-                    Side {
-                        value: usize::try_from(v.abs()).unwrap() - 1,
-                        is_negative: false,
-                    }
+                    Side::with_pos_value(usize::try_from(v.abs()).unwrap() - 1)
                 } else {
-                    Side {
-                        value: usize::try_from(v.abs()).unwrap() - 1,
-                        is_negative: true,
-                    }
+                    Side::with_neg_value(usize::try_from(v.abs()).unwrap() - 1)
                 }
             }
         })
@@ -117,15 +113,15 @@ impl Side {
 impl PartialOrd for Side {
     #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.is_negative ^ other.is_negative {
+        if self.is_negative() ^ other.is_negative() {
             // We can't compare two sides with different sign
             return None;
         }
 
-        if self.is_negative {
-            Some(other.value.cmp(&self.value))
+        if self.is_negative() {
+            Some(other.value_unchecked().cmp(&self.value_unchecked()))
         } else {
-            Some(self.value.cmp(&other.value))
+            Some(self.value_unchecked().cmp(&other.value_unchecked()))
         }
     }
 }
@@ -137,36 +133,18 @@ mod tests {
     #[test]
     fn test_from_str_some() {
         assert_eq!(
-            Side::from_str_left_bound("42").unwrap(),
-            Side {
-                value: 41,
-                is_negative: false
-            }
+            Side::from_str_left_bound("42").unwrap().value(),
+            (false, 41)
         );
-        assert_eq!(
-            Side::from_str_left_bound("-7").unwrap(),
-            Side {
-                value: 6,
-                is_negative: true
-            }
-        );
+        assert_eq!(Side::from_str_left_bound("-7").unwrap().value(), (true, 6));
     }
 
     #[test]
     fn test_from_str_continue() {
+        assert_eq!(Side::from_str_left_bound("").unwrap().value(), (false, 0));
         assert_eq!(
-            Side::from_str_left_bound("").unwrap(),
-            Side {
-                value: 0,
-                is_negative: false
-            }
-        );
-        assert_eq!(
-            Side::from_str_right_bound("").unwrap(),
-            Side {
-                value: usize::MAX,
-                is_negative: false
-            }
+            Side::from_str_right_bound("").unwrap().value(),
+            (false, Side::max_right())
         );
     }
 
