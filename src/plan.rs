@@ -137,7 +137,9 @@ where
         }
 
         if let Some(field) = fields.get(index)
-        // WIP can field start every be eq max_right?
+        // Field can start at max_right when the fields
+        // array is initialized that way.
+         && field.start != Side::max_right()
         {
             Ok(field)
         } else {
