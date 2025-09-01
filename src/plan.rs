@@ -58,7 +58,7 @@ where
         // First collect all indices from bounds, keeping duplicates and original order.
         for bof in opt.bounds.iter() {
             if let BoundOrFiller::Bound(b) = bof {
-                let left_value_0idx = b.l().abs_value();
+                let left_value_0idx = b.l().value_unchecked();
 
                 if b.l().is_negative() {
                     negative_indices.push(left_value_0idx);
@@ -68,11 +68,11 @@ where
 
                 if b.r().is_negative() {
                     // XXX can negative ever be max_right?
-                    if b.r().abs_value() != Side::max_right() {
-                        negative_indices.push(b.r().abs_value());
+                    if b.r().value_unchecked() != Side::max_right() {
+                        negative_indices.push(b.r().value_unchecked());
                     } // else ignore "continue" as right bound
-                } else if b.r().abs_value() != Side::max_right() {
-                    positive_indices.push(b.r().abs_value());
+                } else if b.r().value_unchecked() != Side::max_right() {
+                    positive_indices.push(b.r().value_unchecked());
                 }
             }
         }
@@ -129,7 +129,7 @@ where
             &self.positive_fields
         };
 
-        let index = side_val.abs_value();
+        let index = side_val.value_unchecked();
 
         if index >= fields.len() {
             return Err(anyhow::anyhow!("Out of bounds: {}", side_val));
@@ -155,7 +155,7 @@ where
 
         let end = if l == r {
             l_bound.end
-        } else if r.abs_value() == Side::max_right() {
+        } else if r.value_unchecked() == Side::max_right() {
             line_len
         } else {
             self.get_field_bound(r)?.end
