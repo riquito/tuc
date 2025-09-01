@@ -59,7 +59,7 @@ impl fmt::Display for UserBounds {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match (self.l, self.r) {
             (l, r) if l == r => write!(f, "{}", l),
-            (l, r) if r.abs_value() == Side::max_right() => write!(f, "{}:-1", l),
+            (l, r) if r.value_unchecked() == Side::max_right() => write!(f, "{}:-1", l),
             (l, r) => write!(f, "{}:{}", l, r),
         }
     }
@@ -102,10 +102,13 @@ impl FromStr for UserBounds {
         };
 
         if l != r {
-            if !l.is_negative() && !r.is_negative() && r.abs_value() < l.abs_value() {
+            if !l.is_negative() && !r.is_negative() && r.value_unchecked() < l.value_unchecked() {
                 // both positive
                 bail!("Field left value cannot be greater than right value");
-            } else if l.is_negative() && r.is_negative() && l.abs_value() < r.abs_value() {
+            } else if l.is_negative()
+                && r.is_negative()
+                && l.value_unchecked() < r.value_unchecked()
+            {
                 // both negative. Because we use absolute numbers we inverted the check
                 bail!("Field left value cannot be greater than right value")
             }
@@ -206,18 +209,18 @@ impl UserBoundsTrait<i32> for UserBounds {
     /// );
     /// ```
     fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>> {
-        let r_value = std::cmp::min(self.r.abs_value(), parts_length - 1);
+        let r_value = std::cmp::min(self.r.value_unchecked(), parts_length - 1);
 
-        if self.l.abs_value() >= parts_length {
+        if self.l.value_unchecked() >= parts_length {
             bail!("Out of bounds: {}", self.l);
         } else if r_value >= parts_length {
             bail!("Out of bounds: {}", self.r);
         };
 
         let start = if self.l.is_negative() {
-            parts_length - self.l.abs_value() - 1
+            parts_length - self.l.value_unchecked() - 1
         } else {
-            self.l.abs_value()
+            self.l.value_unchecked()
         };
 
         let end = if self.r.is_negative() {
