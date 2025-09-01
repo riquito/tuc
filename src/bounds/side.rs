@@ -105,26 +105,6 @@ impl Side {
             }
         })
     }
-    /**
-     * Check if a field is between the bounds.
-     *
-     * It errors out if the index has different sign than the bounds
-     * (we can't verify if e.g. -1 idx is between 3:5 without knowing the number
-     * of matching bounds).
-     */
-    #[inline(always)]
-    pub fn between(&self, other: &Self, idx: usize) -> Result<bool> {
-        if self.is_negative ^ other.is_negative {
-            // We can't compare two sides with different sign
-            bail!(
-                "sign mismatch. Can't verify if index {} is between bounds {}",
-                idx + 1,
-                self
-            )
-        }
-
-        Ok((self.value..=other.value).contains(&(idx)))
-    }
 }
 
 impl PartialOrd for Side {

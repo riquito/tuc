@@ -179,7 +179,19 @@ impl UserBoundsTrait<i32> for UserBounds {
      */
     #[inline(always)]
     fn matches(&self, idx: usize) -> Result<bool> {
-        self.l.between(&self.r, idx)
+        let (l_is_negative, l_value) = self.l.value();
+        let (r_is_negative, r_value) = self.r.value();
+
+        if l_is_negative ^ r_is_negative {
+            // We can't compare two sides with different sign
+            bail!(
+                "sign mismatch. Can't verify if index {} is between bounds {}",
+                idx + 1,
+                self
+            )
+        }
+
+        Ok((l_value..=r_value).contains(&(idx)))
     }
 
     /// Transform UserBounds into std::opt::Range
