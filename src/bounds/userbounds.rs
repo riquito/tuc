@@ -93,7 +93,7 @@ impl FromStr for UserBounds {
             ),
             Some(idx_colon) if idx_colon == s.len() - 1 => (
                 Side::from_str_left_bound(&s[..idx_colon])?,
-                Side::new_inf_right(),
+                Side::with_pos_inf(),
             ),
             Some(idx_colon) => (
                 Side::from_str_left_bound(&s[..idx_colon])?,
@@ -135,7 +135,7 @@ impl PartialEq for UserBounds {
 
 impl Default for UserBounds {
     fn default() -> Self {
-        UserBounds::new(Side::with_pos_value(0), Side::new_inf_right())
+        UserBounds::new(Side::with_pos_value(0), Side::with_pos_inf())
     }
 }
 
@@ -371,11 +371,11 @@ mod tests {
         );
         assert_eq!(
             UserBounds::from_str("1:").ok(),
-            Some(UserBounds::new(side_pos(0), Side::new_inf_right())),
+            Some(UserBounds::new(side_pos(0), Side::with_pos_inf())),
         );
         assert_eq!(
             UserBounds::from_str("-1:").ok(),
-            Some(UserBounds::new(side_neg(0), Side::new_inf_right())),
+            Some(UserBounds::new(side_neg(0), Side::with_pos_inf())),
         );
         assert_eq!(
             UserBounds::from_str(":1").ok(),

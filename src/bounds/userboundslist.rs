@@ -24,7 +24,7 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
     fn from(list: Vec<BoundOrFiller>) -> Self {
         let mut ubl = UserBoundsList {
             list,
-            last_interesting_field: Side::new_inf_right(),
+            last_interesting_field: Side::with_pos_inf(),
         };
 
         let mut rightmost_bound: Option<Side> = None;
@@ -52,7 +52,7 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
 
         ubl.last_interesting_field = rightmost_bound
             .and_then(|x| if x.is_negative() { None } else { Some(x) })
-            .unwrap_or(Side::new_inf_right());
+            .unwrap_or(Side::with_pos_inf());
         ubl
     }
 }
