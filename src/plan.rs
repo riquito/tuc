@@ -146,6 +146,7 @@ where
         }
     }
 
+    #[inline(always)]
     pub fn get_field(&self, b: &UserBounds, line_len: usize) -> Result<Range<usize>> {
         let l = b.l();
         let r = b.r();
