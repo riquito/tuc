@@ -117,12 +117,6 @@ impl FromStr for UserBounds {
     }
 }
 
-impl From<Range<usize>> for UserBounds {
-    fn from(value: Range<usize>) -> Self {
-        UserBounds::new(Side::from(value.start + 1), Side::from(value.end))
-    }
-}
-
 impl PartialOrd for UserBounds {
     /// Compare UserBounds. Note that you cannot reliably compare
     /// bounds with a mix of positive/negative indices (you cannot
@@ -284,7 +278,17 @@ impl UserBoundsTrait<i32> for UserBounds {
     fn complement(&self, num_fields: usize) -> Result<Vec<UserBounds>> {
         let r = self.try_into_range(num_fields)?;
         let r_complement = complement_std_range(num_fields, &r);
-        Ok(r_complement.into_iter().map(|x| x.into()).collect())
+        Ok(r_complement
+            .into_iter()
+            .map(|x| {
+                UserBounds::new(
+                    Side::with_pos_value(x.start),
+                    // SAFETY
+                    // complement_std_range won't use usize::MAX
+                    Side::with_pos_value(x.end - 1),
+                )
+            })
+            .collect())
     }
 }
 
@@ -306,6 +310,14 @@ fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usiz
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn side_pos(l: usize) -> Side {
+        Side::with_pos_value(l)
+    }
+
+    fn side_neg(l: usize) -> Side {
+        Side::with_neg_value(l)
+    }
 
     #[test]
     fn test_complement_std_range() {
@@ -332,70 +344,58 @@ mod tests {
 
     #[test]
     fn test_user_bounds_formatting() {
-        assert_eq!(
-            UserBounds::new(1.into(), Side::new_inf_right()).to_string(),
-            "1:-1"
-        );
-        assert_eq!(
-            UserBounds::new(Side::new_inf_left(), 3.into()).to_string(),
-            "1:3"
-        );
-        assert_eq!(
-            UserBounds::new(3.into(), Side::new_inf_right()).to_string(),
-            "3:-1"
-        );
-        assert_eq!(UserBounds::new(1.into(), 2.into()).to_string(), "1:2");
-        assert_eq!(
-            UserBounds::new((-1).into(), (-2).into()).to_string(),
-            "-1:-2"
-        );
+        assert_eq!(UserBounds::from_str("1:").unwrap().to_string(), "1:-1");
+        assert_eq!(UserBounds::from_str(":3").unwrap().to_string(), "1:3");
+        assert_eq!(UserBounds::from_str("3:").unwrap().to_string(), "3:-1");
+        assert_eq!(UserBounds::from_str("1:2").unwrap().to_string(), "1:2");
+        assert_eq!(UserBounds::from_str("-2:-1").unwrap().to_string(), "-2:-1");
     }
 
     #[test]
     fn test_user_bounds_from_str() {
         assert_eq!(
             UserBounds::from_str("1").ok(),
-            Some(UserBounds::new(1.into(), 1.into())),
+            Some(UserBounds::new(side_pos(0), side_pos(0)))
         );
         assert_eq!(
             UserBounds::from_str("-1").ok(),
-            Some(UserBounds::new((-1).into(), (-1).into())),
+            Some(UserBounds::new(side_neg(0), side_neg(0)))
         );
         assert_eq!(
             UserBounds::from_str("1:2").ok(),
-            Some(UserBounds::new(1.into(), 2.into())),
+            Some(UserBounds::new(side_pos(0), side_pos(1)))
         );
         assert_eq!(
             UserBounds::from_str("-2:-1").ok(),
-            Some(UserBounds::new((-2).into(), (-1).into())),
+            Some(UserBounds::new(side_neg(1), side_neg(0)))
         );
         assert_eq!(
             UserBounds::from_str("1:").ok(),
-            Some(UserBounds::new(1.into(), Side::new_inf_right())),
+            Some(UserBounds::new(side_pos(0), Side::new_inf_right())),
         );
         assert_eq!(
             UserBounds::from_str("-1:").ok(),
-            Some(UserBounds::new((-1).into(), Side::new_inf_right())),
+            Some(UserBounds::new(side_neg(0), Side::new_inf_right())),
         );
         assert_eq!(
             UserBounds::from_str(":1").ok(),
-            Some(UserBounds::new(Side::new_inf_left(), 1.into())),
+            Some(UserBounds::new(Side::new_inf_left(), side_pos(0))),
         );
         assert_eq!(
             UserBounds::from_str(":-1").ok(),
-            Some(UserBounds::new(Side::new_inf_left(), (-1).into())),
+            Some(UserBounds::new(Side::new_inf_left(), side_neg(0))),
         );
 
         assert_eq!(
             UserBounds::from_str("1").ok(),
-            Some(UserBounds::with_fallback(1.into(), 1.into(), None)),
+            Some(UserBounds::with_fallback(side_pos(0), side_pos(0), None)),
         );
 
         assert_eq!(
             UserBounds::from_str("1=foo").ok(),
             Some(UserBounds::with_fallback(
-                1.into(),
-                1.into(),
+                side_pos(0),
+                side_pos(0),
                 Some("foo".as_bytes().to_owned())
             )),
         );
@@ -403,8 +403,8 @@ mod tests {
         assert_eq!(
             UserBounds::from_str("1:2=foo").ok(),
             Some(UserBounds::with_fallback(
-                1.into(),
-                2.into(),
+                side_pos(0),
+                side_pos(1),
                 Some("foo".as_bytes().to_owned())
             )),
         );
@@ -412,8 +412,8 @@ mod tests {
         assert_eq!(
             UserBounds::from_str("-1=foo").ok(),
             Some(UserBounds::with_fallback(
-                (-1).into(),
-                (-1).into(),
+                side_neg(0),
+                side_neg(0),
                 Some("foo".as_bytes().to_owned())
             )),
         );
@@ -421,8 +421,8 @@ mod tests {
         assert_eq!(
             UserBounds::from_str("1=allow:colon:in:fallback").ok(),
             Some(UserBounds::with_fallback(
-                1.into(),
-                1.into(),
+                side_pos(0),
+                side_pos(0),
                 Some("allow:colon:in:fallback".as_bytes().to_owned())
             )),
         );
@@ -430,8 +430,8 @@ mod tests {
         assert_eq!(
             UserBounds::from_str("1:2=allow:colon:in:fallback").ok(),
             Some(UserBounds::with_fallback(
-                1.into(),
-                2.into(),
+                side_pos(0),
+                side_pos(1),
                 Some("allow:colon:in:fallback".as_bytes().to_owned())
             )),
         );
@@ -460,52 +460,52 @@ mod tests {
     #[test]
     fn test_unpack_bound() {
         assert_eq!(
-            UserBounds::new(1.into(), 1.into()).unpack(2),
-            vec![UserBounds::new(1.into(), 1.into())],
+            UserBounds::from_str("1").unwrap().unpack(2),
+            vec![UserBounds::from_str("1").unwrap()],
         );
 
         assert_eq!(
-            UserBounds::new(1.into(), Side::new_inf_right()).unpack(2),
+            UserBounds::from_str("1:").unwrap().unpack(2),
             vec![
-                UserBounds::new(1.into(), 1.into()),
-                UserBounds::new(2.into(), 2.into())
+                UserBounds::from_str("1").unwrap(),
+                UserBounds::from_str("2").unwrap()
             ],
         );
 
         assert_eq!(
-            UserBounds::new(Side::new_inf_left(), 2.into()).unpack(2),
+            UserBounds::from_str(":2").unwrap().unpack(2),
             vec![
-                UserBounds::new(1.into(), 1.into()),
-                UserBounds::new(2.into(), 2.into())
+                UserBounds::from_str("1").unwrap(),
+                UserBounds::from_str("2").unwrap()
             ],
         );
 
         assert_eq!(
-            UserBounds::new(Side::new_inf_left(), Side::new_inf_right()).unpack(2),
+            UserBounds::from_str("1:-1").unwrap().unpack(2),
             vec![
-                UserBounds::new(1.into(), 1.into()),
-                UserBounds::new(2.into(), 2.into())
+                UserBounds::from_str("1").unwrap(),
+                UserBounds::from_str("2").unwrap()
             ],
         );
 
         assert_eq!(
-            UserBounds::new((-1).into(), Side::new_inf_right()).unpack(2),
-            vec![UserBounds::new(2.into(), 2.into()),],
+            UserBounds::from_str("-1:").unwrap().unpack(2),
+            vec![UserBounds::from_str("2").unwrap()],
         );
 
         assert_eq!(
-            UserBounds::new(Side::new_inf_left(), (-1).into()).unpack(2),
+            UserBounds::from_str(":-1").unwrap().unpack(2),
             vec![
-                UserBounds::new(1.into(), 1.into()),
-                UserBounds::new(2.into(), 2.into())
+                UserBounds::from_str("1").unwrap(),
+                UserBounds::from_str("2").unwrap()
             ],
         );
 
         assert_eq!(
-            UserBounds::new((-2).into(), (-1).into()).unpack(2),
+            UserBounds::from_str("-2:-1").unwrap().unpack(2),
             vec![
-                UserBounds::new(1.into(), 1.into()),
-                UserBounds::new(2.into(), 2.into())
+                UserBounds::from_str("1").unwrap(),
+                UserBounds::from_str("2").unwrap()
             ],
         );
     }
@@ -513,24 +513,20 @@ mod tests {
     #[test]
     fn test_complement_bound() {
         assert_eq!(
-            UserBounds::new(1.into(), 1.into()).complement(2).unwrap(),
-            vec![UserBounds::new(2.into(), 2.into())],
+            UserBounds::from_str("1:1").unwrap().complement(2).unwrap(),
+            vec![UserBounds::from_str("2:2").unwrap()],
         );
 
         assert_eq!(
-            UserBounds::new(1.into(), Side::new_inf_right())
-                .complement(2)
-                .unwrap(),
+            UserBounds::from_str("1:").unwrap().complement(2).unwrap(),
             Vec::new(),
         );
 
         assert_eq!(
-            UserBounds::new((-3).into(), 3.into())
-                .complement(4)
-                .unwrap(),
+            UserBounds::from_str("-3:3").unwrap().complement(4).unwrap(),
             vec![
-                UserBounds::new(1.into(), 1.into()),
-                UserBounds::new(4.into(), 4.into()),
+                UserBounds::from_str("1:1").unwrap(),
+                UserBounds::from_str("4:4").unwrap(),
             ],
         );
     }
