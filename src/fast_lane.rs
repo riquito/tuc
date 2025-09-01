@@ -64,7 +64,7 @@ fn cut_str_fast_lane<W: Write>(
         return Ok(());
     }
 
-    if last_interesting_field.value_unchecked() == Side::max_right()
+    if last_interesting_field.value_unchecked() == usize::MAX
         || curr_field != last_interesting_field.value_unchecked()
     {
         // We reached the end of the line but didn't find
