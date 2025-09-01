@@ -142,7 +142,7 @@ impl Default for UserBounds {
     }
 }
 
-pub trait UserBoundsTrait<T> {
+pub trait UserBoundsTrait {
     fn new(l: Side, r: Side) -> Self;
     fn with_fallback(l: Side, r: Side, fallback_oob: Option<Vec<u8>>) -> Self;
     fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>>;
@@ -151,7 +151,7 @@ pub trait UserBoundsTrait<T> {
     fn complement(&self, num_fields: usize) -> Result<Vec<UserBounds>>;
 }
 
-impl UserBoundsTrait<i32> for UserBounds {
+impl UserBoundsTrait for UserBounds {
     fn new(l: Side, r: Side) -> Self {
         UserBounds {
             l,
