@@ -31,22 +31,11 @@ impl Side {
         (self.is_negative, self.value)
     }
 
-    pub fn new_inf_left() -> Self {
-        Self {
-            value: Self::min_left(),
-            is_negative: false,
-        }
-    }
-
     pub fn new_inf_right() -> Self {
         Self {
             value: Self::max_right(),
             is_negative: false,
         }
-    }
-
-    pub const fn min_left() -> usize {
-        0
     }
 
     pub const fn max_right() -> usize {
@@ -90,11 +79,7 @@ impl Side {
     fn from_str(s: &str, is_left_bound: bool) -> Result<Self, anyhow::Error> {
         Ok(match s {
             "" => Side {
-                value: if is_left_bound {
-                    Self::min_left()
-                } else {
-                    Self::max_right()
-                },
+                value: if is_left_bound { 0 } else { Self::max_right() },
                 is_negative: false,
             },
             _ => {
