@@ -125,12 +125,14 @@ impl PartialOrd for UserBounds {
     /// bounds with a mix of positive/negative indices (you cannot
     /// compare `-1` with `3` without kwowing how many parts are there).
     /// Check with UserBounds.is_sortable before comparing.
+    #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.r.partial_cmp(&other.l)
     }
 }
 
 impl PartialEq for UserBounds {
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         (self.l, self.r) == (other.l, other.r)
     }

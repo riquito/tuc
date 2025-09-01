@@ -22,6 +22,7 @@ impl Side {
      * Create a new Side, using the provided
      * value as-is. The value must be 0-indexed.
      */
+    #[inline(always)]
     pub fn with_pos_value(value0idx: usize) -> Self {
         Self {
             value: value0idx,
@@ -33,6 +34,7 @@ impl Side {
      * Create a new Side, using the provided
      * value as-is. The value must be 0-indexed.
      */
+    #[inline(always)]
     pub fn with_neg_value(value0idx: usize) -> Self {
         Self {
             value: value0idx,
@@ -44,6 +46,7 @@ impl Side {
      * Create a new Side, positive, with
      * value set to Self::max_right()
      */
+    #[inline(always)]
     pub fn with_pos_inf() -> Self {
         Self {
             value: Self::max_right(),
@@ -51,19 +54,23 @@ impl Side {
         }
     }
 
+    #[inline(always)]
     pub fn value_unchecked(&self) -> usize {
         self.value
     }
 
+    #[inline(always)]
     #[must_use]
     pub fn value(&self) -> (bool, usize) {
         (self.is_negative, self.value)
     }
 
+    #[inline(always)]
     pub const fn max_right() -> usize {
         usize::MAX
     }
 
+    #[inline(always)]
     pub fn is_negative(&self) -> bool {
         self.is_negative
     }
@@ -108,6 +115,7 @@ impl Side {
 }
 
 impl PartialOrd for Side {
+    #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if self.is_negative ^ other.is_negative {
             // We can't compare two sides with different sign
