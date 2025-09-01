@@ -137,7 +137,6 @@ where
         }
 
         if let Some(field) = fields.get(index)
-            && field.start != Side::max_right()
         // WIP can field start every be eq max_right?
         {
             Ok(field)
