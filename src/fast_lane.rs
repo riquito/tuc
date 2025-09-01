@@ -53,7 +53,7 @@ fn cut_str_fast_lane<W: Write>(
 
         fields.push(i + 1);
 
-        if curr_field == last_interesting_field.abs_value() {
+        if curr_field == last_interesting_field.value_unchecked() {
             // We have no use for any other fields in this line
             break;
         }
@@ -64,8 +64,8 @@ fn cut_str_fast_lane<W: Write>(
         return Ok(());
     }
 
-    if last_interesting_field.abs_value() == usize::MAX
-        || curr_field != last_interesting_field.abs_value()
+    if last_interesting_field.value_unchecked() == usize::MAX
+        || curr_field != last_interesting_field.value_unchecked()
     {
         // We reached the end of the line but didn't find
         // every field the user wanted. Maybe they want

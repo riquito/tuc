@@ -51,7 +51,7 @@ impl Side {
         }
     }
 
-    pub fn abs_value(&self) -> usize {
+    pub fn value_unchecked(&self) -> usize {
         self.value
     }
 

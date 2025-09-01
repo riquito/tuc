@@ -26,10 +26,10 @@ impl TryFrom<&UserBoundsList> for ForwardBounds {
             let mut prev_bound_idx = usize::MAX;
             value.iter().try_for_each(|bof| {
                 if let BoundOrFiller::Bound(b) = bof {
-                    if b.l().abs_value() == prev_bound_idx {
+                    if b.l().value_unchecked() == prev_bound_idx {
                         return Err("Bounds are sorted, but can't be repeated");
                     }
-                    prev_bound_idx = b.l().abs_value();
+                    prev_bound_idx = b.l().value_unchecked();
                 }
                 Ok(())
             })?;
@@ -200,7 +200,7 @@ fn print_bof<W: Write>(
         if b.matches(curr_field).unwrap() {
             let prepend_delimiter = !prev_chunk_may_be_truncated
                 && curr_field > 0
-                && (opt.join || (b.l().abs_value() != curr_field));
+                && (opt.join || (b.l().value_unchecked() != curr_field));
 
             let delimiter = opt.replace_delimiter.unwrap_or(opt.delimiter);
 
@@ -211,7 +211,7 @@ fn print_bof<W: Write>(
                 prepend_delimiter,
             )?;
 
-            if b.r().abs_value() == curr_field {
+            if b.r().value_unchecked() == curr_field {
                 bof_idx += 1;
             }
         }
@@ -239,7 +239,7 @@ fn print_filler_or_fallbacks<W: Write>(
             BoundOrFiller::Bound(b) => b,
         };
 
-        if b.r().abs_value() == Side::max_right() {
+        if b.r().value_unchecked() == Side::max_right() {
             break;
         }
 
@@ -320,7 +320,7 @@ fn cut_bytes_stream<R: BufRead, W: Write>(
                 }
 
                 // If we've found the last field we're interested in
-                if curr_field == last_interesting_field.abs_value() {
+                if curr_field == last_interesting_field.value_unchecked() {
                     // Print any remaining fillers (no fallbacks, since we're done with the fields)
                     print_filler_or_fallbacks(stdout, bof_idx, opt)?;
 
