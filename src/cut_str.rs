@@ -353,13 +353,12 @@ where
 {
     match (opt.read_to_end, opt.eol) {
         (false, EOL::Newline) => stdin.for_byte_line(|line| {
-            let line = line.strip_suffix(&[opt.eol as u8]).unwrap_or(line);
             cut_str(
                 line,
                 opt,
                 stdout,
                 compressed_line_buf,
-                &[opt.eol as u8],
+                &[opt.eol.into()],
                 plan,
             )
             .map_err(|x| {
@@ -369,13 +368,12 @@ where
             .and(Ok(true))
         })?,
         (false, EOL::Zero) => stdin.for_byte_record(opt.eol.into(), |line| {
-            let line = line.strip_suffix(&[opt.eol as u8]).unwrap_or(line);
             cut_str(
                 line,
                 opt,
                 stdout,
                 compressed_line_buf,
-                &[opt.eol as u8],
+                &[opt.eol.into()],
                 plan,
             )
             .map_err(|x| {
