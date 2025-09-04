@@ -20,6 +20,7 @@ impl RegexFinder {
 impl DelimiterFinder for RegexFinder {
     type Iter<'a> = Box<dyn Iterator<Item = Range<usize>> + 'a>;
 
+    #[inline(always)]
     fn find_ranges<'a>(&'a self, line: &'a [u8]) -> Self::Iter<'a> {
         if self.trim_empty {
             let line_len = line.len();

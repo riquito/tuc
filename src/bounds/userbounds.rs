@@ -1,18 +1,52 @@
+use crate::bounds::side::Side;
 use anyhow::{Result, bail};
 use std::cmp::Ordering;
-use std::convert::TryInto;
 use std::fmt;
 use std::ops::Range;
 use std::str::FromStr;
 
-use crate::bounds::Side;
-
 #[derive(Debug, Eq, Clone)]
 pub struct UserBounds {
-    pub l: Side,
-    pub r: Side,
-    pub is_last: bool,
-    pub fallback_oob: Option<Vec<u8>>,
+    l: Side,
+    r: Side,
+    is_last: bool,
+    fallback_oob: Option<Vec<u8>>,
+}
+
+impl UserBounds {
+    pub fn new(l: Side, r: Side) -> Self {
+        Self {
+            l,
+            r,
+            is_last: false,
+            fallback_oob: None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn l(&self) -> &Side {
+        &self.l
+    }
+
+    #[inline(always)]
+    pub fn r(&self) -> &Side {
+        &self.r
+    }
+
+    #[inline(always)]
+    pub fn is_last(&self) -> bool {
+        self.is_last
+    }
+
+    #[inline(always)]
+    pub fn set_is_last(&mut self, is_last: bool) {
+        self.is_last = is_last;
+    }
+
+    #[inline(always)]
+    pub fn fallback_oob(&self) -> &Option<Vec<u8>> {
+        &self.fallback_oob
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -24,9 +58,9 @@ pub enum BoundOrFiller {
 impl fmt::Display for UserBounds {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match (self.l, self.r) {
-            (Side::Continue, Side::Continue) => write!(f, "1:-1"),
-            (l, r) if l == r => write!(f, "{l}"),
-            (l, r) => write!(f, "{l}:{r}"),
+            (l, r) if l == r => write!(f, "{}", l),
+            (l, r) if r.value_unchecked() == Side::max_right() => write!(f, "{}:-1", l),
+            (l, r) => write!(f, "{}:{}", l, r),
         }
     }
 }
@@ -50,34 +84,34 @@ impl FromStr for UserBounds {
 
         let (l, r) = match s.find(':') {
             None => {
-                let side = Side::from_str(s)?;
+                let side = Side::from_str_left_bound(s)?;
                 (side, side)
             }
-            Some(idx_colon) if idx_colon == 0 => {
-                (Side::Continue, Side::from_str(&s[idx_colon + 1..])?)
-            }
-            Some(idx_colon) if idx_colon == s.len() - 1 => {
-                (Side::from_str(&s[..idx_colon])?, Side::Continue)
-            }
+            Some(idx_colon) if idx_colon == 0 => (
+                Side::with_pos_value(0),
+                Side::from_str_right_bound(&s[idx_colon + 1..])?,
+            ),
+            Some(idx_colon) if idx_colon == s.len() - 1 => (
+                Side::from_str_left_bound(&s[..idx_colon])?,
+                Side::with_pos_inf(),
+            ),
             Some(idx_colon) => (
-                Side::from_str(&s[..idx_colon])?,
-                Side::from_str(&s[idx_colon + 1..])?,
+                Side::from_str_left_bound(&s[..idx_colon])?,
+                Side::from_str_right_bound(&s[idx_colon + 1..])?,
             ),
         };
 
-        match (l, r) {
-            (Side::Some(0), _) => {
-                bail!("Field value 0 is not allowed (fields are 1-indexed)");
-            }
-            (_, Side::Some(0)) => {
-                bail!("Field value 0 is not allowed (fields are 1-indexed)");
-            }
-            (Side::Some(left), Side::Some(right))
-                if right < left && (right * left).is_positive() =>
-            {
+        if l != r {
+            if !l.is_negative() && !r.is_negative() && r.value_unchecked() < l.value_unchecked() {
+                // both positive
                 bail!("Field left value cannot be greater than right value");
+            } else if l.is_negative()
+                && r.is_negative()
+                && l.value_unchecked() < r.value_unchecked()
+            {
+                // both negative. Because we use absolute numbers we inverted the check
+                bail!("Field left value cannot be greater than right value")
             }
-            _ => (),
         }
 
         let mut b = UserBounds::new(l, r);
@@ -86,33 +120,19 @@ impl FromStr for UserBounds {
     }
 }
 
-impl From<Range<usize>> for UserBounds {
-    fn from(value: Range<usize>) -> Self {
-        let start: i32 = value
-            .start
-            .try_into()
-            .expect("range was bigger than expected");
-
-        let end: i32 = value
-            .end
-            .try_into()
-            .expect("range was bigger than expected");
-
-        UserBounds::new(Side::Some(start + 1), Side::Some(end))
-    }
-}
-
 impl PartialOrd for UserBounds {
     /// Compare UserBounds. Note that you cannot reliably compare
     /// bounds with a mix of positive/negative indices (you cannot
     /// compare `-1` with `3` without kwowing how many parts are there).
     /// Check with UserBounds.is_sortable before comparing.
+    #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.r.partial_cmp(&other.l)
     }
 }
 
 impl PartialEq for UserBounds {
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         (self.l, self.r) == (other.l, other.r)
     }
@@ -120,20 +140,20 @@ impl PartialEq for UserBounds {
 
 impl Default for UserBounds {
     fn default() -> Self {
-        UserBounds::new(Side::Some(1), Side::Continue)
+        UserBounds::new(Side::with_pos_value(0), Side::with_pos_inf())
     }
 }
 
-pub trait UserBoundsTrait<T> {
+pub trait UserBoundsTrait {
     fn new(l: Side, r: Side) -> Self;
     fn with_fallback(l: Side, r: Side, fallback_oob: Option<Vec<u8>>) -> Self;
     fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>>;
-    fn matches(&self, idx: T) -> Result<bool>;
+    fn matches(&self, idx: usize) -> Result<bool>;
     fn unpack(&self, num_fields: usize) -> Vec<UserBounds>;
     fn complement(&self, num_fields: usize) -> Result<Vec<UserBounds>>;
 }
 
-impl UserBoundsTrait<i32> for UserBounds {
+impl UserBoundsTrait for UserBounds {
     fn new(l: Side, r: Side) -> Self {
         UserBounds {
             l,
@@ -158,32 +178,22 @@ impl UserBoundsTrait<i32> for UserBounds {
      * It errors out if the index has different sign than the bounds
      * (we can't verify if e.g. -1 idx is between 3:5 without knowing the number
      * of matching bounds).
-     *
-     * Fields are 1-indexed.
      */
     #[inline(always)]
-    fn matches(&self, idx: i32) -> Result<bool> {
-        match (self.l, self.r) {
-            (Side::Some(left), _) if (left * idx).is_negative() => {
-                bail!(
-                    "sign mismatch. Can't verify if index {} is between bounds {}",
-                    idx,
-                    self
-                )
-            }
-            (_, Side::Some(right)) if (right * idx).is_negative() => {
-                bail!(
-                    "sign mismatch. Can't verify if index {} is between bounds {}",
-                    idx,
-                    self
-                )
-            }
-            (Side::Continue, Side::Continue) => Ok(true),
-            (Side::Some(left), Side::Some(right)) if left <= idx && idx <= right => Ok(true),
-            (Side::Continue, Side::Some(right)) if idx <= right => Ok(true),
-            (Side::Some(left), Side::Continue) if left <= idx => Ok(true),
-            _ => Ok(false),
+    fn matches(&self, idx: usize) -> Result<bool> {
+        let (l_is_negative, l_value) = self.l.value();
+        let (r_is_negative, r_value) = self.r.value();
+
+        if l_is_negative ^ r_is_negative {
+            // We can't compare two sides with different sign
+            bail!(
+                "sign mismatch. Can't verify if index {} is between bounds {}",
+                idx + 1,
+                self
+            )
         }
+
+        Ok((l_value..=r_value).contains(&(idx)))
     }
 
     /// Transform UserBounds into std::opt::Range
@@ -213,26 +223,24 @@ impl UserBoundsTrait<i32> for UserBounds {
     /// );
     /// ```
     fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>> {
-        let parts_length = parts_length as i32;
+        let r_value = std::cmp::min(self.r.value_unchecked(), parts_length - 1);
 
-        let start: i32 = match self.l {
-            Side::Continue => 0,
-            Side::Some(v) => {
-                if v > parts_length || v < -parts_length {
-                    bail!("Out of bounds: {}", v);
-                }
-                if v < 0 { parts_length + v } else { v - 1 }
-            }
+        if self.l.value_unchecked() >= parts_length {
+            bail!("Out of bounds: {}", self.l);
+        } else if r_value >= parts_length {
+            bail!("Out of bounds: {}", self.r);
         };
 
-        let end: i32 = match self.r {
-            Side::Continue => parts_length,
-            Side::Some(v) => {
-                if v > parts_length || v < -parts_length {
-                    bail!("Out of bounds: {}", v);
-                }
-                if v < 0 { parts_length + v + 1 } else { v }
-            }
+        let start = if self.l.is_negative() {
+            parts_length - self.l.value_unchecked() - 1
+        } else {
+            self.l.value_unchecked()
+        };
+
+        let end = if self.r.is_negative() {
+            parts_length - r_value
+        } else {
+            r_value + 1
         };
 
         if end <= start {
@@ -240,34 +248,44 @@ impl UserBoundsTrait<i32> for UserBounds {
             bail!("Field left value cannot be greater than right value");
         }
 
-        Ok(Range {
-            start: start as usize,
-            end: end as usize,
-        })
+        Ok(Range { start, end })
     }
 
     /// Transform a ranged bound into a list of one or more
     /// slot bound
     fn unpack(&self, num_fields: usize) -> Vec<UserBounds> {
         let mut bounds = Vec::new();
-        let n: i32 = num_fields
-            .try_into()
-            .expect("num_fields was bigger than expected");
 
-        let (start, end): (i32, i32) = match (self.l, self.r) {
-            (Side::Continue, Side::Continue) => (1, n),
-            (Side::Continue, Side::Some(right)) => {
-                (1, if right > 0 { right } else { n + 1 + right })
-            }
-            (Side::Some(left), Side::Some(right)) => (
-                if left > 0 { left } else { n + 1 + left },
-                if right > 0 { right } else { n + 1 + right },
+        const RIGHT_MAX: usize = Side::max_right();
+
+        let (start, end): (usize, usize) = match (self.l.value(), self.r.value()) {
+            ((l_is_negative, l_value), (_, RIGHT_MAX)) => (
+                if l_is_negative {
+                    num_fields - l_value - 1
+                } else {
+                    l_value
+                },
+                num_fields - 1,
             ),
-            (Side::Some(left), Side::Continue) => (if left > 0 { left } else { n + 1 + left }, n),
+            ((l_is_negative, l_value), (r_is_negative, r_value)) => (
+                if l_is_negative {
+                    num_fields - l_value - 1
+                } else {
+                    l_value
+                },
+                if r_is_negative {
+                    num_fields - r_value - 1
+                } else {
+                    r_value
+                },
+            ),
         };
 
         for i in start..=end {
-            bounds.push(UserBounds::new(Side::Some(i), Side::Some(i)))
+            bounds.push(UserBounds::new(
+                Side::with_pos_value(i),
+                Side::with_pos_value(i),
+            ))
         }
 
         bounds
@@ -277,7 +295,17 @@ impl UserBoundsTrait<i32> for UserBounds {
     fn complement(&self, num_fields: usize) -> Result<Vec<UserBounds>> {
         let r = self.try_into_range(num_fields)?;
         let r_complement = complement_std_range(num_fields, &r);
-        Ok(r_complement.into_iter().map(|x| x.into()).collect())
+        Ok(r_complement
+            .into_iter()
+            .map(|x| {
+                UserBounds::new(
+                    Side::with_pos_value(x.start),
+                    // SAFETY
+                    // complement_std_range won't use usize::MAX
+                    Side::with_pos_value(x.end - 1),
+                )
+            })
+            .collect())
     }
 }
 
@@ -299,6 +327,14 @@ fn complement_std_range(parts_length: usize, r: &Range<usize>) -> Vec<Range<usiz
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn side_pos(l: usize) -> Side {
+        Side::with_pos_value(l)
+    }
+
+    fn side_neg(l: usize) -> Side {
+        Side::with_neg_value(l)
+    }
 
     #[test]
     fn test_complement_std_range() {
@@ -325,77 +361,58 @@ mod tests {
 
     #[test]
     fn test_user_bounds_formatting() {
-        assert_eq!(
-            UserBounds::new(Side::Continue, Side::Continue).to_string(),
-            "1:-1"
-        );
-        assert_eq!(
-            UserBounds::new(Side::Continue, Side::Some(3)).to_string(),
-            ":3"
-        );
-        assert_eq!(
-            UserBounds::new(Side::Some(3), Side::Continue).to_string(),
-            "3:"
-        );
-        assert_eq!(
-            UserBounds::new(Side::Some(1), Side::Some(2)).to_string(),
-            "1:2"
-        );
-        assert_eq!(
-            UserBounds::new(Side::Some(-1), Side::Some(-2)).to_string(),
-            "-1:-2"
-        );
+        assert_eq!(UserBounds::from_str("1:").unwrap().to_string(), "1:-1");
+        assert_eq!(UserBounds::from_str(":3").unwrap().to_string(), "1:3");
+        assert_eq!(UserBounds::from_str("3:").unwrap().to_string(), "3:-1");
+        assert_eq!(UserBounds::from_str("1:2").unwrap().to_string(), "1:2");
+        assert_eq!(UserBounds::from_str("-2:-1").unwrap().to_string(), "-2:-1");
     }
 
     #[test]
     fn test_user_bounds_from_str() {
         assert_eq!(
             UserBounds::from_str("1").ok(),
-            Some(UserBounds::new(Side::Some(1), Side::Some(1))),
+            Some(UserBounds::new(side_pos(0), side_pos(0)))
         );
         assert_eq!(
             UserBounds::from_str("-1").ok(),
-            Some(UserBounds::new(Side::Some(-1), Side::Some(-1))),
+            Some(UserBounds::new(side_neg(0), side_neg(0)))
         );
         assert_eq!(
             UserBounds::from_str("1:2").ok(),
-            Some(UserBounds::new(Side::Some(1), Side::Some(2))),
+            Some(UserBounds::new(side_pos(0), side_pos(1)))
         );
         assert_eq!(
             UserBounds::from_str("-2:-1").ok(),
-            Some(UserBounds::new(Side::Some(-2), Side::Some(-1))),
+            Some(UserBounds::new(side_neg(1), side_neg(0)))
         );
         assert_eq!(
             UserBounds::from_str("1:").ok(),
-            Some(UserBounds::new(Side::Some(1), Side::Continue)),
+            Some(UserBounds::new(side_pos(0), Side::with_pos_inf())),
         );
         assert_eq!(
             UserBounds::from_str("-1:").ok(),
-            Some(UserBounds::new(Side::Some(-1), Side::Continue)),
+            Some(UserBounds::new(side_neg(0), Side::with_pos_inf())),
         );
         assert_eq!(
             UserBounds::from_str(":1").ok(),
-            Some(UserBounds::new(Side::Continue, Side::Some(1))),
+            Some(UserBounds::new(Side::with_pos_value(0), side_pos(0))),
         );
         assert_eq!(
             UserBounds::from_str(":-1").ok(),
-            Some(UserBounds::new(Side::Continue, Side::Some(-1))),
+            Some(UserBounds::new(Side::with_pos_value(0), side_neg(0))),
         );
 
         assert_eq!(
             UserBounds::from_str("1").ok(),
-            Some(UserBounds::with_fallback(
-                Side::Some(1),
-                Side::Some(1),
-                None
-            )),
+            Some(UserBounds::with_fallback(side_pos(0), side_pos(0), None)),
         );
 
         assert_eq!(
             UserBounds::from_str("1=foo").ok(),
             Some(UserBounds::with_fallback(
-                Side::Some(1),
-                Side::Some(1),
+                side_pos(0),
+                side_pos(0),
                 Some("foo".as_bytes().to_owned())
             )),
         );
@@ -403,8 +420,8 @@ mod tests {
         assert_eq!(
             UserBounds::from_str("1:2=foo").ok(),
             Some(UserBounds::with_fallback(
-                Side::Some(1),
-                Side::Some(2),
+                side_pos(0),
+                side_pos(1),
                 Some("foo".as_bytes().to_owned())
             )),
         );
@@ -412,8 +429,8 @@ mod tests {
         assert_eq!(
             UserBounds::from_str("-1=foo").ok(),
             Some(UserBounds::with_fallback(
-                Side::Some(-1),
-                Side::Some(-1),
+                side_neg(0),
+                side_neg(0),
                 Some("foo".as_bytes().to_owned())
             )),
         );
@@ -421,8 +438,8 @@ mod tests {
         assert_eq!(
             UserBounds::from_str("1=allow:colon:in:fallback").ok(),
             Some(UserBounds::with_fallback(
-                Side::Some(1),
-                Side::Some(1),
+                side_pos(0),
+                side_pos(0),
                 Some("allow:colon:in:fallback".as_bytes().to_owned())
             )),
         );
@@ -430,8 +447,8 @@ mod tests {
         assert_eq!(
             UserBounds::from_str("1:2=allow:colon:in:fallback").ok(),
             Some(UserBounds::with_fallback(
-                Side::Some(1),
-                Side::Some(2),
+                side_pos(0),
+                side_pos(1),
                 Some("allow:colon:in:fallback".as_bytes().to_owned())
             )),
         );
@@ -460,52 +477,52 @@ mod tests {
     #[test]
     fn test_unpack_bound() {
         assert_eq!(
-            UserBounds::new(Side::Some(1), Side::Some(1)).unpack(2),
-            vec![UserBounds::new(Side::Some(1), Side::Some(1))],
+            UserBounds::from_str("1").unwrap().unpack(2),
+            vec![UserBounds::from_str("1").unwrap()],
         );
 
         assert_eq!(
-            UserBounds::new(Side::Some(1), Side::Continue).unpack(2),
+            UserBounds::from_str("1:").unwrap().unpack(2),
             vec![
-                UserBounds::new(Side::Some(1), Side::Some(1)),
-                UserBounds::new(Side::Some(2), Side::Some(2))
+                UserBounds::from_str("1").unwrap(),
+                UserBounds::from_str("2").unwrap()
             ],
         );
 
         assert_eq!(
-            UserBounds::new(Side::Continue, Side::Some(2)).unpack(2),
+            UserBounds::from_str(":2").unwrap().unpack(2),
             vec![
-                UserBounds::new(Side::Some(1), Side::Some(1)),
-                UserBounds::new(Side::Some(2), Side::Some(2))
+                UserBounds::from_str("1").unwrap(),
+                UserBounds::from_str("2").unwrap()
             ],
         );
 
         assert_eq!(
-            UserBounds::new(Side::Continue, Side::Continue).unpack(2),
+            UserBounds::from_str("1:-1").unwrap().unpack(2),
             vec![
-                UserBounds::new(Side::Some(1), Side::Some(1)),
-                UserBounds::new(Side::Some(2), Side::Some(2))
+                UserBounds::from_str("1").unwrap(),
+                UserBounds::from_str("2").unwrap()
             ],
         );
 
         assert_eq!(
-            UserBounds::new(Side::Some(-1), Side::Continue).unpack(2),
-            vec![UserBounds::new(Side::Some(2), Side::Some(2)),],
+            UserBounds::from_str("-1:").unwrap().unpack(2),
+            vec![UserBounds::from_str("2").unwrap()],
         );
 
         assert_eq!(
-            UserBounds::new(Side::Continue, Side::Some(-1)).unpack(2),
+            UserBounds::from_str(":-1").unwrap().unpack(2),
             vec![
-                UserBounds::new(Side::Some(1), Side::Some(1)),
-                UserBounds::new(Side::Some(2), Side::Some(2))
+                UserBounds::from_str("1").unwrap(),
+                UserBounds::from_str("2").unwrap()
             ],
         );
 
         assert_eq!(
-            UserBounds::new(Side::Some(-2), Side::Some(-1)).unpack(2),
+            UserBounds::from_str("-2:-1").unwrap().unpack(2),
             vec![
-                UserBounds::new(Side::Some(1), Side::Some(1)),
-                UserBounds::new(Side::Some(2), Side::Some(2))
+                UserBounds::from_str("1").unwrap(),
+                UserBounds::from_str("2").unwrap()
             ],
         );
     }
@@ -513,26 +530,20 @@ mod tests {
     #[test]
     fn test_complement_bound() {
         assert_eq!(
-            UserBounds::new(Side::Some(1), Side::Some(1))
-                .complement(2)
-                .unwrap(),
-            vec![UserBounds::new(Side::Some(2), Side::Some(2))],
+            UserBounds::from_str("1:1").unwrap().complement(2).unwrap(),
+            vec![UserBounds::from_str("2:2").unwrap()],
         );
 
         assert_eq!(
-            UserBounds::new(Side::Some(1), Side::Continue)
-                .complement(2)
-                .unwrap(),
+            UserBounds::from_str("1:").unwrap().complement(2).unwrap(),
             Vec::new(),
         );
 
         assert_eq!(
-            UserBounds::new(Side::Some(-3), Side::Some(3))
-                .complement(4)
-                .unwrap(),
+            UserBounds::from_str("-3:3").unwrap().complement(4).unwrap(),
             vec![
-                UserBounds::new(Side::Some(1), Side::Some(1)),
-                UserBounds::new(Side::Some(4), Side::Some(4)),
+                UserBounds::from_str("1:1").unwrap(),
+                UserBounds::from_str("4:4").unwrap(),
             ],
         );
     }

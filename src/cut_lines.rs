@@ -12,11 +12,11 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
     opt: &Opt,
 ) -> Result<()> {
     let mut line_buf = String::with_capacity(1024);
-    let mut line_idx = 0;
+    let mut line_idx = usize::MAX;
     let mut bounds_idx = 0; // keep track of which bounds have been used
     let mut add_newline_next = false;
     while let Some(line) = read_line_with_eol(stdin, &mut line_buf, opt.eol) {
-        line_idx += 1;
+        line_idx = line_idx.wrapping_add(1); // use wrapping add so we can start at 0
 
         let line = line?;
         let line: &str = line.as_ref();
@@ -50,7 +50,7 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
                 stdout.write_all(line.as_bytes())?;
                 add_newline_next = true;
 
-                if b.r == Side::Some(line_idx) {
+                if b.r().value_unchecked() == line_idx {
                     // we exhausted the use of that bound, move on
                     bounds_idx += 1;
                     add_newline_next = false;
@@ -75,7 +75,8 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
 
     // Output is finished. Did we output every bound?
     if let Some(BoundOrFiller::Bound(b)) = opt.bounds.get(bounds_idx)
-        && b.r != Side::Continue
+    // we can ignore the sign because this is forward only
+        && b.r().value_unchecked() != Side::max_right()
     {
         // not good, we still have bounds to print but the input is exhausted
         bail!("Out of bounds: {}", b);

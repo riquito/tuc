@@ -41,7 +41,7 @@ fn cut_str_fast_lane<W: Write>(
 
     let bounds = &opt.bounds;
 
-    let mut curr_field = 0;
+    let mut curr_field = usize::MAX;
 
     fields.clear();
 
@@ -49,27 +49,31 @@ fn cut_str_fast_lane<W: Write>(
     fields.push(0);
 
     for i in memchr::memchr_iter(opt.delimiter, buffer) {
-        curr_field += 1;
+        curr_field = curr_field.wrapping_add(1);
 
         fields.push(i + 1);
 
-        if Side::Some(curr_field) == last_interesting_field {
+        if curr_field == last_interesting_field.value_unchecked() {
             // We have no use for any other fields in this line
             break;
         }
     }
 
-    if curr_field == 0 && opt.only_delimited {
+    if curr_field == usize::MAX && opt.only_delimited {
         // The delimiter was not found
         return Ok(());
     }
 
-    if Side::Some(curr_field) != last_interesting_field {
-        // We reached the end of the line. Who knows, maybe
-        // the user is interested in this field too.
+    if last_interesting_field.value_unchecked() == Side::max_right()
+        || curr_field != last_interesting_field.value_unchecked()
+    {
+        // We reached the end of the line but didn't find
+        // every field the user wanted. Maybe they want
+        // this one too.
 
-        // We add a fake start (+1 because we account for the fake delimiter)
-        // This allows us to avoid one if/else in the output loop
+        // We add the start of a fake extra field
+        // (a field that start right after the end of the line)
+        // to simplify our loop later
         fields.push(buffer.len() + 1);
     }
 
@@ -106,8 +110,8 @@ fn output_parts<W: Write>(
         let idx_start = fields[r.start];
         let idx_end = fields[r.end] - 1;
         &line[idx_start..idx_end]
-    } else if b.fallback_oob.is_some() {
-        b.fallback_oob.as_ref().unwrap()
+    } else if b.fallback_oob().is_some() {
+        b.fallback_oob().as_ref().unwrap()
     } else if let Some(generic_fallback) = opt.fallback_oob {
         generic_fallback
     } else {
@@ -117,7 +121,7 @@ fn output_parts<W: Write>(
     let field_to_print = output;
     stdout.write_all(field_to_print)?;
 
-    if opt.join && !b.is_last {
+    if opt.join && !b.is_last() {
         stdout.write_all(&[opt.delimiter])?;
     }
 

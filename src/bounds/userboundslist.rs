@@ -24,7 +24,7 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
     fn from(list: Vec<BoundOrFiller>) -> Self {
         let mut ubl = UserBoundsList {
             list,
-            last_interesting_field: Side::Continue,
+            last_interesting_field: Side::with_pos_inf(),
         };
 
         let mut rightmost_bound: Option<Side> = None;
@@ -34,8 +34,8 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
 
         ubl.list.iter_mut().for_each(|bof| {
             if let BoundOrFiller::Bound(b) = bof {
-                if rightmost_bound.is_none() || b.r > rightmost_bound.unwrap() {
-                    rightmost_bound = Some(b.r);
+                if rightmost_bound.is_none() || *b.r() > rightmost_bound.unwrap() {
+                    rightmost_bound = Some(*b.r());
                 }
 
                 last_bound = Some(b);
@@ -48,9 +48,11 @@ impl From<Vec<BoundOrFiller>> for UserBoundsList {
 
         last_bound
             .expect("UserBoundsList must contain at least one UserBounds")
-            .is_last = true;
+            .set_is_last(true);
 
-        ubl.last_interesting_field = rightmost_bound.unwrap_or(Side::Continue);
+        ubl.last_interesting_field = rightmost_bound
+            .and_then(|x| if x.is_negative() { None } else { Some(x) })
+            .unwrap_or(Side::with_pos_inf());
         ubl
     }
 }
@@ -73,20 +75,16 @@ impl UserBoundsList {
         let mut has_positive_idx = false;
         let mut has_negative_idx = false;
         self.get_userbounds_only().for_each(|b| {
-            if let Side::Some(left) = b.l {
-                if left.is_positive() {
-                    has_positive_idx = true;
-                } else {
-                    has_negative_idx = true;
-                }
+            if b.l().is_negative() {
+                has_negative_idx = true;
+            } else {
+                has_positive_idx = true;
             }
 
-            if let Side::Some(right) = b.r {
-                if right.is_positive() {
-                    has_positive_idx = true;
-                } else {
-                    has_negative_idx = true;
-                }
+            if b.r().is_negative() {
+                has_negative_idx = true;
+            } else {
+                has_positive_idx = true;
             }
         });
 
@@ -114,19 +112,8 @@ impl UserBoundsList {
     }
 
     fn has_negative_indices(&self) -> bool {
-        self.get_userbounds_only().any(|b| {
-            if let Side::Some(left) = b.l
-                && left.is_negative()
-            {
-                true
-            } else if let Side::Some(right) = b.r
-                && right.is_negative()
-            {
-                true
-            } else {
-                false
-            }
-        })
+        self.get_userbounds_only()
+            .any(|b| b.l().is_negative() || b.r().is_negative())
     }
 
     /// Check if the bounds in the list match the following conditions:
@@ -279,6 +266,14 @@ pub fn parse_bounds_list(s: &str) -> Result<Vec<BoundOrFiller>> {
 mod tests {
     use super::*;
 
+    fn side_pos(l: usize) -> Side {
+        Side::with_pos_value(l)
+    }
+
+    fn side_neg(l: usize) -> Side {
+        Side::with_neg_value(l)
+    }
+
     #[test]
     fn test_parse_bounds_list() {
         // do not replicate tests from test_user_bounds_from_str, focus on
@@ -319,8 +314,8 @@ mod tests {
         assert_eq!(
             parse_bounds_list("1").unwrap(),
             vec![BoundOrFiller::Bound(UserBounds::new(
-                Side::Some(1),
-                Side::Some(1)
+                side_pos(0),
+                side_pos(0)
             ))],
         );
 
@@ -332,40 +327,40 @@ mod tests {
         assert_eq!(
             parse_bounds_list("1,2").unwrap(),
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(0))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(1), side_pos(1))),
             ],
         );
 
         assert_eq!(
             parse_bounds_list("-1,1").unwrap(),
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(-1), Side::Some(-1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new(side_neg(0), side_neg(0))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(0))),
             ],
         );
 
         assert_eq!(
             parse_bounds_list("{1}").unwrap(),
             vec![BoundOrFiller::Bound(UserBounds::new(
-                Side::Some(1),
-                Side::Some(1)
+                side_pos(0),
+                side_pos(0)
             ))],
         );
 
         assert_eq!(
             parse_bounds_list("{1:2}").unwrap(),
             vec![BoundOrFiller::Bound(UserBounds::new(
-                Side::Some(1),
-                Side::Some(2)
+                side_pos(0),
+                side_pos(1)
             ))],
         );
 
         assert_eq!(
             parse_bounds_list("{1,2}").unwrap(),
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2)))
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(0))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(1), side_pos(1)))
             ],
         );
 
@@ -373,8 +368,8 @@ mod tests {
             parse_bounds_list("hello {1,2} {{world}}").unwrap(),
             vec![
                 BoundOrFiller::Filler("hello ".into()),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(0))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(1), side_pos(1))),
                 BoundOrFiller::Filler(" {world}".into()),
             ],
         );
@@ -382,9 +377,9 @@ mod tests {
         assert_eq!(
             parse_bounds_list("{1}😎{2}").unwrap(),
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(0))),
                 BoundOrFiller::Filler("😎".into()),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2)))
+                BoundOrFiller::Bound(UserBounds::new(side_pos(1), side_pos(1)))
             ],
         );
 
@@ -392,8 +387,8 @@ mod tests {
             parse_bounds_list("\\n\\t{{}}{1,2}\\n\\t{{}}").unwrap(),
             vec![
                 BoundOrFiller::Filler("\n\t{}".into()),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(0))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(1), side_pos(1))),
                 BoundOrFiller::Filler("\n\t{}".into()),
             ],
         );
@@ -459,11 +454,11 @@ mod tests {
                 .unpack(4)
                 .list,
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(3), Side::Some(3))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(4), Side::Some(4))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(0))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(0))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(1), side_pos(1))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(2), side_pos(2))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(3), side_pos(3))),
             ]
         );
 
@@ -471,8 +466,8 @@ mod tests {
             UserBoundsList::from_str("a{1:2}b").unwrap().unpack(4).list,
             vec![
                 BoundOrFiller::Filler("a".into()),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(2), Side::Some(2))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(0))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(1), side_pos(1))),
                 BoundOrFiller::Filler("b".into()),
             ]
         );
@@ -487,13 +482,13 @@ mod tests {
                 .unwrap()
                 .list,
             vec![
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(3), Side::Some(6))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(1))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(4), Side::Some(6))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(4))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(6), Side::Some(6))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(1), Side::Some(4))),
-                BoundOrFiller::Bound(UserBounds::new(Side::Some(6), Side::Some(6))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(2), side_pos(5))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(0))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(3), side_pos(5))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(3))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(5), side_pos(5))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(0), side_pos(3))),
+                BoundOrFiller::Bound(UserBounds::new(side_pos(5), side_pos(5))),
             ]
         );
 
