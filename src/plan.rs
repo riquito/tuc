@@ -122,7 +122,7 @@ where
     }
     #[inline(always)]
     fn get_field_bound(&self, side_val: &Side) -> Result<&Range<usize>> {
-        let is_negative = side_val.is_negative();
+        let (is_negative, index) = side_val.value();
 
         let fields = if is_negative {
             &self.negative_fields
@@ -130,17 +130,13 @@ where
             &self.positive_fields
         };
 
-        let index = side_val.value_unchecked();
+        let field = fields
+            .get(index)
+            .ok_or_else(|| anyhow::anyhow!("Out of bounds: {}", side_val))?;
 
-        if index >= fields.len() {
-            return Err(anyhow::anyhow!("Out of bounds: {}", side_val));
-        }
-
-        if let Some(field) = fields.get(index)
         // Field can start at max_right when the fields
-        // array is initialized that way.
-         && field.start != Side::max_right()
-        {
+        // vector is still using max_right as a placeholder.
+        if field.start != Side::max_right() {
             Ok(field)
         } else {
             Err(anyhow::anyhow!("Out of bounds: {}", side_val))
