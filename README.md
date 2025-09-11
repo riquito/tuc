@@ -16,7 +16,7 @@ Download one of the [prebuilt binaries](https://github.com/riquito/tuc/releases)
 or run
 
 ```sh
-# requires rustc >= 1.61.0
+# requires rustc >= 1.85.0
 cargo install tuc # append `--no-default-features` for a smaller binary with no regex support
 ```
 
@@ -33,7 +33,7 @@ No time to install it? Play with a webassembly version online, the [tuc playgrou
 ## Help
 
 ```
-tuc 1.2.0
+tuc 1.3.0
 Cut text (or bytes) where a delimiter matches, then keep the desired parts.
 
 USAGE:
