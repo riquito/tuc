@@ -254,6 +254,46 @@ Heartfelt thanks to package maintainers: you make it easy to access open source 
   sudo port install tuc
   ```
 
+## Benchmarks
+
+### Single char delimiter
+
+| Command                                                                  |       Mean [s] | Min [s] | Max [s] |     Relative |
+| :----------------------------------------------------------------------- | -------------: | ------: | ------: | -----------: |
+| `./target/release/tuc -d , -f 1,8,19 tmp/data.csv > /dev/null`           |  1.080 ± 0.012 |   1.071 |   1.101 |         1.00 |
+| `./target/release/tuc -d , -f 1,8,19 --no-mmap tmp/data.csv > /dev/null` |  1.230 ± 0.004 |   1.225 |   1.236 |  1.14 ± 0.01 |
+| `hck -Ld, -f1,8,19 tmp/data.csv > /dev/null`                             |  1.276 ± 0.004 |   1.272 |   1.282 |  1.18 ± 0.01 |
+| `hck -Ld, -f1,8,19 --no-mmap tmp/data.csv > /dev/null`                   |  1.364 ± 0.003 |   1.360 |   1.368 |  1.26 ± 0.01 |
+| `coreutils cut -d , -f 1,8,19 tmp/data.csv > /dev/null`                  |  1.764 ± 0.008 |   1.756 |   1.774 |  1.63 ± 0.02 |
+| `hck -d, -f1,8,19  tmp/data.csv > /dev/null`                             |  2.006 ± 0.006 |   1.998 |   2.014 |  1.86 ± 0.02 |
+| `hck -d, -f1,8,19  --no-mmap tmp/data.csv > /dev/null`                   |  2.130 ± 0.062 |   2.096 |   2.241 |  1.97 ± 0.06 |
+| `choose -f , -i tmp/data.csv 0 7 18 > /dev/null`                         |  4.347 ± 0.014 |   4.329 |   4.365 |  4.03 ± 0.05 |
+| `cut -d, -f1,8,19 tmp/data.csv > /dev/null`                              |  5.726 ± 0.012 |   5.712 |   5.742 |  5.30 ± 0.06 |
+| `awk -F, '{print $1, $8, $19}' tmp/data.csv > /dev/null`                 | 35.852 ± 0.121 |  35.683 |  36.006 | 33.20 ± 0.39 |
+
+### Multi chars delimiter
+
+| Command                                                                                 |       Mean [s] | Min [s] | Max [s] |     Relative |
+| :-------------------------------------------------------------------------------------- | -------------: | ------: | ------: | -----------: |
+| `./target/release/tuc -d'   ' -f 1,8,19 ./tmp/data-multichar.txt > /dev/null`           |  1.464 ± 0.016 |   1.443 |   1.489 |         1.00 |
+| `./target/release/tuc -d'   ' -f 1,8,19 --no-mmap ./tmp/data-multichar.txt > /dev/null` |  1.541 ± 0.009 |   1.531 |   1.554 |  1.05 ± 0.01 |
+| `hck -Ld'   ' -f1,8,19 ./tmp/data-multichar.txt > /dev/null`                            |  1.640 ± 0.010 |   1.627 |   1.654 |  1.12 ± 0.01 |
+| `hck -Ld'   ' -f1,8,19 --no-mmap ./tmp/data-multichar.txt > /dev/null`                  |  1.697 ± 0.007 |   1.688 |   1.705 |  1.16 ± 0.01 |
+| `hck -d'   ' -f1,8,19 ./tmp/data-multichar.txt > /dev/null`                             |  2.191 ± 0.005 |   2.185 |   2.197 |  1.50 ± 0.02 |
+| `hck -d'   ' --no-mmap -f1,8,19 ./tmp/data-multichar.txt > /dev/null`                   |  2.252 ± 0.019 |   2.225 |   2.277 |  1.54 ± 0.02 |
+| `choose -f '   ' -i ./tmp/data-multichar.txt 0 7 18  > /dev/null`                       |  4.414 ± 0.036 |   4.371 |   4.470 |  3.02 ± 0.04 |
+| `< ./tmp/data-multichar.txt tr -s ' ' \| hck -Ld' ' -f1,8,19 > /dev/null`               |  5.266 ± 0.042 |   5.210 |   5.327 |  3.60 ± 0.05 |
+| `< ./tmp/data-multichar.txt tr -s ' ' \| cut -d ' ' -f1,8,19 > /dev/null`               |  5.310 ± 0.044 |   5.260 |   5.355 |  3.63 ± 0.05 |
+| `awk -F' ' '{print $1, $8 $19}' ./tmp/data-multichar.txt > /dev/null`                   |  6.015 ± 0.063 |   5.942 |   6.105 |  4.11 ± 0.06 |
+| `hck -d'\s+' -f1,8,19 ./tmp/data-multichar.txt > /dev/null`                             |  9.834 ± 0.049 |   9.749 |   9.872 |  6.72 ± 0.08 |
+| `./target/release/tuc -e'\s+' -f 1,8,19 ./tmp/data-multichar.txt > /dev/null`           |  9.870 ± 0.056 |   9.801 |   9.940 |  6.74 ± 0.08 |
+| `hck -d'\s+' -f1,8,19 --no-mmap ./tmp/data-multichar.txt > /dev/null`                   |  9.876 ± 0.043 |   9.824 |   9.934 |  6.75 ± 0.08 |
+| `./target/release/tuc -e'\s+' -f 1,8,19 --no-mmap ./tmp/data-multichar.txt > /dev/null` | 10.009 ± 0.066 |   9.956 |  10.118 |  6.84 ± 0.09 |
+| `choose -f '[[:space:]]' -i ./tmp/data-multichar.txt 0 7 18  > /dev/null`               | 13.373 ± 0.398 |  13.022 |  13.829 |  9.13 ± 0.29 |
+| `awk -F'[:space:]+' '{print $1, $8, $19}' ./tmp/data-multichar.txt > /dev/null`         | 13.927 ± 0.233 |  13.672 |  14.298 |  9.51 ± 0.19 |
+| `awk -F'   ' '{print $1, $8, $19}' ./tmp/data-multichar.txt > /dev/null`                | 14.471 ± 0.297 |  14.313 |  14.999 |  9.88 ± 0.23 |
+| `choose -f '\s' -i ./tmp/data-multichar.txt 0 7 18  > /dev/null`                        | 26.576 ± 0.232 |  26.328 |  26.846 | 18.15 ± 0.26 |
+
 ## LICENSE
 
 Tuc is distributed under the GNU GPL license (version 3 or any later version).
