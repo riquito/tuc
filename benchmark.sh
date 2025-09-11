@@ -50,6 +50,18 @@ hyperfine --warmup 3 -m 5 --export-markdown single_char.md --show-output \
      "awk -F, '{print \$1, \$8, \$19}' tmp/data.csv > /dev/null" \
      'cut -d, -f1,8,19 tmp/data.csv > /dev/null'
 
+hyperfine --warmup 3 -m 5 --export-markdown single_char_non_sequential.md --show-output \
+     './target/release/tuc -d , -f 1,19,8 tmp/data.csv > /dev/null' \
+     './target/release/tuc -d , -f 1,19,8 --no-mmap tmp/data.csv > /dev/null' \
+     'hck -Ld, -f1,19,8 tmp/data.csv > /dev/null' \
+     'hck -Ld, -f1,19,8 --no-mmap tmp/data.csv > /dev/null' \
+     'hck -d, -f1,19,8  tmp/data.csv > /dev/null' \
+     'hck -d, -f1,19,8  --no-mmap tmp/data.csv > /dev/null' \
+     'coreutils cut -d , -f 1,19,8 tmp/data.csv > /dev/null' \
+     'choose -f ',' -i tmp/data.csv 0 18 7 > /dev/null' \
+     "awk -F, '{print \$1, \$19, \$8}' tmp/data.csv > /dev/null" \
+     'cut -d, -f1,19,8 tmp/data.csv > /dev/null'
+
 ./target/release/tuc -d, -f1: -r '   ' ./tmp/data.csv > ./tmp/data-multichar.txt
 sed -i 's/# label/#label/' ./tmp/data-multichar.txt
 

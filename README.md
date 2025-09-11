@@ -256,7 +256,10 @@ Heartfelt thanks to package maintainers: you make it easy to access open source 
 
 ## Benchmarks
 
-### Single char delimiter
+Benchmarks results will vary depending on the machine.
+You can run them yourself using `./benchmark.sh`.
+
+### Single char delimiter (sequential fields)
 
 | Command                                                                  |       Mean [s] | Min [s] | Max [s] |     Relative |
 | :----------------------------------------------------------------------- | -------------: | ------: | ------: | -----------: |
@@ -264,12 +267,27 @@ Heartfelt thanks to package maintainers: you make it easy to access open source 
 | `./target/release/tuc -d , -f 1,8,19 --no-mmap tmp/data.csv > /dev/null` |  1.230 ± 0.004 |   1.225 |   1.236 |  1.14 ± 0.01 |
 | `hck -Ld, -f1,8,19 tmp/data.csv > /dev/null`                             |  1.276 ± 0.004 |   1.272 |   1.282 |  1.18 ± 0.01 |
 | `hck -Ld, -f1,8,19 --no-mmap tmp/data.csv > /dev/null`                   |  1.364 ± 0.003 |   1.360 |   1.368 |  1.26 ± 0.01 |
-| `coreutils cut -d , -f 1,8,19 tmp/data.csv > /dev/null`                  |  1.764 ± 0.008 |   1.756 |   1.774 |  1.63 ± 0.02 |
+| `uutils/coreutils cut -d , -f 1,8,19 tmp/data.csv > /dev/null`           |  1.764 ± 0.008 |   1.756 |   1.774 |  1.63 ± 0.02 |
 | `hck -d, -f1,8,19  tmp/data.csv > /dev/null`                             |  2.006 ± 0.006 |   1.998 |   2.014 |  1.86 ± 0.02 |
 | `hck -d, -f1,8,19  --no-mmap tmp/data.csv > /dev/null`                   |  2.130 ± 0.062 |   2.096 |   2.241 |  1.97 ± 0.06 |
 | `choose -f , -i tmp/data.csv 0 7 18 > /dev/null`                         |  4.347 ± 0.014 |   4.329 |   4.365 |  4.03 ± 0.05 |
 | `cut -d, -f1,8,19 tmp/data.csv > /dev/null`                              |  5.726 ± 0.012 |   5.712 |   5.742 |  5.30 ± 0.06 |
 | `awk -F, '{print $1, $8, $19}' tmp/data.csv > /dev/null`                 | 35.852 ± 0.121 |  35.683 |  36.006 | 33.20 ± 0.39 |
+
+### Single char delimiter (non sequential fields)
+
+| Command                                                                  |       Mean [s] | Min [s] | Max [s] |     Relative |
+| :----------------------------------------------------------------------- | -------------: | ------: | ------: | -----------: |
+| `./target/release/tuc -d , -f 1,19,8 tmp/data.csv > /dev/null`           |  1.093 ± 0.006 |   1.082 |   1.097 |         1.00 |
+| `./target/release/tuc -d , -f 1,19,8 --no-mmap tmp/data.csv > /dev/null` |  1.231 ± 0.004 |   1.226 |   1.235 |  1.13 ± 0.01 |
+| `hck -Ld, -f1,19,8 tmp/data.csv > /dev/null`                             |  1.465 ± 0.006 |   1.457 |   1.473 |  1.34 ± 0.01 |
+| `hck -Ld, -f1,19,8 --no-mmap tmp/data.csv > /dev/null`                   |  1.568 ± 0.003 |   1.565 |   1.572 |  1.43 ± 0.01 |
+| `uutils/coreutils cut -d , -f 1,19,8 tmp/data.csv > /dev/null`           |  1.769 ± 0.006 |   1.763 |   1.779 |  1.62 ± 0.01 |
+| `hck -d, -f1,19,8  tmp/data.csv > /dev/null`                             |  2.012 ± 0.004 |   2.008 |   2.016 |  1.84 ± 0.01 |
+| `hck -d, -f1,19,8  --no-mmap tmp/data.csv > /dev/null`                   |  2.112 ± 0.007 |   2.104 |   2.120 |  1.93 ± 0.01 |
+| `choose -f , -i tmp/data.csv 0 18 7 > /dev/null`                         |  4.412 ± 0.105 |   4.320 |   4.577 |  4.04 ± 0.10 |
+| `cut -d, -f1,19,8 tmp/data.csv > /dev/null`                              |  5.723 ± 0.005 |   5.718 |   5.728 |  5.24 ± 0.03 |
+| `awk -F, '{print $1, $19, $8}' tmp/data.csv > /dev/null`                 | 36.106 ± 0.320 |  35.699 |  36.514 | 33.04 ± 0.34 |
 
 ### Multi chars delimiter
 
