@@ -243,6 +243,11 @@ Heartfelt thanks to package maintainers: you make it easy to access open source 
   yay -S tuc-bin # install pre-built binaries tuc and tuc-regex
   ```
 
+- [openSUSE Tumbleweed](https://build.opensuse.org/package/show/openSUSE:Factory/tuc):
+  ```sh
+  sudo zypper install tuc
+  ```
+
 - [Brew](https://formulae.brew.sh/formula/tuc):
 
   ```sh
