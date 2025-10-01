@@ -17,7 +17,7 @@ categories = ["command-line-utilities"]
 anyhow = "1.0.99"
 bstr = "1.12.0"
 itertools = "0.14.0"
-memchr = "2.7.5"
+memchr = "2.7.6"
 memmap2 = "0.9.8"
 pico-args = { version = "0.5.0", features = ["short-space-opt", "combined-flags", "eq-separator"] }
 regex = { version = "1.11", optional = true }
