@@ -20,7 +20,7 @@ itertools = "0.14.0"
 memchr = "2.7.6"
 memmap2 = "0.9.9"
 pico-args = { version = "0.5.0", features = ["short-space-opt", "combined-flags", "eq-separator"] }
-regex = { version = "1.11", optional = true }
+regex = { version = "1.12", optional = true }
 serde_json = "1.0.145"
 
 [features]
