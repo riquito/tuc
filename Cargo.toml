@@ -16,7 +16,6 @@ categories = ["command-line-utilities"]
 [dependencies]
 anyhow = "1.0.100"
 bstr = "1.12.1"
-itertools = "0.14.0"
 memchr = "2.7.6"
 memmap2 = "0.9.9"
 pico-args = { version = "0.5.0", features = ["short-space-opt", "combined-flags", "eq-separator"] }
