@@ -87,11 +87,8 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
     Ok(())
 }
 
-fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> Result<()> {
-    unsafe {
-        let mutable_ptr = opt as *const Opt as *mut Opt;
-        (*mutable_ptr).read_to_end = true;
-    }
+fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &mut Opt) -> Result<()> {
+    opt.read_to_end = true;
 
     // Just use read_and_cut_str, we're cutting a (big) string whose delimiter is newline
     read_and_cut_str(stdin, stdout, opt)?;
@@ -102,7 +99,7 @@ fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> 
 pub fn read_and_cut_lines<A: BufRead, B: Write>(
     stdin: &mut A,
     stdout: &mut B,
-    opt: &Opt,
+    opt: &mut Opt,
 ) -> Result<()> {
     // If bounds cut from left to right and do not internally overlap
     // (e.g. 1:2,2,4:5,8) then we can use a streaming algorithm and avoid
@@ -232,7 +229,7 @@ mod tests {
 
         let mut input = b"a\nb".as_slice();
         let mut output = Vec::with_capacity(100);
-        cut_lines(&mut input, &mut output, &opt).unwrap();
+        cut_lines(&mut input, &mut output, &mut opt).unwrap();
         assert_eq!(output, b"b\n");
     }
 
@@ -246,11 +243,11 @@ mod tests {
         let mut output = Vec::new();
 
         output.clear();
-        let res = cut_lines(&mut input1, &mut output, &opt);
+        let res = cut_lines(&mut input1, &mut output, &mut opt);
         assert_eq!(res.unwrap_err().to_string(), "Out of bounds: 3");
 
         output.clear();
-        let res = cut_lines(&mut input2, &mut output, &opt);
+        let res = cut_lines(&mut input2, &mut output, &mut opt);
         assert_eq!(res.unwrap_err().to_string(), "Out of bounds: 3");
     }
 
@@ -264,11 +261,11 @@ mod tests {
         let mut output = Vec::new();
 
         output.clear();
-        cut_lines(&mut input1, &mut output, &opt).unwrap();
+        cut_lines(&mut input1, &mut output, &mut opt).unwrap();
         assert_eq!(output, b"b\n");
 
         output.clear();
-        cut_lines(&mut input2, &mut output, &opt).unwrap();
+        cut_lines(&mut input2, &mut output, &mut opt).unwrap();
         assert_eq!(output, b"b\n");
     }
 
@@ -294,7 +291,7 @@ mod tests {
 
         let mut input = b"a\0b".as_slice();
         let mut output = Vec::new();
-        cut_lines(&mut input, &mut output, &opt).unwrap();
+        cut_lines(&mut input, &mut output, &mut opt).unwrap();
         assert_eq!(output, b"a\0");
     }
 
@@ -304,11 +301,11 @@ mod tests {
         // preserve the original delimiters in its output
         // (in particular when outputting a range), instead
         // "compress" first merge the delimiters, then cut.
-        let opt: Opt = "-l 1:2 -p".parse().unwrap();
+        let mut opt: Opt = "-l 1:2 -p".parse().unwrap();
 
         let mut input = b"a\n\nb".as_slice();
         let mut output = Vec::with_capacity(100);
-        cut_lines(&mut input, &mut output, &opt).unwrap();
+        cut_lines(&mut input, &mut output, &mut opt).unwrap();
         assert_eq!(output, b"a\nb\n");
     }
 }

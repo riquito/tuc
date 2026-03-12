@@ -68,7 +68,7 @@ fn run() -> Result<()> {
     }
 
     let args = maybe_args.expect("We already handled the possible errors");
-    let opt: Opt = args
+    let mut opt: Opt = args
         .try_into()
         .map_err(|e| {
             eprintln!("{}", e);
@@ -119,7 +119,7 @@ fn run() -> Result<()> {
     if opt.bounds_type == BoundsType::Bytes {
         read_and_cut_bytes(&mut reader, &mut stdout, &opt)?;
     } else if opt.bounds_type == BoundsType::Lines {
-        read_and_cut_lines(&mut reader, &mut stdout, &opt)?;
+        read_and_cut_lines(&mut reader, &mut stdout, &mut opt)?;
     } else if let Ok(fast_opt) = FastOpt::try_from(&opt) {
         read_and_cut_text_as_bytes(&mut reader, &mut stdout, &fast_opt)?;
     } else {
