@@ -17,7 +17,7 @@ categories = ["command-line-utilities"]
 anyhow = "1.0.102"
 bstr = "1.12.1"
 memchr = "2.8.0"
-memmap2 = "0.9.9"
+memmap2 = "0.9.10"
 pico-args = { version = "0.5.0", features = ["short-space-opt", "combined-flags", "eq-separator"] }
 regex = { version = "1.12", optional = true }
 serde_json = "1.0.148"
