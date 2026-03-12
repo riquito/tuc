@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [unreleased]
 
+- fix: removed unnecessary unsafe usage around cut_lines
 - fix: properly use --fixed-memory custom value if present
 - chore: removed unnecessary itertools dependency
 
