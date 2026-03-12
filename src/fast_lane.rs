@@ -28,8 +28,8 @@ fn cut_str_fast_lane<W: Write>(
 ) -> Result<()> {
     let mut buffer = initial_buffer;
 
-    if opt.trim.is_some() {
-        buffer = trim(buffer, opt.trim.as_ref().unwrap(), opt.delimiter)
+    if let Some(trim_value) = opt.trim {
+        buffer = trim(buffer, &trim_value, opt.delimiter)
     }
 
     if buffer.is_empty() {

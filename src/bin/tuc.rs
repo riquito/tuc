@@ -83,8 +83,8 @@ fn run() -> Result<()> {
     let mut file_reader;
     let mut stdin;
 
-    let mut reader: &mut dyn std::io::BufRead = if opt.path.is_some() {
-        let file = std::fs::File::open(opt.path.as_ref().unwrap()).map_err(|e| {
+    let mut reader: &mut dyn std::io::BufRead = if let Some(path_buf) = opt.path.as_ref() {
+        let file = std::fs::File::open(path_buf).map_err(|e| {
             let path = opt.path.as_ref().unwrap();
             anyhow::anyhow!("{}.\nWas attempting to read {:?}", e, &path)
         })?;
