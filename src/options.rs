@@ -260,7 +260,7 @@ impl TryFrom<args::Args> for Opt {
             return Err(OptError::FixedMemoryZero);
         };
 
-        // convert from kilobytes to megabytes
+        // convert from kilobytes to bytes
         let fixed_memory = value.fixed_memory_kb.map(|x| x * 1024);
 
         if value.join_yes && value.join_no {
