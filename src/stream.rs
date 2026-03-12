@@ -113,7 +113,7 @@ impl TryFrom<&Opt> for StreamOpt {
 
     fn try_from(value: &Opt) -> Result<Self, Self::Error> {
         if value.delimiter.as_bytes().len() != 1 {
-            return Err("Delimiter must be 1 byte wide for FastOpt");
+            return Err("Delimiter must be 1 byte wide for StreamOpt");
         }
 
         if value.complement
