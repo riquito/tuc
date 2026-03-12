@@ -133,10 +133,10 @@ where
     let mut line = line;
 
     if let Some(trim_kind) = opt.trim {
-        if opt.regex_bag.is_some() {
+        if let Some(regex_bag) = opt.regex_bag.as_ref() {
             #[cfg(feature = "regex")]
             {
-                line = trim_regex(line, &trim_kind, &opt.regex_bag.as_ref().unwrap().greedy);
+                line = trim_regex(line, &trim_kind, &regex_bag.greedy);
             }
         } else {
             line = trim(line, &trim_kind, &opt.delimiter);
@@ -154,15 +154,13 @@ where
     let line_holder: std::borrow::Cow<[u8]>;
 
     if opt.compress_delimiter {
-        if opt.regex_bag.is_some() && cfg!(feature = "regex") {
+        if let Some(regex_bag) = opt.regex_bag.as_ref()
+            && cfg!(feature = "regex")
+        {
             #[cfg(feature = "regex")]
             {
                 let delimiter = opt.replace_delimiter.as_ref().unwrap(); // we checked earlier the invariant
-                line_holder = compress_delimiter_with_regex(
-                    line,
-                    &opt.regex_bag.as_ref().unwrap().greedy,
-                    delimiter,
-                );
+                line_holder = compress_delimiter_with_regex(line, &regex_bag.greedy, delimiter);
                 line = &line_holder;
             }
         } else {
@@ -305,20 +303,21 @@ pub fn read_and_cut_str<B: BufRead, W: Write>(
     #[cfg(not(feature = "regex"))]
     let maybe_regex: Option<()> = None;
 
-    if should_compress_delimiter && maybe_regex.is_some() && opt.replace_delimiter.is_some() {
+    if should_compress_delimiter
+        && maybe_regex.is_some()
+        && let Some(replace_delimiter) = opt.replace_delimiter.as_ref()
+    {
         // Special case: compressed delimiter + regex + delimiter replacement.
         // We setup now the search plan, taking into account that when we start searching
         // for the delimiter it will have been already replaced (so we won't use
         // the regex to search for the original delimiter, we will do a fixed-string search
         // for the new delimiter).
-        let replace_delimiter = opt.replace_delimiter.as_ref().unwrap();
         let mut plan = FieldPlan::from_opt_fixed_with_custom_delimiter(opt, replace_delimiter)?;
 
         process_lines_with_plan(stdin, stdout, opt, &mut compressed_line_buf, &mut plan)
-    } else if maybe_regex.is_some() {
+    } else if let Some(regex) = maybe_regex {
         #[cfg(feature = "regex")]
         {
-            let regex = maybe_regex.unwrap();
             let trim_empty = opt.bounds_type == BoundsType::Characters;
             let mut plan = FieldPlan::from_opt_regex(opt, regex.clone(), trim_empty)?;
             process_lines_with_plan(stdin, stdout, opt, &mut compressed_line_buf, &mut plan)
