@@ -78,6 +78,11 @@ fn run() -> Result<()> {
 
     let mut stdout = std::io::BufWriter::with_capacity(64 * 1024, std::io::stdout().lock());
 
+    // Set the buffer capacity. If fixed_memory is defined, use that instead
+    // (we will check later that it's being used solely for the stream
+    // algorithm or fail trying).
+    let read_buf_capacity = opt.fixed_memory.unwrap_or(64 * 1024);
+
     let mmap;
     let mut mmap_cursor;
     let mut file_reader;
@@ -94,11 +99,11 @@ fn run() -> Result<()> {
             mmap_cursor = std::io::Cursor::new(&mmap[..]);
             &mut mmap_cursor
         } else {
-            file_reader = std::io::BufReader::with_capacity(64 * 1024, file);
+            file_reader = std::io::BufReader::with_capacity(read_buf_capacity, file);
             &mut file_reader
         }
     } else {
-        stdin = std::io::BufReader::with_capacity(64 * 1024, std::io::stdin().lock());
+        stdin = std::io::BufReader::with_capacity(read_buf_capacity, std::io::stdin().lock());
         &mut stdin
     };
 
