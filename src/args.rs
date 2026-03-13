@@ -96,9 +96,7 @@ pub fn parse_args(args: Vec<OsString>) -> Result<Args, ArgsParseError> {
     let remaining = pargs.finish();
 
     if remaining.len() > 1 {
-        eprintln!("tuc: unexpected arguments: {remaining:?}");
-        eprintln!("Try 'tuc --help' for more information.");
-        std::process::exit(1);
+        return Err(ArgsParseError::UnexpectedArguments(remaining));
     }
 
     let path = remaining
@@ -109,20 +107,16 @@ pub fn parse_args(args: Vec<OsString>) -> Result<Args, ArgsParseError> {
     if let Some(some_path) = path.as_ref() {
         if !some_path.exists() {
             // Last argument should be a path, but if it looks like an option
-            // (e.g. starts with a dash), we print a dedicated error message.
+            // (e.g. starts with a dash), we report it as an unexpected argument.
             if some_path.as_path().to_string_lossy().starts_with("-") {
-                eprintln!("tuc: unexpected arguments: {remaining:?}");
-                eprintln!("Try 'tuc --help' for more information.");
-                std::process::exit(1);
+                return Err(ArgsParseError::UnexpectedArguments(remaining));
             }
 
-            eprintln!("tuc: runtime error. The file {some_path:?} does not exist");
-            std::process::exit(1);
+            return Err(ArgsParseError::FileNotFound(some_path.clone()));
         }
 
         if !some_path.is_file() {
-            eprintln!("tuc: runtime error. The path {some_path:?} is not a file");
-            std::process::exit(1);
+            return Err(ArgsParseError::NotAFile(some_path.clone()));
         }
     }
 
@@ -157,6 +151,9 @@ pub enum ArgsParseError {
     PicoArgs(pico_args::Error),
     HelpRequested,
     VersionRequested,
+    UnexpectedArguments(Vec<OsString>),
+    FileNotFound(PathBuf),
+    NotAFile(PathBuf),
 }
 
 impl std::fmt::Display for ArgsParseError {
@@ -165,6 +162,16 @@ impl std::fmt::Display for ArgsParseError {
             ArgsParseError::PicoArgs(e) => write!(f, "Argument parsing error: {}", e),
             ArgsParseError::HelpRequested => write!(f, "Help requested"),
             ArgsParseError::VersionRequested => write!(f, "Version requested"),
+            ArgsParseError::UnexpectedArguments(args) => {
+                writeln!(f, "tuc: unexpected arguments: {args:?}")?;
+                write!(f, "Try 'tuc --help' for more information.")
+            }
+            ArgsParseError::FileNotFound(path) => {
+                write!(f, "tuc: runtime error. The file {path:?} does not exist")
+            }
+            ArgsParseError::NotAFile(path) => {
+                write!(f, "tuc: runtime error. The path {path:?} is not a file")
+            }
         }
     }
 }
