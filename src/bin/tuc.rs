@@ -60,7 +60,10 @@ fn run() -> Result<()> {
                 println!("tuc {}", env!("CARGO_PKG_VERSION"));
                 std::process::exit(0);
             }
-            args::ArgsParseError::PicoArgs(e) => {
+            e @ (args::ArgsParseError::UnexpectedArguments(_)
+            | args::ArgsParseError::PicoArgs(_)
+            | args::ArgsParseError::FileNotFound(_)
+            | args::ArgsParseError::NotAFile(_)) => {
                 eprintln!("{}", e);
                 std::process::exit(1);
             }
