@@ -30,7 +30,7 @@ fast-lane = []
 #debug-assertions = false
 
 [dev-dependencies]
-assert_cmd = "2.0.17"
+assert_cmd = "2.2.0"
 predicates = { version = "3.1.4",  default-features = false }
 shlex = "1.3"
 
