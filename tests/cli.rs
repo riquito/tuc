@@ -444,6 +444,17 @@ fn it_fails_if_there_are_unknown_arguments() {
 }
 
 #[test]
+fn it_fails_if_option_is_missing_its_value() {
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+    let assert = cmd.args(["-f"]).write_stdin("foobar").assert();
+
+    assert
+        .failure()
+        .stderr("Argument parsing error: the '-f' option doesn't have an associated value\n");
+}
+
+#[test]
 fn it_fails_if_both_join_and_nojoin_are_used_at_once() {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
 
