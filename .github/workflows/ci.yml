@@ -9,7 +9,7 @@ jobs:
     name: Check if safe to merge
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -18,7 +18,7 @@ jobs:
           override: true
           components: clippy, rustfmt
 
-      - uses: Swatinem/rust-cache@v2.8.2
+      - uses: Swatinem/rust-cache@v2.9.1
 
       - uses: actions-rs/cargo@v1
         with:
@@ -65,7 +65,7 @@ jobs:
     steps:
       - name: Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v2.5.0
+        uses: dependabot/fetch-metadata@v3.1.0
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
       - name: Enable auto-merge for Dependabot PRs
